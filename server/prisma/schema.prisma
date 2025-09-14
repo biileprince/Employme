@@ -1,0 +1,255 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                     String          @id @default(cuid())
+  email                  String          @unique
+  password               String
+  firstName              String?
+  lastName               String?
+  imageUrl               String?
+  role                   UserRole        @default(JOB_SEEKER)
+  isActive               Boolean         @default(true)
+  isVerified             Boolean         @default(false)
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+  resetCode              String?
+  resetCodeExpiry        DateTime?
+  verificationCode       String?
+  verificationCodeExpiry DateTime?
+  admin                  Admin?
+  attachments            Attachment[]
+  employer               Employer?
+  jobSeeker              JobSeeker?
+  socialAccounts         SocialAccount[]
+
+  @@map("users")
+}
+
+model SocialAccount {
+  id          String   @id @default(cuid())
+  userId      String
+  provider    String
+  providerId  String
+  email       String?
+  displayName String?
+  photos      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@unique([userId, provider])
+  @@map("social_accounts")
+}
+
+model JobSeeker {
+  id              String           @id @default(cuid())
+  userId          String           @unique
+  firstName       String
+  lastName        String
+  dateOfBirth     DateTime?
+  location        String?
+  bio             String?
+  skills          String[]
+  experience      ExperienceLevel?
+  education       String?
+  cvUrl           String?
+  profileImageUrl String?
+  isProfilePublic Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  countryCode     String?
+  phone           String?
+  applications    Application[]
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  savedJobs       SavedJob[]
+
+  @@map("job_seekers")
+}
+
+model Employer {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  companyName String
+  industry    String?
+  location    String?
+  website     String?
+  description String?
+  logoUrl     String?
+  founded     Int?
+  companySize String?
+  isVerified  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  countryCode String?
+  phone       String?
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobs        Job[]
+
+  @@map("employers")
+}
+
+model Admin {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  firstName String
+  lastName  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("admins")
+}
+
+model Job {
+  id                 String           @id @default(cuid())
+  employerId         String
+  title              String
+  description        String
+  requirements       String[]
+  location           String
+  category           JobCategory      @default(OTHER)
+  isRemote           Boolean          @default(false)
+  jobType            JobType          @default(FULL_TIME)
+  experience         ExperienceLevel?
+  salaryMin          Int?
+  salaryMax          Int?
+  deadline           DateTime?
+  isActive           Boolean          @default(true)
+  isFeatured         Boolean          @default(false)
+  viewCount          Int              @default(0)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  benefits           String[]
+  contactPhone       String?
+  contactCountryCode String?
+  applications       Application[]
+  attachments        Attachment[]
+  employer           Employer         @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  savedJobs          SavedJob[]
+
+  @@map("jobs")
+}
+
+model Application {
+  id          String            @id @default(cuid())
+  jobId       String
+  jobSeekerId String
+  coverLetter String?
+  status      ApplicationStatus @default(PENDING)
+  appliedAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  job         Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  jobSeeker   JobSeeker         @relation(fields: [jobSeekerId], references: [id], onDelete: Cascade)
+  attachments Attachment[]
+
+  @@unique([jobId, jobSeekerId])
+  @@map("applications")
+}
+
+model SavedJob {
+  id          String    @id @default(cuid())
+  jobId       String
+  jobSeekerId String
+  savedAt     DateTime  @default(now())
+  job         Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  jobSeeker   JobSeeker @relation(fields: [jobSeekerId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, jobSeekerId])
+  @@map("saved_jobs")
+}
+
+model Attachment {
+  id            String         @id @default(cuid())
+  filename      String
+  url           String
+  publicId      String?
+  fileType      AttachmentType
+  fileSize      Int?
+  mimeType      String?
+  uploadedBy    String?
+  jobId         String?
+  userId        String?
+  applicationId String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  application   Application?   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  job           Job?           @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user          User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("attachments")
+}
+
+enum UserRole {
+  JOB_SEEKER
+  EMPLOYER
+  ADMIN
+}
+
+enum JobType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERNSHIP
+  FREELANCE
+}
+
+enum ExperienceLevel {
+  ENTRY_LEVEL
+  MID_LEVEL
+  SENIOR_LEVEL
+  EXECUTIVE
+}
+
+enum ApplicationStatus {
+  PENDING
+  REVIEWED
+  SHORTLISTED
+  REJECTED
+  HIRED
+}
+
+enum JobCategory {
+  TECHNOLOGY
+  FINANCE
+  HEALTHCARE
+  EDUCATION
+  MARKETING
+  SALES
+  DESIGN
+  ENGINEERING
+  OPERATIONS
+  HUMAN_RESOURCES
+  LEGAL
+  CUSTOMER_SERVICE
+  MANUFACTURING
+  CONSULTING
+  MEDIA
+  GOVERNMENT
+  NON_PROFIT
+  AGRICULTURE
+  CONSTRUCTION
+  HOSPITALITY
+  TRANSPORTATION
+  RETAIL
+  OTHER
+  REAL_ESTATE
+  TELECOMMUNICATIONS
+}
+
+enum AttachmentType {
+  IMAGE
+  DOCUMENT
+  RESUME
+  COVER_LETTER
+  PORTFOLIO
+  CERTIFICATE
+  OTHER
+}

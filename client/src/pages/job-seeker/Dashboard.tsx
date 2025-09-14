@@ -1,0 +1,343 @@
+import { useAuth } from '../../contexts/AuthContext';
+import { useState, useEffect } from 'react';
+import { Navigate, Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { FiUser, FiBriefcase, FiBookmark, FiTrendingUp, FiEye, FiMapPin } from 'react-icons/fi';
+import { userAPI, jobsAPI } from '../../services/api';
+
+interface DashboardStats {
+  totalJobs: number;
+  savedJobs: number;
+  applications: number;
+  profileViews: number;
+}
+
+interface RecentJob {
+  id: string;
+  title: string;
+  employer: {
+    companyName: string;
+    location?: string;
+  };
+  location: string;
+  createdAt: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  jobType: string;
+}
+
+interface UserProfile {
+  id: string;
+  firstName?: string;
+  lastName?: string;
+  role: string;
+  profile?: Record<string, unknown>;
+}
+
+const Dashboard = () => {
+  const { user, isLoading } = useAuth();
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [stats, setStats] = useState<DashboardStats>({
+    totalJobs: 0,
+    savedJobs: 0,
+    applications: 0,
+    profileViews: 0
+  });
+  const [recentJobs, setRecentJobs] = useState<RecentJob[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      if (!user) return;
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Fetch user profile
+        try {
+          const profileResponse = await userAPI.me();
+          setUserProfile(profileResponse.data.user);
+        } catch (profileError) {
+          console.warn('Failed to fetch user profile:', profileError);
+          // Use auth user data as fallback
+          setUserProfile({
+            id: user.id,
+            firstName: user.firstName || '',
+            lastName: user.lastName || '',
+            role: 'JOB_SEEKER'
+          });
+        }
+
+        // Fetch recent jobs
+        const jobsResponse = await jobsAPI.getAll({ limit: 5 });
+        setRecentJobs(jobsResponse.data.jobs);
+
+        // Set stats with real data
+        setStats({
+          totalJobs: jobsResponse.data.pagination.total,
+          savedJobs: 3, // This would come from saved jobs API
+          applications: 7, // This would come from applications API
+          profileViews: 45 // This would come from profile views API
+        });
+
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        setError('Failed to load dashboard data. Please refresh the page.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (!isLoading && user) {
+      fetchDashboardData();
+    }
+  }, [user, isLoading]);
+
+  if (isLoading || loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-foreground mb-2">Something went wrong</h2>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-GH', {
+      style: 'currency',
+      currency: 'GHS'
+    }).format(amount);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-GH', {
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <motion.h1 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-4xl font-bold text-foreground mb-2"
+          >
+            Welcome back, {userProfile?.firstName || user?.firstName || 'User'}!
+          </motion.h1>
+          <p className="text-muted-foreground text-lg">
+            Here's what's happening with your job search today.
+          </p>
+        </div>
+
+        {/* Stats Cards */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+        >
+          <div className="bg-card border border-border rounded-xl p-6 hover:shadow-lg transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-muted-foreground text-sm">Available Jobs</p>
+                <p className="text-3xl font-bold text-foreground">{stats.totalJobs}</p>
+              </div>
+              <div className="h-12 w-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                <FiBriefcase className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-card border border-border rounded-xl p-6 hover:shadow-lg transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-muted-foreground text-sm">Saved Jobs</p>
+                <p className="text-3xl font-bold text-foreground">{stats.savedJobs}</p>
+              </div>
+              <div className="h-12 w-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
+                <FiBookmark className="h-6 w-6 text-green-600 dark:text-green-400" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-card border border-border rounded-xl p-6 hover:shadow-lg transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-muted-foreground text-sm">Applications</p>
+                <p className="text-3xl font-bold text-foreground">{stats.applications}</p>
+              </div>
+              <div className="h-12 w-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+                <FiTrendingUp className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-card border border-border rounded-xl p-6 hover:shadow-lg transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-muted-foreground text-sm">Profile Views</p>
+                <p className="text-3xl font-bold text-foreground">{stats.profileViews}</p>
+              </div>
+              <div className="h-12 w-12 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
+                <FiEye className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Recent Jobs */}
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 }}
+            className="lg:col-span-2"
+          >
+            <div className="bg-card border border-border rounded-xl p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-semibold text-foreground">Recent Job Postings</h2>
+                <Link 
+                  to="/jobs" 
+                  className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                >
+                  View all jobs →
+                </Link>
+              </div>
+
+              <div className="space-y-4">
+                {recentJobs.map((job) => (
+                  <div 
+                    key={job.id}
+                    className="p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-semibold text-foreground hover:text-blue-600 cursor-pointer">
+                        {job.title}
+                      </h3>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDate(job.createdAt)}
+                      </span>
+                    </div>
+                    
+                    <p className="text-muted-foreground text-sm mb-2">
+                      {job.employer.companyName}
+                    </p>
+                    
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <FiMapPin className="h-3 w-3" />
+                        {job.location}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <FiBriefcase className="h-3 w-3" />
+                        {job.jobType}
+                      </div>
+                      {job.salaryMin && job.salaryMax && (
+                        <div>
+                          {formatCurrency(job.salaryMin)} - {formatCurrency(job.salaryMax)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Quick Actions */}
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.3 }}
+            className="space-y-6"
+          >
+            {/* Profile Card */}
+            <div className="bg-card border border-border rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-foreground mb-4">Your Profile</h3>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-12 w-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                  <FiUser className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="font-medium text-foreground">
+                    {userProfile?.firstName} {userProfile?.lastName}
+                  </p>
+                  <p className="text-sm text-muted-foreground capitalize">
+                    {userProfile?.role?.toLowerCase().replace('_', ' ')}
+                  </p>
+                </div>
+              </div>
+              
+              <Link
+                to="/profile"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors block text-center"
+              >
+                Edit Profile
+              </Link>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="bg-card border border-border rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h3>
+              
+              <div className="space-y-3">
+                <Link
+                  to="/jobs"
+                  className="w-full border border-border hover:bg-muted/50 py-2 px-4 rounded-lg text-sm font-medium transition-colors block text-center"
+                >
+                  Browse Jobs
+                </Link>
+                
+                <Link
+                  to="/saved-jobs"
+                  className="w-full border border-border hover:bg-muted/50 py-2 px-4 rounded-lg text-sm font-medium transition-colors block text-center"
+                >
+                  Saved Jobs
+                </Link>
+                
+                <Link
+                  to="/applications"
+                  className="w-full border border-border hover:bg-muted/50 py-2 px-4 rounded-lg text-sm font-medium transition-colors block text-center"
+                >
+                  My Applications
+                </Link>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
