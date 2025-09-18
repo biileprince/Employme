@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { useAuth } from '../../contexts/AuthContext';
-import { userAPI } from '../../services/api';
-import PhoneInput from '../../components/ui/PhoneInput';
-import { INDUSTRIES } from '../../utils/constants';
-import imagegreet from '../../assets/images/imagegreet.jpg';
-import ladyWithLaptop from '../../assets/images/Ladywithlaptop.jpg';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { useAuth } from "../../contexts/AuthContext";
+import { userAPI } from "../../services/api";
+import PhoneInput from "../../components/ui/PhoneInput";
+import { INDUSTRIES } from "../../utils/constants";
+import imagegreet from "../../assets/images/imagegreet.jpg";
+import ladyWithLaptop from "../../assets/images/Ladywithlaptop.jpg";
 
 // Role-based form interfaces
 interface JobSeekerProfile {
@@ -37,136 +37,154 @@ interface EmployerProfile {
 }
 
 export default function Onboarding() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   // Role-based form data
   const [jobSeekerData, setJobSeekerData] = useState<JobSeekerProfile>({
-    fullName: '',
-    phone: '',
-    countryCode: '+233',
-    location: '',
-    bio: '',
-    experience: '',
+    fullName: "",
+    phone: "",
+    countryCode: "+233",
+    location: "",
+    bio: "",
+    experience: "",
     skills: [],
-    education: '',
-    desiredJobTitle: '',
-    desiredSalary: '',
-    availability: 'FULL_TIME',
+    education: "",
+    desiredJobTitle: "",
+    desiredSalary: "",
+    availability: "FULL_TIME",
   });
 
   const [employerData, setEmployerData] = useState<EmployerProfile>({
-    companyName: '',
-    companySize: '',
-    industry: '',
-    website: '',
-    phone: '',
-    countryCode: '+233',
-    location: '',
-    description: '',
-    contactPersonName: '',
-    contactPersonTitle: '',
+    companyName: "",
+    companySize: "",
+    industry: "",
+    website: "",
+    phone: "",
+    countryCode: "+233",
+    location: "",
+    description: "",
+    contactPersonName: "",
+    contactPersonTitle: "",
   });
 
   // Current skill input
-  const [currentSkill, setCurrentSkill] = useState('');
+  const [currentSkill, setCurrentSkill] = useState("");
 
   useEffect(() => {
     if (!user) {
-      navigate('/auth');
+      navigate("/auth");
       return;
     }
 
     if (user.hasProfile) {
       // Redirect based on role if profile already exists
-      if (user.role === 'EMPLOYER') {
-        navigate('/employer/dashboard');
+      if (user.role === "EMPLOYER") {
+        navigate("/employer/dashboard");
       } else {
-        navigate('/dashboard');
+        navigate("/job-seeker/dashboard");
       }
       return;
     }
 
     // Pre-fill name if available
-    if (user.role === 'JOB_SEEKER') {
-      setJobSeekerData(prev => ({
+    if (user.role === "JOB_SEEKER") {
+      setJobSeekerData((prev) => ({
         ...prev,
-        fullName: `${user.firstName} ${user.lastName}`.trim()
+        fullName: `${user.firstName} ${user.lastName}`.trim(),
       }));
-    } else if (user.role === 'EMPLOYER') {
-      setEmployerData(prev => ({
+    } else if (user.role === "EMPLOYER") {
+      setEmployerData((prev) => ({
         ...prev,
-        contactPersonName: `${user.firstName} ${user.lastName}`.trim()
+        contactPersonName: `${user.firstName} ${user.lastName}`.trim(),
       }));
     }
   }, [user, navigate]);
 
-  const handleJobSeekerChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleJobSeekerChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
+  ) => {
     setJobSeekerData({
       ...jobSeekerData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     });
   };
 
-  const handleEmployerChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleEmployerChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
+  ) => {
     setEmployerData({
       ...employerData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     });
   };
 
   const addSkill = () => {
-    if (currentSkill.trim() && !jobSeekerData.skills.includes(currentSkill.trim())) {
+    if (
+      currentSkill.trim() &&
+      !jobSeekerData.skills.includes(currentSkill.trim())
+    ) {
       setJobSeekerData({
         ...jobSeekerData,
-        skills: [...jobSeekerData.skills, currentSkill.trim()]
+        skills: [...jobSeekerData.skills, currentSkill.trim()],
       });
-      setCurrentSkill('');
+      setCurrentSkill("");
     }
   };
 
   const removeSkill = (skillToRemove: string) => {
     setJobSeekerData({
       ...jobSeekerData,
-      skills: jobSeekerData.skills.filter(skill => skill !== skillToRemove)
+      skills: jobSeekerData.skills.filter((skill) => skill !== skillToRemove),
     });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
 
     try {
-      const profileData = user?.role === 'JOB_SEEKER' ? jobSeekerData : employerData;
-      
+      const profileData =
+        user?.role === "JOB_SEEKER" ? jobSeekerData : employerData;
+
       // Add the role to the profile data so the API knows which endpoint to use
       const profileDataWithRole = {
         ...profileData,
-        role: user?.role
+        role: user?.role,
       };
-      
-      await userAPI.createProfile(profileDataWithRole as Record<string, unknown>);
-      
+
+      await userAPI.createProfile(
+        profileDataWithRole as Record<string, unknown>
+      );
+
+      // Refresh user data to update hasProfile flag
+      await refreshUser();
+
       // Show success message
-      const roleText = user?.role === 'EMPLOYER' ? 'Employer' : 'Job Seeker';
-      setSuccess(`🎉 ${roleText} profile created successfully! Redirecting to your dashboard...`);
-      
+      const roleText = user?.role === "EMPLOYER" ? "Employer" : "Job Seeker";
+      setSuccess(
+        `🎉 ${roleText} profile created successfully! Redirecting to your dashboard...`
+      );
+
       // Redirect after a short delay to show the success message
       setTimeout(() => {
-        if (user?.role === 'EMPLOYER') {
-          navigate('/employer/dashboard');
+        if (user?.role === "EMPLOYER") {
+          navigate("/employer/dashboard");
         } else {
-          navigate('/dashboard');
+          navigate("/job-seeker/dashboard");
         }
       }, 2000);
-      
     } catch (err) {
-      setError((err as Error).message || 'Failed to create profile');
+      setError((err as Error).message || "Failed to create profile");
     } finally {
       setIsLoading(false);
     }
@@ -176,17 +194,27 @@ export default function Onboarding() {
     return null; // Will redirect in useEffect
   }
 
-  const isJobSeeker = user.role === 'JOB_SEEKER';
-  const isEmployer = user.role === 'EMPLOYER';
+  const isJobSeeker = user.role === "JOB_SEEKER";
+  const isEmployer = user.role === "EMPLOYER";
 
   return (
     <div className="min-h-screen flex">
       {/* Left side - Image */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
-        <div className={`absolute inset-0 ${isEmployer ? 'bg-gradient-to-br from-secondary-600/90 to-secondary-800/90' : 'bg-gradient-to-br from-primary-600/90 to-primary-800/90'} z-10`} />
-        <img 
+        <div
+          className={`absolute inset-0 ${
+            isEmployer
+              ? "bg-gradient-to-br from-secondary-600/90 to-secondary-800/90"
+              : "bg-gradient-to-br from-primary-600/90 to-primary-800/90"
+          } z-10`}
+        />
+        <img
           src={isEmployer ? imagegreet : ladyWithLaptop}
-          alt={isEmployer ? "Professional greeting" : "Professional woman with laptop"}
+          alt={
+            isEmployer
+              ? "Professional greeting"
+              : "Professional woman with laptop"
+          }
           className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="relative z-20 flex flex-col justify-center px-12 text-white">
@@ -196,15 +224,24 @@ export default function Onboarding() {
             transition={{ duration: 0.8 }}
           >
             <h1 className="text-4xl font-bold mb-6">
-              {isEmployer ? 'Complete Your Company Profile' : 'Complete Your Profile'}
+              {isEmployer
+                ? "Complete Your Company Profile"
+                : "Complete Your Profile"}
             </h1>
-            <p className={`text-xl mb-8 ${isEmployer ? 'text-secondary-100' : 'text-primary-100'}`}>
-              {isEmployer 
-                ? 'Set up your company profile to start posting jobs and finding the best talent.'
-                : 'Complete your profile to get personalized job recommendations and stand out to employers.'
-              }
+            <p
+              className={`text-xl mb-8 ${
+                isEmployer ? "text-secondary-100" : "text-primary-100"
+              }`}
+            >
+              {isEmployer
+                ? "Set up your company profile to start posting jobs and finding the best talent."
+                : "Complete your profile to get personalized job recommendations and stand out to employers."}
             </p>
-            <div className={`space-y-4 ${isEmployer ? 'text-secondary-100' : 'text-primary-100'}`}>
+            <div
+              className={`space-y-4 ${
+                isEmployer ? "text-secondary-100" : "text-primary-100"
+              }`}
+            >
               {isEmployer ? (
                 <>
                   <div className="flex items-center">
@@ -251,10 +288,12 @@ export default function Onboarding() {
             className="text-center"
           >
             <h2 className="text-3xl font-bold text-foreground mb-2">
-              {isEmployer ? 'Company Profile' : 'Your Profile'}
+              {isEmployer ? "Company Profile" : "Your Profile"}
             </h2>
             <p className="text-muted-foreground">
-              {isEmployer ? 'Tell us about your company' : 'Tell us about yourself'}
+              {isEmployer
+                ? "Tell us about your company"
+                : "Tell us about yourself"}
             </p>
           </motion.div>
 
@@ -263,7 +302,7 @@ export default function Onboarding() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
             className="bg-card rounded-2xl shadow-xl border border-border p-8 max-h-[70vh] overflow-y-auto"
-            style={{ boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)' }}
+            style={{ boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.15)" }}
           >
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
@@ -282,7 +321,10 @@ export default function Onboarding() {
                 // Job Seeker Form
                 <>
                   <div>
-                    <label htmlFor="fullName" className="block text-sm font-medium text-foreground mb-1">
+                    <label
+                      htmlFor="fullName"
+                      className="block text-sm font-medium text-foreground mb-1"
+                    >
                       Full Name
                     </label>
                     <input
@@ -299,14 +341,24 @@ export default function Onboarding() {
                   <PhoneInput
                     countryCode={jobSeekerData.countryCode}
                     phoneNumber={jobSeekerData.phone}
-                    onCountryCodeChange={(code) => setJobSeekerData(prev => ({ ...prev, countryCode: code }))}
-                    onPhoneNumberChange={(phone) => setJobSeekerData(prev => ({ ...prev, phone }))}
+                    onCountryCodeChange={(code) =>
+                      setJobSeekerData((prev) => ({
+                        ...prev,
+                        countryCode: code,
+                      }))
+                    }
+                    onPhoneNumberChange={(phone) =>
+                      setJobSeekerData((prev) => ({ ...prev, phone }))
+                    }
                     label="Phone Number"
                     required
                   />
 
                   <div>
-                    <label htmlFor="location" className="block text-sm font-medium text-foreground mb-1">
+                    <label
+                      htmlFor="location"
+                      className="block text-sm font-medium text-foreground mb-1"
+                    >
                       Location
                     </label>
                     <input
@@ -322,7 +374,10 @@ export default function Onboarding() {
                   </div>
 
                   <div>
-                    <label htmlFor="desiredJobTitle" className="block text-sm font-medium text-foreground mb-1">
+                    <label
+                      htmlFor="desiredJobTitle"
+                      className="block text-sm font-medium text-foreground mb-1"
+                    >
                       Desired Job Title
                     </label>
                     <input
@@ -338,7 +393,10 @@ export default function Onboarding() {
                   </div>
 
                   <div>
-                    <label htmlFor="availability" className="block text-sm font-medium text-foreground mb-1">
+                    <label
+                      htmlFor="availability"
+                      className="block text-sm font-medium text-foreground mb-1"
+                    >
                       Availability
                     </label>
                     <select
@@ -356,7 +414,10 @@ export default function Onboarding() {
                   </div>
 
                   <div>
-                    <label htmlFor="experience" className="block text-sm font-medium text-foreground mb-1">
+                    <label
+                      htmlFor="experience"
+                      className="block text-sm font-medium text-foreground mb-1"
+                    >
                       Experience Level
                     </label>
                     <select
@@ -368,14 +429,21 @@ export default function Onboarding() {
                       className="w-full px-3 py-2 border border-input rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                     >
                       <option value="">Select experience level</option>
-                      <option value="ENTRY_LEVEL">Entry Level (0-2 years)</option>
+                      <option value="ENTRY_LEVEL">
+                        Entry Level (0-2 years)
+                      </option>
                       <option value="MID_LEVEL">Mid Level (3-5 years)</option>
-                      <option value="SENIOR_LEVEL">Senior Level (6+ years)</option>
+                      <option value="SENIOR_LEVEL">
+                        Senior Level (6+ years)
+                      </option>
                     </select>
                   </div>
 
                   <div>
-                    <label htmlFor="education" className="block text-sm font-medium text-foreground mb-1">
+                    <label
+                      htmlFor="education"
+                      className="block text-sm font-medium text-foreground mb-1"
+                    >
                       Education Level
                     </label>
                     <select
@@ -396,7 +464,10 @@ export default function Onboarding() {
                   </div>
 
                   <div>
-                    <label htmlFor="skills" className="block text-sm font-medium text-foreground mb-1">
+                    <label
+                      htmlFor="skills"
+                      className="block text-sm font-medium text-foreground mb-1"
+                    >
                       Skills
                     </label>
                     <div className="flex gap-2 mb-2">
@@ -404,7 +475,9 @@ export default function Onboarding() {
                         type="text"
                         value={currentSkill}
                         onChange={(e) => setCurrentSkill(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addSkill())}
+                        onKeyPress={(e) =>
+                          e.key === "Enter" && (e.preventDefault(), addSkill())
+                        }
                         className="flex-1 px-3 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                         placeholder="Add a skill"
                       />
@@ -436,7 +509,10 @@ export default function Onboarding() {
                   </div>
 
                   <div>
-                    <label htmlFor="desiredSalary" className="block text-sm font-medium text-foreground mb-1">
+                    <label
+                      htmlFor="desiredSalary"
+                      className="block text-sm font-medium text-foreground mb-1"
+                    >
                       Desired Salary (GHS/month)
                     </label>
                     <input
@@ -451,7 +527,10 @@ export default function Onboarding() {
                   </div>
 
                   <div>
-                    <label htmlFor="bio" className="block text-sm font-medium text-foreground mb-1">
+                    <label
+                      htmlFor="bio"
+                      className="block text-sm font-medium text-foreground mb-1"
+                    >
                       Professional Summary
                     </label>
                     <textarea
@@ -470,7 +549,10 @@ export default function Onboarding() {
                 // Employer Form
                 <>
                   <div>
-                    <label htmlFor="contactPersonName" className="block text-sm font-medium text-foreground mb-1">
+                    <label
+                      htmlFor="contactPersonName"
+                      className="block text-sm font-medium text-foreground mb-1"
+                    >
                       Contact Person Name
                     </label>
                     <input
@@ -485,7 +567,10 @@ export default function Onboarding() {
                   </div>
 
                   <div>
-                    <label htmlFor="contactPersonTitle" className="block text-sm font-medium text-foreground mb-1">
+                    <label
+                      htmlFor="contactPersonTitle"
+                      className="block text-sm font-medium text-foreground mb-1"
+                    >
                       Your Title
                     </label>
                     <input
@@ -503,14 +588,24 @@ export default function Onboarding() {
                   <PhoneInput
                     countryCode={employerData.countryCode}
                     phoneNumber={employerData.phone}
-                    onCountryCodeChange={(code) => setEmployerData(prev => ({ ...prev, countryCode: code }))}
-                    onPhoneNumberChange={(phone) => setEmployerData(prev => ({ ...prev, phone }))}
+                    onCountryCodeChange={(code) =>
+                      setEmployerData((prev) => ({
+                        ...prev,
+                        countryCode: code,
+                      }))
+                    }
+                    onPhoneNumberChange={(phone) =>
+                      setEmployerData((prev) => ({ ...prev, phone }))
+                    }
                     label="Phone Number"
                     required
                   />
 
                   <div>
-                    <label htmlFor="companyName" className="block text-sm font-medium text-foreground mb-1">
+                    <label
+                      htmlFor="companyName"
+                      className="block text-sm font-medium text-foreground mb-1"
+                    >
                       Company Name
                     </label>
                     <input
@@ -525,7 +620,10 @@ export default function Onboarding() {
                   </div>
 
                   <div>
-                    <label htmlFor="industry" className="block text-sm font-medium text-foreground mb-1">
+                    <label
+                      htmlFor="industry"
+                      className="block text-sm font-medium text-foreground mb-1"
+                    >
                       Industry
                     </label>
                     <select
@@ -537,7 +635,7 @@ export default function Onboarding() {
                       className="w-full px-3 py-2 border border-input rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                     >
                       <option value="">Select industry</option>
-                      {INDUSTRIES.map(industry => (
+                      {INDUSTRIES.map((industry) => (
                         <option key={industry} value={industry.toUpperCase()}>
                           {industry}
                         </option>
@@ -546,7 +644,10 @@ export default function Onboarding() {
                   </div>
 
                   <div>
-                    <label htmlFor="companySize" className="block text-sm font-medium text-foreground mb-1">
+                    <label
+                      htmlFor="companySize"
+                      className="block text-sm font-medium text-foreground mb-1"
+                    >
                       Company Size
                     </label>
                     <select
@@ -567,7 +668,10 @@ export default function Onboarding() {
                   </div>
 
                   <div>
-                    <label htmlFor="location" className="block text-sm font-medium text-foreground mb-1">
+                    <label
+                      htmlFor="location"
+                      className="block text-sm font-medium text-foreground mb-1"
+                    >
                       Company Location
                     </label>
                     <input
@@ -583,7 +687,10 @@ export default function Onboarding() {
                   </div>
 
                   <div>
-                    <label htmlFor="website" className="block text-sm font-medium text-foreground mb-1">
+                    <label
+                      htmlFor="website"
+                      className="block text-sm font-medium text-foreground mb-1"
+                    >
                       Company Website (Optional)
                     </label>
                     <input
@@ -598,7 +705,10 @@ export default function Onboarding() {
                   </div>
 
                   <div>
-                    <label htmlFor="description" className="block text-sm font-medium text-foreground mb-1">
+                    <label
+                      htmlFor="description"
+                      className="block text-sm font-medium text-foreground mb-1"
+                    >
                       Company Description
                     </label>
                     <textarea
@@ -619,12 +729,12 @@ export default function Onboarding() {
                 type="submit"
                 disabled={isLoading}
                 className={`w-full py-3 px-4 rounded-md font-medium text-white transition-colors ${
-                  isEmployer 
-                    ? 'bg-secondary hover:bg-secondary/90 disabled:bg-secondary/50' 
-                    : 'bg-primary hover:bg-primary/90 disabled:bg-primary/50'
+                  isEmployer
+                    ? "bg-secondary hover:bg-secondary/90 disabled:bg-secondary/50"
+                    : "bg-primary hover:bg-primary/90 disabled:bg-primary/50"
                 }`}
               >
-                {isLoading ? 'Creating Profile...' : 'Complete Profile'}
+                {isLoading ? "Creating Profile..." : "Complete Profile"}
               </button>
             </form>
           </motion.div>

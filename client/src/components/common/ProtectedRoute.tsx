@@ -34,7 +34,7 @@ export function ProtectedRoute({
     if (user.role === 'EMPLOYER') {
       return <Navigate to="/employer/dashboard" replace />;
     } else {
-      return <Navigate to="/dashboard" replace />;
+      return <Navigate to="/job-seeker/dashboard" replace />;
     }
   }
 
@@ -48,7 +48,7 @@ export function ProtectedRoute({
     if (user.role === 'EMPLOYER') {
       return <Navigate to="/employer/dashboard" replace />;
     } else {
-      return <Navigate to="/dashboard" replace />;
+      return <Navigate to="/job-seeker/dashboard" replace />;
     }
   }
 

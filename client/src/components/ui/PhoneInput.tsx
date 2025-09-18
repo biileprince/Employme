@@ -1,6 +1,10 @@
-import React from 'react';
-import { MdPhone } from 'react-icons/md';
-import { COUNTRY_CODES } from '../../utils/countryCode';
+import React, { useState, useEffect } from "react";
+import { MdPhone } from "react-icons/md";
+import {
+  fetchCountryCodes,
+  DEFAULT_COUNTRY_CODES,
+  type CountryCode,
+} from "../../utils/countryCode";
 
 interface PhoneInputProps {
   countryCode: string;
@@ -23,24 +27,50 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
   placeholder = "Phone number",
   required = false,
   error,
-  className = ""
+  className = "",
 }) => {
+  const [countryCodes, setCountryCodes] = useState<CountryCode[]>(
+    DEFAULT_COUNTRY_CODES
+  );
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const loadCountryCodes = async () => {
+      setIsLoading(true);
+      try {
+        const codes = await fetchCountryCodes();
+        setCountryCodes(codes);
+      } catch (error) {
+        console.error("Failed to load country codes:", error);
+        // Keep default codes if API fails
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadCountryCodes();
+  }, []);
+
   return (
     <div className={className}>
       {label && (
         <label className="block text-sm font-medium text-foreground mb-2">
-          {label} {required && '*'}
+          {label} {required && "*"}
         </label>
       )}
       <div className="flex space-x-2">
         <select
           value={countryCode}
           onChange={(e) => onCountryCodeChange(e.target.value)}
+          disabled={isLoading}
           className="px-3 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground min-w-[120px]"
         >
-          {COUNTRY_CODES.map(country => (
-            <option key={country.code} value={country.code}>
-              {country.flag} {country.code}
+          {countryCodes.map((country, index) => (
+            <option
+              key={`${country.code}-${country.country}-${index}`}
+              value={country.code}
+            >
+              {country.flag} {country.code} {country.country}
             </option>
           ))}
         </select>
@@ -57,12 +87,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
           />
         </div>
       </div>
-      {error && (
-        <p className="text-red-500 text-xs mt-1">{error}</p>
-      )}
-      <p className="text-xs text-muted-foreground mt-1">
-        Enter 7-15 digits without country code
-      </p>
+      {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
     </div>
   );
 };

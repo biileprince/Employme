@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { 
-  MdEdit, 
-  MdSave, 
-  MdCancel, 
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import {
+  MdEdit,
+  MdSave,
+  MdCancel,
   MdBusiness,
   MdLocationOn,
   MdPhone,
@@ -11,11 +11,11 @@ import {
   MdLanguage,
   MdPerson,
   MdDescription,
-  MdWork
-} from 'react-icons/md';
-import { userAPI } from '../../services/api';
-import PhoneInput from '../../components/ui/PhoneInput';
-import { INDUSTRIES } from '../../utils/constants';
+  MdWork,
+} from "react-icons/md";
+import { userAPI } from "../../services/api";
+import PhoneInput from "../../components/ui/PhoneInput";
+import { INDUSTRIES } from "../../utils/constants";
 interface EmployerProfile {
   id: string;
   userId: string;
@@ -39,36 +39,36 @@ interface EmployerProfile {
 }
 
 const COMPANY_SIZES = [
-  '1-10 employees',
-  '11-50 employees',
-  '51-200 employees',
-  '201-500 employees',
-  '501-1000 employees',
-  '1000+ employees'
+  "1-10 employees",
+  "11-50 employees",
+  "51-200 employees",
+  "201-500 employees",
+  "501-1000 employees",
+  "1000+ employees",
 ];
 
 export default function EmployerProfile() {
   const [profile, setProfile] = useState<EmployerProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [isEditing, setIsEditing] = useState(false);
 
   const [formData, setFormData] = useState({
-    companyName: '',
-    industry: '',
-    location: '',
-    website: '',
-    description: '',
-    logoUrl: '',
-    founded: '',
-    companySize: '',
-    phone: '',
-    countryCode: '+233',
-    firstName: '',
-    lastName: '',
-    email: ''
+    companyName: "",
+    industry: "",
+    location: "",
+    website: "",
+    description: "",
+    logoUrl: "",
+    founded: "",
+    companySize: "",
+    phone: "",
+    countryCode: "+233",
+    firstName: "",
+    lastName: "",
+    email: "",
   });
 
   useEffect(() => {
@@ -79,13 +79,13 @@ export default function EmployerProfile() {
     try {
       setIsLoading(true);
       const response = await userAPI.getProfile();
-      console.log('Profile response:', response); // Debug log
-      
+      console.log("Profile response:", response); // Debug log
+
       // Handle the backend response structure
       const userData = response.data.user;
       const employerProfile = userData.profile;
-      
-      if (employerProfile && userData.role === 'EMPLOYER') {
+
+      if (employerProfile && userData.role === "EMPLOYER") {
         // Combine user data with employer profile data
         const fullProfile: EmployerProfile = {
           ...employerProfile,
@@ -93,74 +93,80 @@ export default function EmployerProfile() {
             firstName: userData.firstName,
             lastName: userData.lastName,
             email: userData.email,
-            imageUrl: userData.imageUrl
-          }
+            imageUrl: userData.imageUrl,
+          },
         };
-        
+
         setProfile(fullProfile);
         setFormData({
-          companyName: employerProfile.companyName || '',
-          industry: employerProfile.industry || '',
-          location: employerProfile.location || '',
-          website: employerProfile.website || '',
-          description: employerProfile.description || '',
-          logoUrl: employerProfile.logoUrl || '',
-          founded: employerProfile.founded ? employerProfile.founded.toString() : '',
-          companySize: employerProfile.companySize || '',
-          phone: employerProfile.phone || '',
-          countryCode: employerProfile.countryCode || '+233',
-          firstName: userData.firstName || '',
-          lastName: userData.lastName || '',
-          email: userData.email || ''
+          companyName: employerProfile.companyName || "",
+          industry: employerProfile.industry || "",
+          location: employerProfile.location || "",
+          website: employerProfile.website || "",
+          description: employerProfile.description || "",
+          logoUrl: employerProfile.logoUrl || "",
+          founded: employerProfile.founded
+            ? employerProfile.founded.toString()
+            : "",
+          companySize: employerProfile.companySize || "",
+          phone: employerProfile.phone || "",
+          countryCode: employerProfile.countryCode || "+233",
+          firstName: userData.firstName || "",
+          lastName: userData.lastName || "",
+          email: userData.email || "",
         });
       } else {
         // No employer profile exists yet, show empty form
         setProfile(null);
         setFormData({
-          companyName: '',
-          industry: '',
-          location: '',
-          website: '',
-          description: '',
-          logoUrl: '',
-          founded: '',
-          companySize: '',
-          phone: '',
-          countryCode: '+233',
-          firstName: userData?.firstName || '',
-          lastName: userData?.lastName || '',
-          email: userData?.email || ''
+          companyName: "",
+          industry: "",
+          location: "",
+          website: "",
+          description: "",
+          logoUrl: "",
+          founded: "",
+          companySize: "",
+          phone: "",
+          countryCode: "+233",
+          firstName: userData?.firstName || "",
+          lastName: userData?.lastName || "",
+          email: userData?.email || "",
         });
       }
     } catch (err) {
-      console.error('Failed to fetch profile:', err);
-      setError('Failed to load profile');
+      console.error("Failed to fetch profile:", err);
+      setError("Failed to load profile");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
+  ) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
   const handlePhoneChange = (phone: string, countryCode: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       phone,
-      countryCode
+      countryCode,
     }));
   };
 
   const handleSave = async () => {
     try {
       setIsSaving(true);
-      setError('');
-      setSuccess('');
+      setError("");
+      setSuccess("");
 
       const updateData = {
         companyName: formData.companyName,
@@ -174,7 +180,7 @@ export default function EmployerProfile() {
         phone: formData.phone,
         countryCode: formData.countryCode,
         firstName: formData.firstName,
-        lastName: formData.lastName
+        lastName: formData.lastName,
       };
 
       if (profile) {
@@ -184,16 +190,16 @@ export default function EmployerProfile() {
         // Create new profile
         await userAPI.createEmployerProfile(updateData);
       }
-      
+
       await fetchProfile(); // Refresh the profile
-      setSuccess('Profile updated successfully!');
+      setSuccess("Profile updated successfully!");
       setIsEditing(false);
-      
+
       // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(''), 3000);
+      setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
-      console.error('Failed to update profile:', err);
-      setError('Failed to update profile. Please try again.');
+      console.error("Failed to update profile:", err);
+      setError("Failed to update profile. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -202,23 +208,23 @@ export default function EmployerProfile() {
   const handleCancel = () => {
     if (profile) {
       setFormData({
-        companyName: profile.companyName || '',
-        industry: profile.industry || '',
-        location: profile.location || '',
-        website: profile.website || '',
-        description: profile.description || '',
-        logoUrl: profile.logoUrl || '',
-        founded: profile.founded ? profile.founded.toString() : '',
-        companySize: profile.companySize || '',
-        phone: profile.phone || '',
-        countryCode: profile.countryCode || '+233',
-        firstName: profile.user?.firstName || '',
-        lastName: profile.user?.lastName || '',
-        email: profile.user?.email || ''
+        companyName: profile.companyName || "",
+        industry: profile.industry || "",
+        location: profile.location || "",
+        website: profile.website || "",
+        description: profile.description || "",
+        logoUrl: profile.logoUrl || "",
+        founded: profile.founded ? profile.founded.toString() : "",
+        companySize: profile.companySize || "",
+        phone: profile.phone || "",
+        countryCode: profile.countryCode || "+233",
+        firstName: profile.user?.firstName || "",
+        lastName: profile.user?.lastName || "",
+        email: profile.user?.email || "",
       });
     }
     setIsEditing(false);
-    setError('');
+    setError("");
   };
 
   if (isLoading) {
@@ -236,39 +242,26 @@ export default function EmployerProfile() {
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Company Profile</h1>
+            <h1 className="text-3xl font-bold text-foreground">
+              Company Profile
+            </h1>
             <p className="text-muted-foreground">
-              {profile ? 'Manage your company information and profile' : 'Create your company profile to get started'}
+              {profile
+                ? "Manage your company information and profile"
+                : "Create your company profile to get started"}
             </p>
           </div>
-          
-          {!isEditing ? (
-            <button
-              onClick={() => setIsEditing(true)}
-              className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
-            >
-              <MdEdit className="w-4 h-4" />
-              {profile ? 'Edit Profile' : 'Create Profile'}
-            </button>
-          ) : (
-            <div className="flex gap-2">
+
+          {!isEditing && (
+            <div className="mt-4">
               <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                onClick={() => setIsEditing(true)}
+                className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
               >
-                <MdSave className="w-4 h-4" />
-                {isSaving ? 'Saving...' : 'Save Changes'}
-              </button>
-              <button
-                onClick={handleCancel}
-                disabled={isSaving}
-                className="inline-flex items-center gap-2 bg-muted text-muted-foreground px-4 py-2 rounded-lg hover:bg-muted/80 transition-colors"
-              >
-                <MdCancel className="w-4 h-4" />
-                Cancel
+                <MdEdit className="w-4 h-4" />
+                {profile ? "Edit Profile" : "Create Profile"}
               </button>
             </div>
           )}
@@ -306,7 +299,7 @@ export default function EmployerProfile() {
               <MdPerson className="w-5 h-5" />
               Personal Information
             </h2>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
@@ -321,7 +314,9 @@ export default function EmployerProfile() {
                     className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                   />
                 ) : (
-                  <p className="text-foreground py-3">{profile?.user?.firstName || 'Not provided'}</p>
+                  <p className="text-foreground py-3">
+                    {profile?.user?.firstName || "Not provided"}
+                  </p>
                 )}
               </div>
 
@@ -338,7 +333,9 @@ export default function EmployerProfile() {
                     className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                   />
                 ) : (
-                  <p className="text-foreground py-3">{profile?.user?.lastName || 'Not provided'}</p>
+                  <p className="text-foreground py-3">
+                    {profile?.user?.lastName || "Not provided"}
+                  </p>
                 )}
               </div>
 
@@ -347,7 +344,9 @@ export default function EmployerProfile() {
                   <MdEmail className="w-4 h-4" />
                   Email
                 </label>
-                <p className="text-muted-foreground py-3">{profile?.user?.email || 'Not provided'}</p>
+                <p className="text-muted-foreground py-3">
+                  {profile?.user?.email || "Not provided"}
+                </p>
               </div>
 
               <div>
@@ -360,11 +359,15 @@ export default function EmployerProfile() {
                     phoneNumber={formData.phone}
                     countryCode={formData.countryCode}
                     onPhoneNumberChange={handlePhoneChange}
-                    onCountryCodeChange={(code) => handlePhoneChange(formData.phone, code)}
+                    onCountryCodeChange={(code) =>
+                      handlePhoneChange(formData.phone, code)
+                    }
                   />
                 ) : (
                   <p className="text-foreground py-3">
-                    {profile?.phone ? `${profile.countryCode || ''} ${profile.phone}` : 'Not provided'}
+                    {profile?.phone
+                      ? `${profile.countryCode || ""} ${profile.phone}`
+                      : "Not provided"}
                   </p>
                 )}
               </div>
@@ -382,7 +385,7 @@ export default function EmployerProfile() {
               <MdBusiness className="w-5 h-5" />
               Company Information
             </h2>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
@@ -398,7 +401,9 @@ export default function EmployerProfile() {
                     required
                   />
                 ) : (
-                  <p className="text-foreground py-3">{profile?.companyName || 'Not provided'}</p>
+                  <p className="text-foreground py-3">
+                    {profile?.companyName || "Not provided"}
+                  </p>
                 )}
               </div>
 
@@ -421,7 +426,9 @@ export default function EmployerProfile() {
                     ))}
                   </select>
                 ) : (
-                  <p className="text-foreground py-3">{profile?.industry || 'Not specified'}</p>
+                  <p className="text-foreground py-3">
+                    {profile?.industry || "Not specified"}
+                  </p>
                 )}
               </div>
 
@@ -440,7 +447,9 @@ export default function EmployerProfile() {
                     className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                   />
                 ) : (
-                  <p className="text-foreground py-3">{profile?.location || 'Not provided'}</p>
+                  <p className="text-foreground py-3">
+                    {profile?.location || "Not provided"}
+                  </p>
                 )}
               </div>
 
@@ -461,16 +470,16 @@ export default function EmployerProfile() {
                 ) : (
                   <p className="text-foreground py-3">
                     {profile?.website ? (
-                      <a 
-                        href={profile.website} 
-                        target="_blank" 
+                      <a
+                        href={profile.website}
+                        target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary hover:text-primary/80 transition-colors"
                       >
                         {profile.website}
                       </a>
                     ) : (
-                      'Not provided'
+                      "Not provided"
                     )}
                   </p>
                 )}
@@ -492,7 +501,9 @@ export default function EmployerProfile() {
                     className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                   />
                 ) : (
-                  <p className="text-foreground py-3">{profile?.founded || 'Not provided'}</p>
+                  <p className="text-foreground py-3">
+                    {profile?.founded || "Not provided"}
+                  </p>
                 )}
               </div>
 
@@ -516,7 +527,9 @@ export default function EmployerProfile() {
                     ))}
                   </select>
                 ) : (
-                  <p className="text-foreground py-3">{profile?.companySize || 'Not specified'}</p>
+                  <p className="text-foreground py-3">
+                    {profile?.companySize || "Not specified"}
+                  </p>
                 )}
               </div>
             </div>
@@ -539,7 +552,7 @@ export default function EmployerProfile() {
               ) : (
                 <div className="bg-muted p-4 rounded-lg">
                   <p className="text-foreground leading-relaxed">
-                    {profile?.description || 'No company description provided.'}
+                    {profile?.description || "No company description provided."}
                   </p>
                 </div>
               )}
@@ -562,16 +575,18 @@ export default function EmployerProfile() {
               ) : (
                 <div className="flex items-center gap-4">
                   {profile?.logoUrl && (
-                    <img 
-                      src={profile.logoUrl} 
-                      alt="Company Logo" 
+                    <img
+                      src={profile.logoUrl}
+                      alt="Company Logo"
                       className="w-16 h-16 object-contain rounded-lg border border-border"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
+                        (e.target as HTMLImageElement).style.display = "none";
                       }}
                     />
                   )}
-                  <p className="text-foreground">{profile?.logoUrl || 'No logo provided'}</p>
+                  <p className="text-foreground">
+                    {profile?.logoUrl || "No logo provided"}
+                  </p>
                 </div>
               )}
             </div>
@@ -586,18 +601,52 @@ export default function EmployerProfile() {
           >
             <h2 className="text-xl font-semibold mb-4">Verification Status</h2>
             <div className="flex items-center gap-3">
-              <div className={`w-3 h-3 rounded-full ${profile?.isVerified ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+              <div
+                className={`w-3 h-3 rounded-full ${
+                  profile?.isVerified ? "bg-green-500" : "bg-yellow-500"
+                }`}
+              ></div>
               <span className="text-foreground">
-                {profile?.isVerified ? 'Verified Company' : 'Pending Verification'}
+                {profile?.isVerified
+                  ? "Verified Company"
+                  : "Pending Verification"}
               </span>
             </div>
             {!profile?.isVerified && (
               <p className="text-muted-foreground text-sm mt-2">
-                Complete your profile information to get verified and build trust with candidates.
+                Complete your profile information to get verified and build
+                trust with candidates.
               </p>
             )}
           </motion.div>
         </div>
+
+        {/* Action Buttons - Bottom of Page */}
+        {isEditing && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="mt-8 flex justify-end gap-4 sticky bottom-4 bg-background/90 backdrop-blur-sm p-4 rounded-lg border border-border"
+          >
+            <button
+              onClick={handleCancel}
+              disabled={isSaving}
+              className="inline-flex items-center gap-2 bg-muted text-muted-foreground px-6 py-3 rounded-lg hover:bg-muted/80 transition-colors"
+            >
+              <MdCancel className="w-4 h-4" />
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            >
+              <MdSave className="w-4 h-4" />
+              {isSaving ? "Saving..." : "Save Changes"}
+            </button>
+          </motion.div>
+        )}
       </div>
     </div>
   );

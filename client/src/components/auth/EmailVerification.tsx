@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import React, { useState } from "react";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface EmailVerificationProps {
   email: string;
@@ -7,48 +7,50 @@ interface EmailVerificationProps {
   onSwitchToLogin: () => void;
 }
 
-export const EmailVerification: React.FC<EmailVerificationProps> = ({ 
-  email, 
+export const EmailVerification: React.FC<EmailVerificationProps> = ({
+  email,
   onVerificationSuccess,
-  onSwitchToLogin 
+  onSwitchToLogin,
 }) => {
-  const [code, setCode] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [code, setCode] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [isResending, setIsResending] = useState(false);
   const { verifyEmail, resendVerificationCode, isLoading } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
 
     if (code.length !== 6) {
-      setError('Please enter a valid 6-digit code');
+      setError("Please enter a valid 6-digit code");
       return;
     }
 
     try {
       await verifyEmail(code);
-      setSuccess('Email verified successfully! Please log in to continue.');
+      setSuccess(
+        "Email verified successfully! Redirecting to your dashboard..."
+      );
       setTimeout(() => {
         onVerificationSuccess();
       }, 2000);
     } catch (err) {
-      setError((err as Error).message || 'Verification failed');
+      setError((err as Error).message || "Verification failed");
     }
   };
 
   const handleResendCode = async () => {
     setIsResending(true);
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
 
     try {
       await resendVerificationCode(email);
-      setSuccess('Verification code sent! Please check your email.');
+      setSuccess("Verification code sent! Please check your email.");
     } catch (err) {
-      setError((err as Error).message || 'Failed to resend code');
+      setError((err as Error).message || "Failed to resend code");
     } finally {
       setIsResending(false);
     }
@@ -63,9 +65,7 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
         <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
           We've sent a 6-digit verification code to:
         </p>
-        <p className="font-medium text-blue-600 dark:text-blue-400">
-          {email}
-        </p>
+        <p className="font-medium text-blue-600 dark:text-blue-400">{email}</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -82,7 +82,10 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
         )}
 
         <div>
-          <label htmlFor="code" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label
+            htmlFor="code"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+          >
             Verification Code
           </label>
           <input
@@ -91,7 +94,7 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
             value={code}
             onChange={(e) => {
               // Only allow numbers and limit to 6 digits
-              const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+              const value = e.target.value.replace(/\D/g, "").slice(0, 6);
               setCode(value);
             }}
             maxLength={6}
@@ -108,7 +111,7 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
           disabled={isLoading || code.length !== 6}
           className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white py-2 px-4 rounded-md transition-colors"
         >
-          {isLoading ? 'Verifying...' : 'Verify Email'}
+          {isLoading ? "Verifying..." : "Verify Email"}
         </button>
       </form>
 
@@ -121,7 +124,7 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
           disabled={isResending}
           className="text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 disabled:text-blue-400"
         >
-          {isResending ? 'Sending...' : 'Resend code'}
+          {isResending ? "Sending..." : "Resend code"}
         </button>
       </div>
 
