@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLoaderData, Link } from "react-router-dom";
 import {
   HiLocationMarker,
@@ -15,8 +15,18 @@ import {
   HiAcademicCap,
   HiCheckCircle,
   HiArrowLeft,
+  HiEye,
 } from "react-icons/hi";
 import Button from "../../components/ui/Button";
+import { AttachmentViewer } from "../../components/ui";
+import { AuthModal } from "../../components/auth";
+import {
+  applicationsAPI,
+  savedJobsAPI,
+  formatImageUrl,
+} from "../../services/api";
+import { useAuth } from "../../contexts/AuthContext";
+import { getCategoryLabel } from "../../utils/constants";
 
 // Database job structure from API
 interface DatabaseJob {
@@ -37,9 +47,17 @@ interface DatabaseJob {
   createdAt: Date;
   updatedAt: Date;
   requirements: string[];
+  responsibilities?: string;
   benefits: string[];
   contactPhone?: string;
   contactCountryCode?: string;
+  attachments?: Array<{
+    id: string;
+    filename: string;
+    url: string;
+    fileType: string;
+    fileSize: number;
+  }>;
   employer: {
     companyName: string;
     logoUrl?: string;
@@ -70,7 +88,13 @@ const JobDetail = () => {
     job: Job;
     relatedJobs: Job[];
   };
+  const { user } = useAuth();
   const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showApplyModal, setShowApplyModal] = useState(false);
+  const [isApplying, setIsApplying] = useState(false);
+  const [hasApplied, setHasApplied] = useState(false);
 
   // Type guard to check if job is from database
   const isDatabaseJob = (job: Job): job is DatabaseJob => {
@@ -98,6 +122,90 @@ const JobDetail = () => {
     return job.salary || "Salary negotiable";
   };
 
+  // Check if job is saved and handle save/unsave
+  useEffect(() => {
+    const checkJobStatus = async () => {
+      if (!user) return;
+
+      try {
+        // Check if job is saved
+        const savedResponse = await savedJobsAPI.getSavedJobs();
+        const savedJobs =
+          (
+            savedResponse as {
+              data: { savedJobs: { jobId: string; id: string }[] };
+            }
+          ).data.savedJobs || [];
+        const isJobSaved = savedJobs.some(
+          (savedJob) => (savedJob.jobId || savedJob.id) === job.id
+        );
+        setIsSaved(isJobSaved);
+
+        // Check if user has already applied
+        const applicationsResponse = await applicationsAPI.getMyApplications();
+        const applications =
+          (
+            applicationsResponse as {
+              data: { applications: { jobId: string }[] };
+            }
+          ).data.applications || [];
+        const hasUserApplied = applications.some((app) => app.jobId === job.id);
+        setHasApplied(hasUserApplied);
+      } catch (error) {
+        console.error("Error checking job status:", error);
+      }
+    };
+
+    checkJobStatus();
+  }, [user, job.id]);
+
+  const handleSaveJob = async () => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      if (isSaved) {
+        await savedJobsAPI.unsaveJob(job.id);
+        setIsSaved(false);
+      } else {
+        await savedJobsAPI.saveJob(job.id);
+        setIsSaved(true);
+      }
+    } catch (error) {
+      console.error("Error saving/unsaving job:", error);
+      alert("Failed to save job. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleApplyJob = async () => {
+    if (!user) {
+      setShowApplyModal(true);
+      return;
+    }
+
+    if (hasApplied) {
+      alert("You have already applied for this job.");
+      return;
+    }
+
+    setIsApplying(true);
+    try {
+      await applicationsAPI.apply(job.id);
+      setHasApplied(true);
+      alert("Application submitted successfully!");
+    } catch (error) {
+      console.error("Error applying for job:", error);
+      alert("Failed to submit application. Please try again.");
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
   const getRequirements = (job: Job) => {
     if (isDatabaseJob(job)) {
       return job.requirements || [];
@@ -118,10 +226,12 @@ const JobDetail = () => {
   };
 
   const getCompanyLogo = (job: Job) => {
+    // Only get the actual company logo
     if (isDatabaseJob(job) && job.employer.logoUrl) {
-      return job.employer.logoUrl;
+      return formatImageUrl(job.employer.logoUrl);
     }
 
+    // Fallback to mock logos based on company name
     const companyName = getCompanyName(job);
     const logos: Record<string, string> = {
       "TechCorp Ghana":
@@ -139,6 +249,14 @@ const JobDetail = () => {
       logos[companyName] ||
       "https://images.unsplash.com/photo-1549923746-c502d488b3ea?w=120&h=120&fit=crop&crop=center"
     );
+  };
+
+  const getJobImages = (job: Job) => {
+    // Get job advertisement images from attachments (fileType: "IMAGE")
+    if (isDatabaseJob(job) && job.attachments && job.attachments.length > 0) {
+      return job.attachments.filter((att) => att.fileType === "IMAGE");
+    }
+    return [];
   };
 
   const getCompanyDescription = (job: Job) => {
@@ -175,13 +293,18 @@ const JobDetail = () => {
           </div>
 
           <div className="flex flex-col lg:flex-row gap-6">
-            {/* Company Logo */}
+            {/* Company Logo Only */}
             <div className="flex-shrink-0">
-              <img
-                src={getCompanyLogo(job)}
-                alt={`${getCompanyName(job)} logo`}
-                className="w-24 h-24 rounded-xl object-cover border-2 border-border dark:border-gray-700 shadow-lg"
-              />
+              <div className="flex flex-col items-center">
+                <img
+                  src={getCompanyLogo(job)}
+                  alt={`${getCompanyName(job)} logo`}
+                  className="w-24 h-24 rounded-xl object-cover border-2 border-border dark:border-gray-700 shadow-lg"
+                />
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  Company Logo
+                </p>
+              </div>
             </div>
 
             {/* Job Header Info */}
@@ -241,33 +364,61 @@ const JobDetail = () => {
 
                 {/* Action Buttons */}
                 <div className="flex md:flex-col lg:flex-row   gap-2 md:gap-3 md:flex-shrink-0">
-                  <button
-                    onClick={() => setIsSaved(!isSaved)}
-                    className={`flex items-center justify-center gap-1.5 px-3 md:px-4 py-2 rounded-lg border transition-colors text-sm font-medium whitespace-nowrap ${
-                      isSaved
-                        ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400"
-                        : "bg-background dark:bg-gray-800 border-border dark:border-gray-700 text-muted-foreground dark:text-gray-400 hover:text-foreground dark:hover:text-white"
-                    }`}
-                  >
-                    <HiHeart
-                      className={`w-4 h-4 ${isSaved ? "fill-current" : ""}`}
-                    />
-                    <span className="hidden sm:inline">
-                      {isSaved ? "Saved" : "Save Job"}
-                    </span>
-                  </button>
+                  {user?.role === "JOB_SEEKER" && (
+                    <button
+                      onClick={handleSaveJob}
+                      disabled={isSaving}
+                      className={`flex items-center justify-center gap-1.5 px-3 md:px-4 py-2 rounded-lg border transition-colors text-sm font-medium whitespace-nowrap ${
+                        isSaved
+                          ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400"
+                          : "bg-background dark:bg-gray-800 border-border dark:border-gray-700 text-muted-foreground dark:text-gray-400 hover:text-foreground dark:hover:text-white"
+                      } ${isSaving ? "opacity-50 cursor-not-allowed" : ""}`}
+                    >
+                      {isSaving ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                      ) : (
+                        <HiHeart
+                          className={`w-4 h-4 ${isSaved ? "fill-current" : ""}`}
+                        />
+                      )}
+                      <span className="hidden sm:inline">
+                        {isSaving
+                          ? "Saving..."
+                          : isSaved
+                          ? "Saved"
+                          : "Save Job"}
+                      </span>
+                    </button>
+                  )}
 
                   <button className="flex items-center justify-center gap-1.5 px-3 md:px-4 py-2 rounded-lg border border-border dark:border-gray-700 bg-background dark:bg-gray-800 text-muted-foreground dark:text-gray-400 hover:text-foreground dark:hover:text-white transition-colors text-sm font-medium whitespace-nowrap">
                     <HiShare className="w-4 h-4" />
                     <span className="hidden sm:inline">Share</span>
                   </button>
 
-                  <Button
-                    size="md"
-                    className="px-4 md:px-6 text-sm font-medium whitespace-nowrap"
-                  >
-                    Apply Now
-                  </Button>
+                  {user?.role === "JOB_SEEKER" && (
+                    <Button
+                      size="md"
+                      onClick={handleApplyJob}
+                      disabled={isApplying || hasApplied}
+                      className={`px-4 md:px-6 text-sm font-medium whitespace-nowrap ${
+                        hasApplied
+                          ? "bg-secondary/20 text-secondary cursor-not-allowed"
+                          : ""
+                      }`}
+                    >
+                      {isApplying ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+                          Applying...
+                        </>
+                      ) : hasApplied ? (
+                        "Applied ✓"
+                      ) : (
+                        "Apply Now"
+                      )}
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
@@ -280,6 +431,38 @@ const JobDetail = () => {
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Main Content */}
           <div className="flex-1 space-y-8">
+            {/* Job Advertisement Image - Prominent Display */}
+            {getJobImages(job).length > 0 && (
+              <div className="bg-card rounded-xl border border-border p-6">
+                <h3 className="text-xl font-semibold text-foreground mb-4">
+                  Job Advertisement
+                </h3>
+                <div
+                  className="relative group cursor-pointer rounded-lg overflow-hidden border border-border hover:border-primary/50 transition-all duration-300 shadow-md hover:shadow-lg"
+                  onClick={() =>
+                    window.open(
+                      formatImageUrl(getJobImages(job)[0].url),
+                      "_blank"
+                    )
+                  }
+                >
+                  <img
+                    src={formatImageUrl(getJobImages(job)[0].url)}
+                    alt="Job advertisement"
+                    className="w-full h-80 object-cover transition-transform duration-300 group-hover:scale-105"
+                    loading="lazy"
+                  />
+                  {/* Overlay */}
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                    <div className="text-white text-center">
+                      <HiEye className="w-8 h-8 mx-auto mb-2" />
+                      <p className="text-sm font-medium">View Full Size</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Job Description */}
             <div className="bg-card rounded-xl border border-border p-6">
               <h3 className="text-xl font-semibold text-foreground mb-4">
@@ -315,23 +498,57 @@ const JobDetail = () => {
               </ul>
             </div>
 
-            {/* Benefits */}
-            <div className="bg-card rounded-xl border border-border p-6">
-              <h3 className="text-xl font-semibold text-foreground mb-4">
-                Benefits & Perks
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {getBenefits(job).map((benefit, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center gap-3 p-3 bg-secondary/10 rounded-lg"
-                  >
-                    <HiCheckCircle className="w-5 h-5 text-secondary" />
-                    <span className="text-muted-foreground">{benefit}</span>
-                  </div>
-                ))}
+            {/* Key Responsibilities */}
+            {isDatabaseJob(job) && job.responsibilities && (
+              <div className="bg-card rounded-xl border border-border p-6">
+                <h3 className="text-xl font-semibold text-foreground mb-4">
+                  Key Responsibilities
+                </h3>
+                <div className="prose prose-sm max-w-none text-muted-foreground">
+                  <p className="whitespace-pre-wrap">{job.responsibilities}</p>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Benefits - Only show if there are benefits */}
+            {getBenefits(job).length > 0 && (
+              <div className="bg-card rounded-xl border border-border p-6">
+                <h3 className="text-xl font-semibold text-foreground mb-4">
+                  Benefits & Perks
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {getBenefits(job).map((benefit, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-3 p-3 bg-secondary/10 rounded-lg"
+                    >
+                      <HiCheckCircle className="w-5 h-5 text-secondary" />
+                      <span className="text-muted-foreground">{benefit}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* All Attachments (Documents & Files) - Exclude Job Images */}
+            {isDatabaseJob(job) &&
+              job.attachments &&
+              job.attachments.filter((att) => att.fileType !== "IMAGE").length >
+                0 && (
+                <div className="bg-card rounded-xl border border-border p-6">
+                  <h3 className="text-xl font-semibold text-foreground mb-4">
+                    All Documents & Files
+                  </h3>
+                  <AttachmentViewer
+                    attachments={job.attachments.filter(
+                      (att) => att.fileType !== "IMAGE"
+                    )}
+                    maxPreviewImages={6}
+                    showDownloadButton={true}
+                    showFullscreenButton={true}
+                  />
+                </div>
+              )}
           </div>
 
           {/* Sidebar */}
@@ -350,7 +567,9 @@ const JobDetail = () => {
                       Industry
                     </p>
                     <p className="font-medium text-foreground dark:text-white">
-                      {isDatabaseJob(job) ? job.category : "Technology"}
+                      {isDatabaseJob(job)
+                        ? getCategoryLabel(job.category)
+                        : "Technology"}
                     </p>
                   </div>
                 </div>
@@ -452,28 +671,66 @@ const JobDetail = () => {
         </div>
       </div>
 
-      {/* Sticky Apply Button (Mobile) */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-border dark:border-gray-800 p-3 sm:p-4 lg:hidden">
-        <div className="flex gap-2 sm:gap-3 max-w-screen-sm mx-auto">
-          <button
-            onClick={() => setIsSaved(!isSaved)}
-            className={`flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-lg border transition-colors ${
-              isSaved
-                ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400"
-                : "border-border dark:border-gray-700 text-muted-foreground dark:text-gray-400"
-            }`}
-          >
-            <HiHeart
-              className={`w-5 h-5 sm:w-6 sm:h-6 ${
-                isSaved ? "fill-current" : ""
-              }`}
-            />
-          </button>
-          <Button size="lg" fullWidth className="flex-1">
-            Apply Now
-          </Button>
+      {/* Sticky Apply Button (Mobile) - Only for Job Seekers */}
+      {user?.role === "JOB_SEEKER" && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-border dark:border-gray-800 p-3 sm:p-4 lg:hidden">
+          <div className="flex gap-2 sm:gap-3 max-w-screen-sm mx-auto">
+            <button
+              onClick={handleSaveJob}
+              disabled={isSaving}
+              className={`flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-lg border transition-colors ${
+                isSaved
+                  ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400"
+                  : "border-border dark:border-gray-700 text-muted-foreground dark:text-gray-400"
+              } ${isSaving ? "opacity-50 cursor-not-allowed" : ""}`}
+            >
+              {isSaving ? (
+                <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-current"></div>
+              ) : (
+                <HiHeart
+                  className={`w-5 h-5 sm:w-6 sm:h-6 ${
+                    isSaved ? "fill-current" : ""
+                  }`}
+                />
+              )}
+            </button>
+            <Button
+              size="lg"
+              fullWidth
+              className="flex-1"
+              onClick={handleApplyJob}
+              disabled={isApplying || hasApplied}
+            >
+              {isApplying ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+                  Applying...
+                </>
+              ) : hasApplied ? (
+                "Applied ✓"
+              ) : (
+                "Apply Now"
+              )}
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Auth Modal for Saving */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        title="Login to Save Jobs"
+        actionType="save"
+      />
+
+      {/* Auth Modal for Applying */}
+      <AuthModal
+        isOpen={showApplyModal}
+        onClose={() => setShowApplyModal(false)}
+        title="Login to Apply"
+        actionType="apply"
+      />
     </div>
   );
 };

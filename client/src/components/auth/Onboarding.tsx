@@ -1,37 +1,37 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { FiUpload, FiUser, FiBriefcase, FiCamera } from 'react-icons/fi';
-import { userAPI } from '../../services/api';
+import React, { useState } from "react";
+import { motion } from "framer-motion";
+import { FiUpload, FiUser, FiBriefcase, FiCamera } from "react-icons/fi";
+import { userAPI, attachmentAPI } from "../../services/api";
 
 interface OnboardingProps {
   onComplete: () => void;
 }
 
-type UserRole = 'JOB_SEEKER' | 'EMPLOYER';
+type UserRole = "JOB_SEEKER" | "EMPLOYER";
 
 export function Onboarding({ onComplete }: OnboardingProps) {
   const [step, setStep] = useState(1);
   const [role, setRole] = useState<UserRole | null>(null);
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   // Job Seeker fields
-  const [location, setLocation] = useState('');
-  const [bio, setBio] = useState('');
+  const [location, setLocation] = useState("");
+  const [bio, setBio] = useState("");
   const [skills, setSkills] = useState<string[]>([]);
-  const [experience, setExperience] = useState('');
-  const [education] = useState('');
+  const [experience, setExperience] = useState("");
+  const [education] = useState("");
 
   // Employer fields
-  const [companyName, setCompanyName] = useState('');
-  const [industry, setIndustry] = useState('');
-  const [website, setWebsite] = useState('');
-  const [companyDescription, setCompanyDescription] = useState('');
-  const [companySize] = useState('');
+  const [companyName, setCompanyName] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [website, setWebsite] = useState("");
+  const [companyDescription, setCompanyDescription] = useState("");
+  const [companySize] = useState("");
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -45,29 +45,48 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     }
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const uploadImageToCloudinary = async (_file: File): Promise<string> => {
-    // For demo purposes, return a placeholder URL
-    // In production, implement actual image upload to Cloudinary or similar service
-    return 'https://via.placeholder.com/200x200';
+  const uploadImageToCloudinary = async (file: File): Promise<string> => {
+    try {
+      const response = await attachmentAPI.upload([file], "USER");
+      if (
+        response.success &&
+        response.data &&
+        typeof response.data === "object" &&
+        "attachments" in response.data
+      ) {
+        const responseData = response.data as {
+          attachments: Array<{ url: string }>;
+        };
+        if (responseData.attachments.length > 0) {
+          return responseData.attachments[0].url;
+        }
+      }
+      throw new Error("Failed to upload image");
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      throw error;
+    }
   };
 
   const handleSkillsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const skillsArray = e.target.value.split(',').map(skill => skill.trim()).filter(Boolean);
+    const skillsArray = e.target.value
+      .split(",")
+      .map((skill) => skill.trim())
+      .filter(Boolean);
     setSkills(skillsArray);
   };
 
   const handleSubmit = async () => {
     if (!role || !firstName || !lastName) {
-      setError('Please fill in all required fields');
+      setError("Please fill in all required fields");
       return;
     }
 
     setIsLoading(true);
-    setError('');
+    setError("");
 
     try {
-      let imageUrl = '';
+      let imageUrl = "";
       if (imageFile) {
         imageUrl = await uploadImageToCloudinary(imageFile);
       }
@@ -79,7 +98,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         imageUrl,
       };
 
-      if (role === 'JOB_SEEKER') {
+      if (role === "JOB_SEEKER") {
         profileData.location = location;
         profileData.bio = bio;
         profileData.skills = skills;
@@ -95,14 +114,16 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
       const response = await userAPI.completeOnboarding(profileData);
 
-      if (response.data.success) {
+      if (response.success) {
         onComplete();
       } else {
-        setError('Onboarding failed. Please try again.');
+        setError("Onboarding failed. Please try again.");
       }
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
-      setError(error.response?.data?.message || 'An error occurred during onboarding');
+      setError(
+        error.response?.data?.message || "An error occurred during onboarding"
+      );
     } finally {
       setIsLoading(false);
     }
@@ -127,11 +148,11 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => setRole('JOB_SEEKER')}
+              onClick={() => setRole("JOB_SEEKER")}
               className={`p-8 rounded-xl border-2 transition-all ${
-                role === 'JOB_SEEKER'
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                  : 'border-gray-300 dark:border-gray-600 hover:border-blue-300'
+                role === "JOB_SEEKER"
+                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                  : "border-gray-300 dark:border-gray-600 hover:border-blue-300"
               }`}
             >
               <FiUser className="text-4xl text-blue-600 mx-auto mb-4" />
@@ -146,11 +167,11 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => setRole('EMPLOYER')}
+              onClick={() => setRole("EMPLOYER")}
               className={`p-8 rounded-xl border-2 transition-all ${
-                role === 'EMPLOYER'
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                  : 'border-gray-300 dark:border-gray-600 hover:border-blue-300'
+                role === "EMPLOYER"
+                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                  : "border-gray-300 dark:border-gray-600 hover:border-blue-300"
               }`}
             >
               <FiBriefcase className="text-4xl text-blue-600 mx-auto mb-4" />
@@ -247,7 +268,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           </div>
 
           {/* Role-specific fields */}
-          {role === 'JOB_SEEKER' && (
+          {role === "JOB_SEEKER" && (
             <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -303,7 +324,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             </>
           )}
 
-          {role === 'EMPLOYER' && (
+          {role === "EMPLOYER" && (
             <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -372,7 +393,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
               disabled={isLoading}
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'Setting up...' : 'Complete Setup'}
+              {isLoading ? "Setting up..." : "Complete Setup"}
             </button>
           </div>
         </div>

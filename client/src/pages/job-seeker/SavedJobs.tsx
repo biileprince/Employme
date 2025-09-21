@@ -1,9 +1,14 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { MdBookmark, MdLocationOn, MdAttachMoney, MdBusinessCenter } from "react-icons/md";
+import {
+  MdBookmark,
+  MdLocationOn,
+  MdAttachMoney,
+  MdBusinessCenter,
+} from "react-icons/md";
 import { Button } from "../../components/ui";
-import { jobsAPI } from "../../services/api";
+import { savedJobsAPI } from "../../services/api";
 
 interface SavedJob {
   id: string;
@@ -31,9 +36,11 @@ export default function SavedJobs() {
     const loadSavedJobs = async () => {
       try {
         setIsLoading(true);
-        const response = await jobsAPI.getSavedJobs();
+        const response = await savedJobsAPI.getSavedJobs();
         if (response.success) {
-          setSavedJobs(response.data.savedJobs || []);
+          setSavedJobs(
+            (response.data as { savedJobs: SavedJob[] }).savedJobs || []
+          );
         } else {
           setError(response.message || "Failed to load saved jobs");
         }
@@ -51,9 +58,11 @@ export default function SavedJobs() {
 
   const handleUnsave = async (jobId: string) => {
     try {
-      const response = await jobsAPI.unsaveJob(jobId);
+      const response = await savedJobsAPI.unsaveJob(jobId);
       if (response.success) {
-        setSavedJobs(prev => prev.filter(savedJob => savedJob.job.id !== jobId));
+        setSavedJobs((prev) =>
+          prev.filter((savedJob) => savedJob.job.id !== jobId)
+        );
       }
     } catch (err) {
       console.error("Failed to unsave job:", err);
@@ -62,7 +71,8 @@ export default function SavedJobs() {
 
   const formatSalary = (min?: number, max?: number) => {
     if (!min && !max) return "Salary not specified";
-    if (min && max) return `GH₵${min.toLocaleString()} - GH₵${max.toLocaleString()}`;
+    if (min && max)
+      return `GH₵${min.toLocaleString()} - GH₵${max.toLocaleString()}`;
     if (min) return `From GH₵${min.toLocaleString()}`;
     if (max) return `Up to GH₵${max.toLocaleString()}`;
     return "Salary not specified";
@@ -74,13 +84,18 @@ export default function SavedJobs() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Saved Jobs</h1>
-            <p className="text-muted-foreground">Manage your bookmarked job opportunities</p>
+            <p className="text-muted-foreground">
+              Manage your bookmarked job opportunities
+            </p>
           </div>
         </div>
-        
+
         <div className="grid gap-4">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="bg-card rounded-lg border border-border p-6 animate-pulse">
+            <div
+              key={i}
+              className="bg-card rounded-lg border border-border p-6 animate-pulse"
+            >
               <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
               <div className="h-3 bg-muted rounded w-1/2 mb-4"></div>
               <div className="space-y-2">
@@ -100,10 +115,12 @@ export default function SavedJobs() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Saved Jobs</h1>
-            <p className="text-muted-foreground">Manage your bookmarked job opportunities</p>
+            <p className="text-muted-foreground">
+              Manage your bookmarked job opportunities
+            </p>
           </div>
         </div>
-        
+
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 dark:bg-red-950 dark:border-red-800">
           <p className="text-red-600 dark:text-red-400">{error}</p>
           <Button
@@ -124,13 +141,17 @@ export default function SavedJobs() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Saved Jobs</h1>
-            <p className="text-muted-foreground">Manage your bookmarked job opportunities</p>
+            <p className="text-muted-foreground">
+              Manage your bookmarked job opportunities
+            </p>
           </div>
         </div>
-        
+
         <div className="text-center py-12">
           <MdBookmark className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">No saved jobs yet</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-2">
+            No saved jobs yet
+          </h3>
           <p className="text-muted-foreground mb-6">
             Start browsing jobs and save the ones you're interested in.
           </p>
@@ -148,7 +169,7 @@ export default function SavedJobs() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Saved Jobs</h1>
           <p className="text-muted-foreground">
-            {savedJobs.length} job{savedJobs.length === 1 ? '' : 's'} saved
+            {savedJobs.length} job{savedJobs.length === 1 ? "" : "s"} saved
           </p>
         </div>
       </div>
@@ -177,7 +198,7 @@ export default function SavedJobs() {
                     <p className="text-muted-foreground mb-3">
                       {savedJob.job.employer.companyName}
                     </p>
-                    
+
                     <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-4">
                       <div className="flex items-center gap-1">
                         <MdLocationOn className="w-4 h-4" />
@@ -189,17 +210,22 @@ export default function SavedJobs() {
                       </div>
                       <div className="flex items-center gap-1">
                         <MdAttachMoney className="w-4 h-4" />
-                        <span>{formatSalary(savedJob.job.salaryMin, savedJob.job.salaryMax)}</span>
+                        <span>
+                          {formatSalary(
+                            savedJob.job.salaryMin,
+                            savedJob.job.salaryMax
+                          )}
+                        </span>
                       </div>
                     </div>
-                    
+
                     <p className="text-muted-foreground text-sm line-clamp-2">
                       {savedJob.job.description}
                     </p>
                   </div>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-3 ml-4">
                 <button
                   onClick={() => handleUnsave(savedJob.job.id)}

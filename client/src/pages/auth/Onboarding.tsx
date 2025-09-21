@@ -636,8 +636,8 @@ export default function Onboarding() {
                     >
                       <option value="">Select industry</option>
                       {INDUSTRIES.map((industry) => (
-                        <option key={industry} value={industry.toUpperCase()}>
-                          {industry}
+                        <option key={industry.value} value={industry.value}>
+                          {industry.label}
                         </option>
                       ))}
                     </select>

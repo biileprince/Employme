@@ -31,10 +31,20 @@ export default function MyApplications() {
   const fetchApplications = async () => {
     try {
       const response = await applicationsAPI.getMyApplications();
-      setApplications(response.data as Application[]);
+      if (response.success && response.data) {
+        // Ensure we get an array
+        const applicationsData = Array.isArray(response.data)
+          ? response.data
+          : (response.data as { applications: Application[] })?.applications ||
+            [];
+        setApplications(applicationsData as Application[]);
+      } else {
+        setApplications([]);
+      }
     } catch (err) {
       console.error("Failed to fetch applications:", err);
       setError("Failed to fetch applications");
+      setApplications([]); // Ensure applications is always an array
     } finally {
       setIsLoading(false);
     }

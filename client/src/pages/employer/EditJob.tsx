@@ -1,17 +1,19 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { useAuth } from '../../contexts/AuthContext';
-import { 
-  MdLocationOn, 
-  MdSearch, 
-  MdAdd, 
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { motion } from "framer-motion";
+import { useAuth } from "../../contexts/AuthContext";
+import {
+  MdLocationOn,
+  MdSearch,
+  MdAdd,
   MdClose,
-  MdArrowBack 
-} from 'react-icons/md';
-import PhoneInput from '../../components/ui/PhoneInput';
-import { INDUSTRIES, LOCATION_API_CONFIG } from '../../utils/constants';
-import { jobsAPI } from '../../services/api';
+  MdArrowBack,
+} from "react-icons/md";
+import PhoneInput from "../../components/ui/PhoneInput";
+import ImageUpload from "../../components/ui/ImageUpload";
+import Button from "../../components/ui/Button";
+import { INDUSTRIES, LOCATION_API_CONFIG } from "../../utils/constants";
+import { jobsAPI, attachmentAPI, formatImageUrl } from "../../services/api";
 
 interface LocationResult {
   place_id: number;
@@ -24,6 +26,7 @@ interface Job {
   id: string;
   title: string;
   description: string;
+  responsibilities?: string;
   requirements: string[] | string;
   benefits: string[];
   location: string;
@@ -36,6 +39,12 @@ interface Job {
   applicationDeadline?: string;
   contactPhone?: string;
   contactCountryCode?: string;
+  attachments?: Array<{
+    id: string;
+    url: string;
+    name: string;
+    fileType: string;
+  }>;
 }
 
 const EditJob = () => {
@@ -44,31 +53,33 @@ const EditJob = () => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
-  const [error, setError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
-  const [currentBenefit, setCurrentBenefit] = useState('');
+  const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [currentBenefit, setCurrentBenefit] = useState("");
 
   // Location search states
-  const [locationSearch, setLocationSearch] = useState('');
+  const [locationSearch, setLocationSearch] = useState("");
   const [locationResults, setLocationResults] = useState<LocationResult[]>([]);
   const [isSearchingLocation, setIsSearchingLocation] = useState(false);
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
 
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    requirements: '',
+    title: "",
+    description: "",
+    requirements: "",
+    responsibilities: "", // Add responsibilities field
     benefits: [] as string[],
-    location: '',
-    category: '',
-    experienceLevel: 'ENTRY_LEVEL',
-    type: 'FULL_TIME',
-    salaryMin: '',
-    salaryMax: '',
+    location: "",
+    category: "",
+    experienceLevel: "ENTRY_LEVEL",
+    type: "FULL_TIME",
+    salaryMin: "",
+    salaryMax: "",
     isRemote: false,
-    applicationDeadline: '',
-    contactPhone: '',
-    contactCountryCode: '+233'
+    applicationDeadline: "",
+    contactPhone: "",
+    contactCountryCode: "+233",
+    jobImages: [] as string[], // Add job images field
   });
 
   useEffect(() => {
@@ -76,35 +87,42 @@ const EditJob = () => {
       try {
         setIsFetching(true);
         const response = await jobsAPI.getById(jobId!);
-        console.log('Job response:', response); // Debug log
-        
+        console.log("Job response:", response); // Debug log
+
         // Handle the response structure - backend returns { success: true, data: { job: ... } }
         const jobData = response.data as { job: Job } | Job;
-        const job = 'job' in jobData ? jobData.job : jobData;
-        
+        const job = "job" in jobData ? jobData.job : jobData;
+
         setFormData({
-          title: job.title || '',
-          description: job.description || '',
-          requirements: Array.isArray(job.requirements) 
-            ? job.requirements.join('\n') 
-            : job.requirements || '',
+          title: job.title || "",
+          description: job.description || "",
+          requirements: Array.isArray(job.requirements)
+            ? job.requirements.join("\n")
+            : job.requirements || "",
+          responsibilities: job.responsibilities || "", // Load existing responsibilities
           benefits: job.benefits || [],
-          location: job.location || '',
-          category: job.category || '',
-          experienceLevel: job.experienceLevel || 'ENTRY_LEVEL',
-          type: job.type || 'FULL_TIME',
-          salaryMin: job.salaryMin ? job.salaryMin.toString() : '',
-          salaryMax: job.salaryMax ? job.salaryMax.toString() : '',
+          location: job.location || "",
+          category: job.category || "",
+          experienceLevel: job.experienceLevel || "ENTRY_LEVEL",
+          type: job.type || "FULL_TIME",
+          salaryMin: job.salaryMin ? job.salaryMin.toString() : "",
+          salaryMax: job.salaryMax ? job.salaryMax.toString() : "",
           isRemote: job.isRemote || false,
-          applicationDeadline: job.applicationDeadline ? new Date(job.applicationDeadline).toISOString().split('T')[0] : '',
-          contactPhone: job.contactPhone || '',
-          contactCountryCode: job.contactCountryCode || '+233'
+          applicationDeadline: job.applicationDeadline
+            ? new Date(job.applicationDeadline).toISOString().split("T")[0]
+            : "",
+          contactPhone: job.contactPhone || "",
+          contactCountryCode: job.contactCountryCode || "+233",
+          jobImages:
+            job.attachments
+              ?.filter((att) => att.fileType.startsWith("image/"))
+              .map((att) => formatImageUrl(att.url)) || [],
         });
 
-        setLocationSearch(job.location || '');
+        setLocationSearch(job.location || "");
       } catch (err) {
-        console.error('Failed to fetch job details:', err);
-        setError('Failed to load job details');
+        console.error("Failed to fetch job details:", err);
+        setError("Failed to load job details");
       } finally {
         setIsFetching(false);
       }
@@ -124,108 +142,184 @@ const EditJob = () => {
     setIsSearchingLocation(true);
     try {
       const response = await fetch(
-        `${LOCATION_API_CONFIG.baseUrl}?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=${LOCATION_API_CONFIG.countryCodes}`
+        `${LOCATION_API_CONFIG.baseUrl}?format=json&q=${encodeURIComponent(
+          query
+        )}&limit=5&countrycodes=${LOCATION_API_CONFIG.countryCodes}`
       );
       const data = await response.json();
       setLocationResults(data || []);
       setShowLocationDropdown(true);
     } catch (error) {
-      console.error('Error searching locations:', error);
+      console.error("Error searching locations:", error);
       setLocationResults([]);
     }
     setIsSearchingLocation(false);
   };
 
   const extractCityName = (displayName: string) => {
-    const parts = displayName.split(',');
+    const parts = displayName.split(",");
     return parts[0].trim();
   };
 
   const handleLocationSelect = (location: LocationResult) => {
     const cityName = extractCityName(location.display_name);
-    setFormData(prev => ({ ...prev, location: cityName }));
+    setFormData((prev) => ({ ...prev, location: cityName }));
     setLocationSearch(cityName);
     setShowLocationDropdown(false);
     setLocationResults([]);
   };
 
-  const handleLocationSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLocationSearchChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const value = e.target.value;
     setLocationSearch(value);
-    setFormData(prev => ({ ...prev, location: value }));
+    setFormData((prev) => ({ ...prev, location: value }));
     searchLocation(value);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
+  ) => {
     const { name, value, type } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+      [name]:
+        type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
     }));
   };
 
   const addBenefit = () => {
-    if (currentBenefit.trim() && !formData.benefits.includes(currentBenefit.trim())) {
-      setFormData(prev => ({
+    if (
+      currentBenefit.trim() &&
+      !formData.benefits.includes(currentBenefit.trim())
+    ) {
+      setFormData((prev) => ({
         ...prev,
-        benefits: [...prev.benefits, currentBenefit.trim()]
+        benefits: [...prev.benefits, currentBenefit.trim()],
       }));
-      setCurrentBenefit('');
+      setCurrentBenefit("");
     }
   };
 
   const removeBenefit = (benefit: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      benefits: prev.benefits.filter(b => b !== benefit)
+      benefits: prev.benefits.filter((b) => b !== benefit),
+    }));
+  };
+
+  const handleJobImageUpload = async (files: File[]) => {
+    try {
+      // Only allow one job image
+      if (files.length > 1) {
+        setError("Only one job advertisement image is allowed");
+        return;
+      }
+
+      const response = await attachmentAPI.upload(files, "job", jobId!);
+      if (
+        response.success &&
+        response.data &&
+        typeof response.data === "object" &&
+        "attachments" in response.data
+      ) {
+        const uploadedAttachments = response.data.attachments as Array<{
+          id: string;
+          url: string;
+          filename: string;
+        }>;
+        setFormData((prev) => ({
+          ...prev,
+          // Replace existing job images with the new one (only one allowed)
+          jobImages: uploadedAttachments.map((att) => formatImageUrl(att.url)),
+        }));
+      }
+    } catch (error) {
+      console.error("Failed to upload job images:", error);
+      setError("Failed to upload job images");
+    }
+  };
+
+  const handleRemoveJobImage = () => {
+    setFormData((prev) => ({
+      ...prev,
+      jobImages: [], // Clear job images array
     }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!user) {
-      setError('You must be logged in to update a job');
+      setError("You must be logged in to update a job");
       return;
     }
 
-    if (!formData.title || !formData.description || !formData.location || !formData.category) {
-      setError('Please fill in all required fields');
+    if (
+      !formData.title ||
+      !formData.description ||
+      !formData.location ||
+      !formData.category
+    ) {
+      setError("Please fill in all required fields");
       return;
     }
 
     setIsLoading(true);
-    setError('');
-    setSuccessMessage('');
+    setError("");
+    setSuccessMessage("");
 
     try {
       const jobData = {
         title: formData.title,
         description: formData.description,
-        requirements: formData.requirements.split('\n').filter(req => req.trim()), // Convert to array
+        responsibilities: formData.responsibilities, // Add responsibilities field
+        requirements: formData.requirements
+          .split("\n")
+          .filter((req) => req.trim()), // Convert to array
         location: formData.location,
         isRemote: formData.isRemote,
         jobType: formData.type,
         experience: formData.experienceLevel,
-        salaryMin: formData.salaryMin ? parseInt(formData.salaryMin) : undefined,
-        salaryMax: formData.salaryMax ? parseInt(formData.salaryMax) : undefined,
+        salaryMin: formData.salaryMin
+          ? parseInt(formData.salaryMin)
+          : undefined,
+        salaryMax: formData.salaryMax
+          ? parseInt(formData.salaryMax)
+          : undefined,
         deadline: formData.applicationDeadline || undefined,
         category: formData.category,
         benefits: formData.benefits,
         contactPhone: formData.contactPhone,
         contactCountryCode: formData.contactCountryCode,
+        jobImages: formData.jobImages.map((url) => {
+          // Convert absolute URLs back to relative for storage
+          if (
+            url.startsWith("http://localhost:5000") ||
+            url.startsWith("http://localhost:5001")
+          ) {
+            return url.replace(/^https?:\/\/localhost:\d+/, "");
+          }
+          return url;
+        }),
       };
 
       await jobsAPI.update(jobId!, jobData);
-      setSuccessMessage('Job updated successfully!');
-      
+      setSuccessMessage("Job updated successfully!");
+
       // Navigate back to my jobs after a short delay
       setTimeout(() => {
-        navigate('/employer/my-jobs');
+        navigate("/employer/my-jobs");
       }, 2000);
     } catch (err: unknown) {
-      console.error('Error updating job:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update job. Please try again.';
+      console.error("Error updating job:", err);
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Failed to update job. Please try again.";
       setError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -249,14 +343,16 @@ const EditJob = () => {
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <button
-            onClick={() => navigate('/employer/my-jobs')}
+            onClick={() => navigate("/employer/my-jobs")}
             className="p-2 rounded-lg border border-border hover:bg-muted transition-colors"
           >
             <MdArrowBack className="w-5 h-5" />
           </button>
           <div>
             <h1 className="text-3xl font-bold text-foreground">Edit Job</h1>
-            <p className="text-muted-foreground">Update your job posting details</p>
+            <p className="text-muted-foreground">
+              Update your job posting details
+            </p>
           </div>
         </div>
 
@@ -288,7 +384,7 @@ const EditJob = () => {
             className="bg-card text-card-foreground p-6 rounded-xl border border-border"
           >
             <h2 className="text-xl font-semibold mb-6">Basic Information</h2>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
@@ -318,8 +414,8 @@ const EditJob = () => {
                 >
                   <option value="">Select Category</option>
                   {INDUSTRIES.map((industry) => (
-                    <option key={industry} value={industry}>
-                      {industry}
+                    <option key={industry.value} value={industry.value}>
+                      {industry.label}
                     </option>
                   ))}
                 </select>
@@ -392,7 +488,9 @@ const EditJob = () => {
                     >
                       <div className="flex items-center gap-2">
                         <MdLocationOn className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                        <span className="text-foreground">{extractCityName(location.display_name)}</span>
+                        <span className="text-foreground">
+                          {extractCityName(location.display_name)}
+                        </span>
                       </div>
                     </button>
                   ))}
@@ -410,7 +508,9 @@ const EditJob = () => {
                   onChange={handleInputChange}
                   className="w-4 h-4 text-primary bg-background border-border rounded focus:ring-primary focus:ring-2"
                 />
-                <span className="text-sm font-medium text-foreground">This is a remote position</span>
+                <span className="text-sm font-medium text-foreground">
+                  This is a remote position
+                </span>
               </label>
             </div>
           </motion.div>
@@ -423,7 +523,7 @@ const EditJob = () => {
             className="bg-card text-card-foreground p-6 rounded-xl border border-border"
           >
             <h2 className="text-xl font-semibold mb-6">Job Details</h2>
-            
+
             <div className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
@@ -437,6 +537,21 @@ const EditJob = () => {
                   placeholder="Describe the role, responsibilities, and what makes this position exciting..."
                   className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground resize-none"
                   required
+                />
+              </div>
+
+              {/* Responsibilities Field */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Key Responsibilities
+                </label>
+                <textarea
+                  name="responsibilities"
+                  value={formData.responsibilities}
+                  onChange={handleInputChange}
+                  rows={4}
+                  placeholder="List the main responsibilities and duties for this role..."
+                  className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground resize-none"
                 />
               </div>
 
@@ -467,7 +582,7 @@ const EditJob = () => {
                     placeholder="Add a benefit..."
                     className="flex-1 px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                     onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
+                      if (e.key === "Enter") {
                         e.preventDefault();
                         addBenefit();
                       }
@@ -481,7 +596,7 @@ const EditJob = () => {
                     <MdAdd className="w-5 h-5" />
                   </button>
                 </div>
-                
+
                 {formData.benefits.length > 0 && (
                   <div className="flex flex-wrap gap-2">
                     {formData.benefits.map((benefit, index) => (
@@ -502,6 +617,68 @@ const EditJob = () => {
                   </div>
                 )}
               </div>
+
+              {/* Job Advertisement Image Upload */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Job Advertisement Image
+                  <span className="text-sm text-muted-foreground ml-2">
+                    (Only one image allowed)
+                  </span>
+                </label>
+
+                {/* Current Job Image Display with Remove Option */}
+                {formData.jobImages.length > 0 && (
+                  <div className="mb-4 p-4 border border-border rounded-lg bg-muted/20">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-medium text-foreground">
+                        Current Image:
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRemoveJobImage}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <MdClose className="w-4 h-4 mr-1" />
+                        Remove
+                      </Button>
+                    </div>
+                    <div className="w-32 h-32 rounded-lg overflow-hidden bg-muted">
+                      <img
+                        src={formatImageUrl(formData.jobImages[0])}
+                        alt="Current job advertisement"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          console.warn(
+                            "Failed to load job image:",
+                            formData.jobImages[0]
+                          );
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Upload New Image (only show if no current image) */}
+                {formData.jobImages.length === 0 && (
+                  <ImageUpload
+                    onFilesUpload={handleJobImageUpload}
+                    accept="image/*"
+                    maxFiles={1}
+                    label="Upload Job Advertisement Image"
+                    existingImages={[]}
+                  />
+                )}
+
+                <p className="text-sm text-muted-foreground mt-2">
+                  Add an image to showcase the workplace, team, or job
+                  environment. This will be displayed prominently on the job
+                  details page.
+                </p>
+              </div>
             </div>
           </motion.div>
 
@@ -513,7 +690,7 @@ const EditJob = () => {
             className="bg-card text-card-foreground p-6 rounded-xl border border-border"
           >
             <h2 className="text-xl font-semibold mb-6">Salary & Contact</h2>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
@@ -563,8 +740,15 @@ const EditJob = () => {
                 <PhoneInput
                   phoneNumber={formData.contactPhone}
                   countryCode={formData.contactCountryCode}
-                  onPhoneNumberChange={(phone) => setFormData(prev => ({ ...prev, contactPhone: phone }))}
-                  onCountryCodeChange={(code) => setFormData(prev => ({ ...prev, contactCountryCode: code }))}
+                  onPhoneNumberChange={(phone) =>
+                    setFormData((prev) => ({ ...prev, contactPhone: phone }))
+                  }
+                  onCountryCodeChange={(code) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      contactCountryCode: code,
+                    }))
+                  }
                 />
               </div>
             </div>
@@ -579,7 +763,7 @@ const EditJob = () => {
           >
             <button
               type="button"
-              onClick={() => navigate('/employer/my-jobs')}
+              onClick={() => navigate("/employer/my-jobs")}
               className="px-6 py-3 border border-border text-foreground rounded-lg hover:bg-muted transition-colors"
             >
               Cancel
@@ -589,7 +773,7 @@ const EditJob = () => {
               disabled={isLoading}
               className="flex-1 bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'Updating Job...' : 'Update Job'}
+              {isLoading ? "Updating Job..." : "Update Job"}
             </button>
           </motion.div>
         </form>

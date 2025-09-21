@@ -10,7 +10,8 @@ export interface User {
   role: "JOB_SEEKER" | "EMPLOYER" | "ADMIN";
   isVerified: boolean;
   hasProfile: boolean;
-  profile: object | null;
+  profile: Record<string, unknown> | null; // Allow flexible profile structure
+  imageUrl?: string; // Add optional imageUrl property
 }
 
 interface AuthContextType {

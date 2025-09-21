@@ -1,31 +1,55 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { userAPI } from "../../services/api";
+import { userAPI, attachmentAPI, formatImageUrl } from "../../services/api";
 import PhoneInput from "../../components/ui/PhoneInput";
+import Button from "../../components/ui/Button";
+import ImageUpload from "../../components/ui/ImageUpload";
+import FileUpload from "../../components/ui/FileUpload";
+import AttachmentViewer from "../../components/ui/AttachmentViewer";
 
 interface JobSeekerProfile {
   id: string;
   firstName: string;
   lastName: string;
-  email: string;
-  phone?: string;
-  countryCode?: string;
-  location: string;
+  dateOfBirth?: string;
+  location?: string;
   bio?: string;
-  experience: string;
   skills: string[];
+  experience?: string;
   education?: string;
-  resumeUrl?: string;
-  portfolioUrl?: string;
-  linkedinUrl?: string;
-  isAvailable: boolean;
-  preferredSalary?: string;
-  industry?: string;
-  jobTypes: string[];
+  cvUrl?: string;
+  profileImageUrl?: string;
+  isProfilePublic: boolean;
+  countryCode?: string;
+  phone?: string;
+  resumeAttachments?: Array<{
+    id: string;
+    url: string;
+    filename: string;
+    fileType: string;
+    fileSize: number;
+  }>;
+}
+
+interface UserData {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  role: string;
+  imageUrl?: string;
+  profile?: JobSeekerProfile;
+}
+
+interface ApiResponse {
+  success: boolean;
+  data: {
+    user: UserData;
+  };
 }
 
 export default function JobSeekerProfile() {
-  const [profile, setProfile] = useState<JobSeekerProfile | null>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
@@ -35,20 +59,17 @@ export default function JobSeekerProfile() {
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
-    phone: "",
-    countryCode: "+233",
+    dateOfBirth: "",
     location: "",
     bio: "",
-    experience: "",
     skills: [] as string[],
+    experience: "",
     education: "",
-    resumeUrl: "",
-    portfolioUrl: "",
-    linkedinUrl: "",
-    isAvailable: true,
-    preferredSalary: "",
-    industry: "",
-    jobTypes: [] as string[],
+    cvUrl: "",
+    profileImageUrl: "",
+    isProfilePublic: true,
+    countryCode: "+233",
+    phone: "",
   });
 
   const [newSkill, setNewSkill] = useState("");
@@ -59,34 +80,133 @@ export default function JobSeekerProfile() {
 
   const fetchProfile = async () => {
     try {
-      const response = await userAPI.getProfile();
-      const profileData = response.data as JobSeekerProfile;
-      setProfile(profileData);
+      setIsLoading(true);
+      const response = (await userAPI.me()) as ApiResponse;
+      const data = response.data.user;
+      setUserData(data);
 
       // Populate form with current data
-      setFormData({
-        firstName: profileData.firstName || "",
-        lastName: profileData.lastName || "",
-        phone: profileData.phone || "",
-        countryCode: profileData.countryCode || "+233",
-        location: profileData.location || "",
-        bio: profileData.bio || "",
-        experience: profileData.experience || "",
-        skills: profileData.skills || [],
-        education: profileData.education || "",
-        resumeUrl: profileData.resumeUrl || "",
-        portfolioUrl: profileData.portfolioUrl || "",
-        linkedinUrl: profileData.linkedinUrl || "",
-        isAvailable: profileData.isAvailable ?? true,
-        preferredSalary: profileData.preferredSalary || "",
-        industry: profileData.industry || "",
-        jobTypes: profileData.jobTypes || [],
-      });
+      if (data.profile) {
+        setFormData({
+          firstName: data.profile.firstName || data.firstName || "",
+          lastName: data.profile.lastName || data.lastName || "",
+          dateOfBirth: data.profile.dateOfBirth
+            ? data.profile.dateOfBirth.split("T")[0]
+            : "",
+          location: data.profile.location || "",
+          bio: data.profile.bio || "",
+          skills: data.profile.skills || [],
+          experience: data.profile.experience || "",
+          education: data.profile.education || "",
+          cvUrl: data.profile.cvUrl || "",
+          profileImageUrl: data.profile.profileImageUrl || data.imageUrl || "",
+          isProfilePublic: data.profile.isProfilePublic ?? true,
+          countryCode: data.profile.countryCode || "+233",
+          phone: data.profile.phone || "",
+        });
+      } else {
+        // No profile exists, prefill with user data
+        setFormData((prev) => ({
+          ...prev,
+          firstName: data.firstName || "",
+          lastName: data.lastName || "",
+          profileImageUrl: data.imageUrl || "",
+        }));
+      }
     } catch (err) {
       console.error("Failed to fetch profile:", err);
       setError("Failed to fetch profile");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleProfileImageUpload = async (files: File[]) => {
+    try {
+      const response = await attachmentAPI.upload(files, "USER");
+      if (
+        response.success &&
+        response.data &&
+        typeof response.data === "object" &&
+        "attachments" in response.data
+      ) {
+        const responseData = response.data as {
+          attachments: Array<{ url: string; id: string; filename: string }>;
+        };
+        if (responseData.attachments.length > 0) {
+          const uploadedAttachment = responseData.attachments[0];
+          const imageUrl = formatImageUrl(uploadedAttachment.url);
+
+          // Update form data
+          setFormData((prev) => ({
+            ...prev,
+            profileImageUrl: imageUrl,
+          }));
+
+          // Update userData state so image appears immediately
+          setUserData((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  imageUrl: imageUrl,
+                  profile: {
+                    ...prev.profile!,
+                    profileImageUrl: imageUrl,
+                  },
+                }
+              : prev
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Failed to upload profile image:", error);
+      setError("Failed to upload profile image");
+    }
+  };
+
+  const handleResumeUpload = async (files: File[]) => {
+    try {
+      const response = await attachmentAPI.upload(files, "USER");
+      if (
+        response.success &&
+        response.data &&
+        typeof response.data === "object" &&
+        "attachments" in response.data
+      ) {
+        const responseData = response.data as {
+          attachments: Array<{ url: string; id: string; filename: string }>;
+        };
+        if (responseData.attachments.length > 0) {
+          const uploadedAttachment = responseData.attachments[0];
+          setFormData((prev) => ({
+            ...prev,
+            cvUrl: uploadedAttachment.url,
+          }));
+          // Store the attachment in userData for display
+          setUserData((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  profile: {
+                    ...prev.profile!,
+                    resumeAttachments: [
+                      {
+                        id: uploadedAttachment.id,
+                        url: uploadedAttachment.url,
+                        filename: uploadedAttachment.filename || files[0].name,
+                        fileType: files[0].type || "application/pdf",
+                        fileSize: files[0].size,
+                      },
+                    ],
+                  },
+                }
+              : prev
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Failed to upload resume:", error);
+      setError("Failed to upload resume");
     }
   };
 
@@ -96,7 +216,7 @@ export default function JobSeekerProfile() {
     setSuccess("");
 
     try {
-      await userAPI.updateProfile(formData);
+      await userAPI.updateJobSeekerProfile(formData);
       setSuccess("Profile updated successfully!");
       setIsEditing(false);
       await fetchProfile(); // Refresh profile
@@ -144,35 +264,49 @@ export default function JobSeekerProfile() {
         </div>
 
         <div className="flex items-center space-x-4">
+          {/* Profile Image Display */}
+          {(userData?.profile?.profileImageUrl || userData?.imageUrl) && (
+            <div className="flex-shrink-0">
+              <img
+                src={formatImageUrl(
+                  userData.profile?.profileImageUrl || userData.imageUrl!
+                )}
+                alt="Profile"
+                className="w-16 h-16 object-cover rounded-full border-2 border-border bg-background"
+                onError={(e) => {
+                  console.warn(
+                    "Failed to load header profile image:",
+                    userData?.profile?.profileImageUrl || userData?.imageUrl
+                  );
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
+              />
+            </div>
+          )}
+
           {!isEditing ? (
-            <button
-              onClick={() => setIsEditing(true)}
-              className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
-            >
+            <Button onClick={() => setIsEditing(true)} variant="primary">
               Edit Profile
-            </button>
+            </Button>
           ) : (
-            <div className="space-x-2">
-              <button
-                onClick={() => setIsEditing(false)}
-                className="bg-muted text-muted-foreground px-4 py-2 rounded-md hover:bg-muted/80 transition-colors"
-              >
+            <div className="flex space-x-2">
+              <Button onClick={() => setIsEditing(false)} variant="outline">
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleSave}
-                disabled={isSaving}
-                className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
+                isLoading={isSaving}
+                variant="primary"
               >
-                {isSaving ? "Saving..." : "Save Changes"}
-              </button>
+                Save Changes
+              </Button>
             </div>
           )}
         </div>
       </div>
 
       {error && (
-        <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-md mb-6">
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md mb-6 dark:bg-red-950 dark:border-red-800 dark:text-red-400">
           {error}
         </div>
       )}
@@ -194,6 +328,47 @@ export default function JobSeekerProfile() {
             <h2 className="text-xl font-semibold text-foreground mb-4">
               Basic Information
             </h2>
+
+            {/* Profile Image Upload */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Profile Image
+              </label>
+              {isEditing ? (
+                <ImageUpload
+                  onFilesUpload={handleProfileImageUpload}
+                  accept="image/*"
+                  maxFiles={1}
+                  label="Upload Profile Image"
+                  existingImages={
+                    formData.profileImageUrl ? [formData.profileImageUrl] : []
+                  }
+                />
+              ) : (
+                <div className="flex items-center gap-4">
+                  {userData?.profile?.profileImageUrl || userData?.imageUrl ? (
+                    <img
+                      src={formatImageUrl(
+                        userData.profile?.profileImageUrl || userData.imageUrl!
+                      )}
+                      alt="Profile"
+                      className="w-16 h-16 object-cover rounded-full border border-border"
+                      onError={(e) => {
+                        console.warn(
+                          "Failed to load profile image:",
+                          userData?.profile?.profileImageUrl ||
+                            userData?.imageUrl
+                        );
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <p className="text-muted-foreground">No profile image</p>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
@@ -210,7 +385,9 @@ export default function JobSeekerProfile() {
                   />
                 ) : (
                   <div className="text-foreground">
-                    {profile?.firstName || "Not specified"}
+                    {userData?.profile?.firstName ||
+                      userData?.firstName ||
+                      "Not specified"}
                   </div>
                 )}
               </div>
@@ -230,7 +407,33 @@ export default function JobSeekerProfile() {
                   />
                 ) : (
                   <div className="text-foreground">
-                    {profile?.lastName || "Not specified"}
+                    {userData?.profile?.lastName ||
+                      userData?.lastName ||
+                      "Not specified"}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  Date of Birth
+                </label>
+                {isEditing ? (
+                  <input
+                    type="date"
+                    value={formData.dateOfBirth}
+                    onChange={(e) =>
+                      setFormData({ ...formData, dateOfBirth: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                  />
+                ) : (
+                  <div className="text-foreground">
+                    {userData?.profile?.dateOfBirth
+                      ? new Date(
+                          userData.profile.dateOfBirth
+                        ).toLocaleDateString()
+                      : "Not specified"}
                   </div>
                 )}
               </div>
@@ -253,16 +456,18 @@ export default function JobSeekerProfile() {
                   />
                 ) : (
                   <div className="text-foreground">
-                    {profile?.phone
-                      ? `${profile.countryCode || "+233"} ${profile.phone}`
+                    {userData?.profile?.phone
+                      ? `${userData?.profile?.countryCode || "+233"} ${
+                          userData?.profile?.phone
+                        }`
                       : "Not specified"}
                   </div>
                 )}
               </div>
 
-              <div>
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  Location *
+                  Location
                 </label>
                 {isEditing ? (
                   <input
@@ -271,12 +476,12 @@ export default function JobSeekerProfile() {
                     onChange={(e) =>
                       setFormData({ ...formData, location: e.target.value })
                     }
-                    placeholder="e.g., New York, NY or Remote"
+                    placeholder="e.g., Accra, Ghana"
                     className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                   />
                 ) : (
                   <div className="text-foreground">
-                    {profile?.location || "Not specified"}
+                    {userData?.profile?.location || "Not specified"}
                   </div>
                 )}
               </div>
@@ -292,7 +497,7 @@ export default function JobSeekerProfile() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  Experience Level *
+                  Experience Level
                 </label>
                 {isEditing ? (
                   <select
@@ -303,61 +508,37 @@ export default function JobSeekerProfile() {
                     className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                   >
                     <option value="">Select experience level</option>
-                    <option value="Entry Level">Entry Level (0-2 years)</option>
-                    <option value="Mid Level">Mid Level (3-5 years)</option>
-                    <option value="Senior Level">
-                      Senior Level (6-10 years)
+                    <option value="ENTRY_LEVEL">Entry Level (0-2 years)</option>
+                    <option value="MID_LEVEL">Mid Level (2-5 years)</option>
+                    <option value="SENIOR_LEVEL">
+                      Senior Level (5+ years)
                     </option>
-                    <option value="Executive">Executive (10+ years)</option>
+                    <option value="EXECUTIVE">Executive (Leadership)</option>
                   </select>
                 ) : (
                   <div className="text-foreground">
-                    {profile?.experience || "Not specified"}
+                    {userData?.profile?.experience || "Not specified"}
                   </div>
                 )}
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  Industry
+                  Education
                 </label>
                 {isEditing ? (
-                  <input
-                    type="text"
-                    value={formData.industry}
+                  <textarea
+                    value={formData.education}
                     onChange={(e) =>
-                      setFormData({ ...formData, industry: e.target.value })
+                      setFormData({ ...formData, education: e.target.value })
                     }
-                    placeholder="e.g., Technology, Healthcare, Finance"
+                    rows={3}
+                    placeholder="Your educational background..."
                     className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                   />
                 ) : (
                   <div className="text-foreground">
-                    {profile?.industry || "Not specified"}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                  Preferred Salary Range
-                </label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={formData.preferredSalary}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        preferredSalary: e.target.value,
-                      })
-                    }
-                    placeholder="e.g., $60,000 - $80,000 or Negotiable"
-                    className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
-                  />
-                ) : (
-                  <div className="text-foreground">
-                    {profile?.preferredSalary || "Not specified"}
+                    {userData?.profile?.education || "Not specified"}
                   </div>
                 )}
               </div>
@@ -377,8 +558,48 @@ export default function JobSeekerProfile() {
                     className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                   />
                 ) : (
-                  <div className="text-foreground whitespace-pre-wrap">
-                    {profile?.bio || "Not specified"}
+                  <div className="text-foreground">
+                    {userData?.profile?.bio || "Not specified"}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  CV/Resume
+                </label>
+                {isEditing ? (
+                  <FileUpload
+                    onFilesUpload={handleResumeUpload}
+                    maxFiles={1}
+                    acceptedTypes={[
+                      "application/pdf",
+                      "application/msword",
+                      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    ]}
+                    maxFileSize={10 * 1024 * 1024} // 10MB
+                    label="Upload CV/Resume"
+                    description="Upload your CV or Resume (.pdf, .doc, .docx)"
+                  />
+                ) : (
+                  <div className="text-foreground">
+                    {userData?.profile?.resumeAttachments &&
+                    userData.profile.resumeAttachments.length > 0 ? (
+                      <AttachmentViewer
+                        attachments={userData.profile.resumeAttachments}
+                      />
+                    ) : userData?.profile?.cvUrl ? (
+                      <a
+                        href={formatImageUrl(userData.profile.cvUrl)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        View CV/Resume
+                      </a>
+                    ) : (
+                      "No resume uploaded"
+                    )}
                   </div>
                 )}
               </div>
@@ -392,34 +613,29 @@ export default function JobSeekerProfile() {
             </h2>
             {isEditing ? (
               <div>
-                <div className="flex gap-2 mb-4">
+                <div className="flex space-x-2 mb-4">
                   <input
                     type="text"
                     value={newSkill}
                     onChange={(e) => setNewSkill(e.target.value)}
-                    onKeyPress={(e) =>
-                      e.key === "Enter" && (e.preventDefault(), addSkill())
-                    }
-                    placeholder="Add a skill and press Enter"
+                    onKeyPress={(e) => e.key === "Enter" && addSkill()}
+                    placeholder="Add a skill"
                     className="flex-1 px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                   />
-                  <button
-                    onClick={addSkill}
-                    className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
-                  >
+                  <Button onClick={addSkill} variant="outline">
                     Add
-                  </button>
+                  </Button>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {formData.skills.map((skill, index) => (
+                  {formData.skills.map((skill: string, index: number) => (
                     <span
                       key={index}
-                      className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-secondary/10 text-secondary"
+                      className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm flex items-center space-x-2"
                     >
-                      {skill}
+                      <span>{skill}</span>
                       <button
                         onClick={() => removeSkill(skill)}
-                        className="ml-2 text-destructive hover:text-destructive/80"
+                        className="text-red-500 hover:text-red-700"
                       >
                         ×
                       </button>
@@ -429,160 +645,61 @@ export default function JobSeekerProfile() {
               </div>
             ) : (
               <div className="flex flex-wrap gap-2">
-                {profile?.skills?.map((skill, index) => (
-                  <span
-                    key={index}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-muted text-muted-foreground"
-                  >
-                    {skill}
-                  </span>
-                )) || (
-                  <div className="text-muted-foreground">No skills added</div>
+                {userData?.profile?.skills?.map(
+                  (skill: string, index: number) => (
+                    <span
+                      key={index}
+                      className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm"
+                    >
+                      {skill}
+                    </span>
+                  )
+                ) || (
+                  <span className="text-muted-foreground">No skills added</span>
                 )}
               </div>
             )}
           </div>
 
-          {/* Links */}
+          {/* Privacy Settings */}
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-foreground mb-4">
-              Links & Documents
+              Privacy Settings
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                  Resume URL
-                </label>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-sm font-medium text-foreground">
+                    Public Profile
+                  </label>
+                  <p className="text-sm text-muted-foreground">
+                    Allow employers to find and view your profile
+                  </p>
+                </div>
                 {isEditing ? (
-                  <input
-                    type="url"
-                    value={formData.resumeUrl}
-                    onChange={(e) =>
-                      setFormData({ ...formData, resumeUrl: e.target.value })
-                    }
-                    placeholder="https://..."
-                    className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
-                  />
-                ) : (
-                  <div className="text-foreground">
-                    {profile?.resumeUrl ? (
-                      <a
-                        href={profile.resumeUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline"
-                      >
-                        View Resume
-                      </a>
-                    ) : (
-                      "Not specified"
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                  Portfolio URL
-                </label>
-                {isEditing ? (
-                  <input
-                    type="url"
-                    value={formData.portfolioUrl}
-                    onChange={(e) =>
-                      setFormData({ ...formData, portfolioUrl: e.target.value })
-                    }
-                    placeholder="https://..."
-                    className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
-                  />
-                ) : (
-                  <div className="text-foreground">
-                    {profile?.portfolioUrl ? (
-                      <a
-                        href={profile.portfolioUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline"
-                      >
-                        View Portfolio
-                      </a>
-                    ) : (
-                      "Not specified"
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                  LinkedIn URL
-                </label>
-                {isEditing ? (
-                  <input
-                    type="url"
-                    value={formData.linkedinUrl}
-                    onChange={(e) =>
-                      setFormData({ ...formData, linkedinUrl: e.target.value })
-                    }
-                    placeholder="https://linkedin.com/in/..."
-                    className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
-                  />
-                ) : (
-                  <div className="text-foreground">
-                    {profile?.linkedinUrl ? (
-                      <a
-                        href={profile.linkedinUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline"
-                      >
-                        View LinkedIn
-                      </a>
-                    ) : (
-                      "Not specified"
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Availability */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-foreground mb-4">
-              Availability
-            </h2>
-            <div className="flex items-center">
-              {isEditing ? (
-                <label className="flex items-center">
                   <input
                     type="checkbox"
-                    checked={formData.isAvailable}
+                    checked={formData.isProfilePublic}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        isAvailable: e.target.checked,
+                        isProfilePublic: e.target.checked,
                       })
                     }
-                    className="h-4 w-4 text-primary focus:ring-primary border-border rounded"
+                    className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
                   />
-                  <span className="ml-2 text-sm text-foreground">
-                    I am currently available for new opportunities
+                ) : (
+                  <span
+                    className={`px-2 py-1 rounded text-xs ${
+                      userData?.profile?.isProfilePublic
+                        ? "bg-secondary/10 text-secondary"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {userData?.profile?.isProfilePublic ? "Public" : "Private"}
                   </span>
-                </label>
-              ) : (
-                <span
-                  className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    profile?.isAvailable
-                      ? "bg-secondary/10 text-secondary"
-                      : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {profile?.isAvailable
-                    ? "Available for opportunities"
-                    : "Not currently looking"}
-                </span>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>

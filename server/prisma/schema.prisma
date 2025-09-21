@@ -114,6 +114,7 @@ model Job {
   title              String
   description        String
   requirements       String[]
+  responsibilities   String[]         @default([])
   location           String
   category           JobCategory      @default(OTHER)
   isRemote           Boolean          @default(false)

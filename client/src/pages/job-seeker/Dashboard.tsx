@@ -10,7 +10,12 @@ import {
   FiEye,
   FiMapPin,
 } from "react-icons/fi";
-import { userAPI, jobsAPI } from "../../services/api";
+import {
+  userAPI,
+  jobsAPI,
+  applicationsAPI,
+  savedJobsAPI,
+} from "../../services/api";
 
 interface DashboardStats {
   totalJobs: number;
@@ -41,6 +46,33 @@ interface UserProfile {
   profile?: Record<string, unknown>;
 }
 
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  message?: string;
+}
+
+interface JobsApiResponse {
+  jobs: RecentJob[];
+  pagination: {
+    total: number;
+    page: number;
+    pages: number;
+  };
+}
+
+interface ApplicationsApiResponse {
+  applications: unknown[];
+}
+
+interface SavedJobsApiResponse {
+  savedJobs: unknown[];
+}
+
+interface UserApiResponse {
+  user: UserProfile;
+}
+
 const Dashboard = () => {
   const { user, isLoading } = useAuth();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -62,12 +94,37 @@ const Dashboard = () => {
         setLoading(true);
         setError(null);
 
-        // Fetch user profile
-        try {
-          const profileResponse = await userAPI.me();
-          setUserProfile(profileResponse.data.user);
-        } catch (profileError) {
-          console.warn("Failed to fetch user profile:", profileError);
+        // Fetch all data in parallel
+        const [
+          profileResponse,
+          jobsResponse,
+          applicationsResponse,
+          savedJobsResponse,
+        ] = await Promise.all([
+          userAPI.me().catch((err) => {
+            console.warn("Failed to fetch user profile:", err);
+            return null;
+          }),
+          jobsAPI.getAll({ limit: 5 }).catch((err) => {
+            console.warn("Failed to fetch recent jobs:", err);
+            return { data: { jobs: [], pagination: { total: 0 } } };
+          }),
+          applicationsAPI.getMyApplications().catch((err) => {
+            console.warn("Failed to fetch applications:", err);
+            return { data: { applications: [] } };
+          }),
+          savedJobsAPI.getSavedJobs().catch((err) => {
+            console.warn("Failed to fetch saved jobs:", err);
+            return { data: { savedJobs: [] } };
+          }),
+        ]);
+
+        // Update user profile
+        if (profileResponse) {
+          setUserProfile(
+            (profileResponse as ApiResponse<UserApiResponse>).data.user
+          );
+        } else {
           // Use auth user data as fallback
           setUserProfile({
             id: user.id,
@@ -77,16 +134,23 @@ const Dashboard = () => {
           });
         }
 
-        // Fetch recent jobs
-        const jobsResponse = await jobsAPI.getAll({ limit: 5 });
-        setRecentJobs(jobsResponse.data.jobs);
+        // Update recent jobs
+        setRecentJobs(
+          (jobsResponse as ApiResponse<JobsApiResponse>).data.jobs || []
+        );
 
-        // Set stats with real data
+        // Update stats with real data
         setStats({
-          totalJobs: jobsResponse.data.pagination.total,
-          savedJobs: 3, // This would come from saved jobs API
-          applications: 7, // This would come from applications API
-          profileViews: 45, // This would come from profile views API
+          totalJobs:
+            (jobsResponse as ApiResponse<JobsApiResponse>).data.pagination
+              ?.total || 0,
+          savedJobs:
+            (savedJobsResponse as ApiResponse<SavedJobsApiResponse>).data
+              .savedJobs?.length || 0,
+          applications:
+            (applicationsResponse as ApiResponse<ApplicationsApiResponse>).data
+              .applications?.length || 0,
+          profileViews: 0, // This would need a dedicated API endpoint
         });
       } catch (error) {
         console.error("Error fetching dashboard data:", error);

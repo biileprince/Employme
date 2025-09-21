@@ -1,22 +1,26 @@
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { 
-  MdDashboard, 
-  MdDescription, 
-  MdBookmark, 
-  MdPerson, 
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import {
+  MdDashboard,
+  MdDescription,
+  MdBookmark,
+  MdPerson,
   MdSearch,
-  MdLogout 
-} from 'react-icons/md';
-import { useAuth } from '../contexts/AuthContext';
-import ThemeToggle from '../components/ui/ThemeToggle';
+  MdLogout,
+} from "react-icons/md";
+import { useAuth } from "../contexts/AuthContext";
+import ThemeToggle from "../components/ui/ThemeToggle";
 
 const sidebarLinks = [
-  { to: '/job-seeker/dashboard', label: 'Dashboard', icon: MdDashboard },
-  { to: '/jobs', label: 'Browse Jobs', icon: MdSearch },
-  { to: '/job-seeker/applications', label: 'My Applications', icon: MdDescription },
-  { to: '/job-seeker/saved-jobs', label: 'Saved Jobs', icon: MdBookmark },
-  { to: '/job-seeker/profile', label: 'Profile', icon: MdPerson },
+  { to: "/job-seeker/dashboard", label: "Dashboard", icon: MdDashboard },
+  { to: "/jobs", label: "Browse Jobs", icon: MdSearch },
+  {
+    to: "/job-seeker/applications",
+    label: "My Applications",
+    icon: MdDescription,
+  },
+  { to: "/job-seeker/saved-jobs", label: "Saved Jobs", icon: MdBookmark },
+  { to: "/job-seeker/profile", label: "Profile", icon: MdPerson },
 ];
 
 export default function JobSeekerDashboardLayout() {
@@ -27,9 +31,9 @@ export default function JobSeekerDashboardLayout() {
   const handleLogout = async () => {
     try {
       await logout();
-      navigate('/login');
+      navigate("/login");
     } catch (error) {
-      console.error('Logout failed:', error);
+      console.error("Logout failed:", error);
     }
   };
 
@@ -39,8 +43,12 @@ export default function JobSeekerDashboardLayout() {
       <aside className="fixed left-0 top-0 h-screen w-64 bg-card border-r border-border flex flex-col shadow-lg z-40">
         {/* Logo/Brand */}
         <div className="p-6 border-b border-border">
-          <Link to="/" className="text-2xl font-bold text-primary hover:text-primary/80 transition-colors">
-            Employ<span className="text-secondary">.</span><span className="text-secondary">me</span>
+          <Link
+            to="/"
+            className="text-2xl font-bold text-primary hover:text-primary/80 transition-colors"
+          >
+            Employ<span className="text-secondary">.</span>
+            <span className="text-secondary">me</span>
           </Link>
           <p className="text-sm text-muted-foreground mt-1">Job Seeker Panel</p>
         </div>
@@ -55,8 +63,8 @@ export default function JobSeekerDashboardLayout() {
                 to={link.to}
                 className={`flex items-center gap-3 py-3 px-4 rounded-lg transition-all duration-200 ${
                   location.pathname === link.to
-                    ? 'bg-primary text-primary-foreground shadow-md'
-                    : 'text-foreground hover:bg-muted hover:text-primary'
+                    ? "bg-primary text-primary-foreground shadow-md"
+                    : "text-foreground hover:bg-muted hover:text-primary"
                 }`}
               >
                 <IconComponent className="w-5 h-5" />
@@ -85,7 +93,8 @@ export default function JobSeekerDashboardLayout() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl font-semibold text-foreground">
-                {sidebarLinks.find(link => link.to === location.pathname)?.label || 'Dashboard'}
+                {sidebarLinks.find((link) => link.to === location.pathname)
+                  ?.label || "Dashboard"}
               </h1>
               <p className="text-sm text-muted-foreground">
                 Manage your job search and applications
@@ -94,11 +103,11 @@ export default function JobSeekerDashboardLayout() {
             <div className="flex items-center gap-4">
               <ThemeToggle />
               <div className="text-sm text-muted-foreground">
-                {new Date().toLocaleDateString('en-US', { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
+                {new Date().toLocaleDateString("en-US", {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
                 })}
               </div>
             </div>

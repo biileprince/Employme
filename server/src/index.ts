@@ -8,6 +8,8 @@ import cookieParser from "cookie-parser";
 import session from "express-session";
 import { createServer } from "http";
 import { Server } from "socket.io";
+import path from "path";
+import fs from "fs";
 
 // Import routes
 import authRoutes from "./routes/authRoutes.js";
@@ -49,7 +51,7 @@ app.use(
         defaultSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         scriptSrc: ["'self'"],
-        imgSrc: ["'self'", "data:", "https:"],
+        imgSrc: ["'self'", "data:", "https:", "http://localhost:5173"],
       },
     },
   })
@@ -80,6 +82,18 @@ app.use(limiter);
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// Serve static files from uploads directory
+app.use(
+  "/uploads",
+  express.static(path.join(process.cwd(), "uploads"), {
+    setHeaders: (res, path) => {
+      res.header("Access-Control-Allow-Origin", "*");
+      res.header("Access-Control-Allow-Methods", "GET");
+      res.header("Cross-Origin-Resource-Policy", "cross-origin");
+    },
+  })
+);
 
 // Session middleware for Passport
 app.use(
@@ -125,6 +139,30 @@ app.get("/health", (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
   });
+});
+
+// Image serving endpoint with proper CORS
+app.get("/uploads/:filename", (req, res) => {
+  const { filename } = req.params;
+  const filePath = path.join(process.cwd(), "uploads", filename);
+
+  // Set CORS headers
+  res.header(
+    "Access-Control-Allow-Origin",
+    process.env.CLIENT_URL || "http://localhost:5173"
+  );
+  res.header("Access-Control-Allow-Methods", "GET");
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept"
+  );
+
+  // Check if file exists and serve it
+  if (fs.existsSync(filePath)) {
+    res.sendFile(filePath);
+  } else {
+    res.status(404).json({ error: "File not found" });
+  }
 });
 
 // Authentication routes (public)

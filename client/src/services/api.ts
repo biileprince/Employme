@@ -1,6 +1,25 @@
 // API configuration and utilities
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const SERVER_BASE_URL = API_BASE_URL.replace("/api", "");
+
+// Utility function to ensure URLs are properly formatted
+export const formatImageUrl = (url: string): string => {
+  if (!url) return "";
+
+  // If URL is already absolute, return as is
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+
+  // If URL starts with /, prepend server base URL
+  if (url.startsWith("/")) {
+    return `${SERVER_BASE_URL}${url}`;
+  }
+
+  // Otherwise, assume it's a relative path and prepend server base URL
+  return `${SERVER_BASE_URL}/${url}`;
+};
 
 // API response type
 interface ApiResponse<T = unknown> {
@@ -95,12 +114,25 @@ class ApiClient {
 
     try {
       const response = await fetch(url, config);
-      const result = await response.json();
 
+      // Check if response is ok first
       if (!response.ok) {
-        throw new Error(result.message || "API request failed");
+        // Handle non-JSON error responses (like 429 Too Many Requests)
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const result = await response.json();
+          throw new Error(
+            result.message ||
+              `API request failed with status ${response.status}`
+          );
+        } else {
+          // Non-JSON response (like plain text error messages)
+          const text = await response.text();
+          throw new Error(`API request failed: ${response.status} - ${text}`);
+        }
       }
 
+      const result = await response.json();
       return result;
     } catch (error) {
       console.error("API request error:", error);
@@ -126,6 +158,41 @@ class ApiClient {
   // DELETE request
   async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, "DELETE");
+  }
+
+  // File upload request
+  async uploadFiles<T>(
+    endpoint: string,
+    formData: FormData
+  ): Promise<ApiResponse<T>> {
+    const url = `${this.baseURL}${endpoint}`;
+
+    const headers: HeadersInit = {};
+
+    if (this.token) {
+      headers.Authorization = `Bearer ${this.token}`;
+    }
+
+    const config: RequestInit = {
+      method: "POST",
+      headers,
+      body: formData,
+      credentials: "include",
+    };
+
+    try {
+      const response = await fetch(url, config);
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Upload failed");
+      }
+
+      return result;
+    } catch (error) {
+      console.error("File upload error:", error);
+      throw error;
+    }
   }
 }
 
@@ -205,15 +272,16 @@ export const jobsAPI = {
     apiClient.post("/jobs", jobData),
 
   deleteJob: (id: string) => apiClient.delete(`/jobs/${id}`),
-
-  // Saved jobs methods
-  getSavedJobs: () => apiClient.get("/saved-jobs"),
-
-  saveJob: (jobId: string) => apiClient.post("/saved-jobs", { jobId }),
-
-  unsaveJob: (jobId: string) => apiClient.delete(`/saved-jobs/${jobId}`),
 };
 
+// Saved jobs API endpoints
+export const savedJobsAPI = {
+  getSavedJobs: () => apiClient.get("/saved-jobs"),
+
+  saveJob: (jobId: string) => apiClient.post("/saved-jobs/save", { jobId }),
+
+  unsaveJob: (jobId: string) => apiClient.post("/saved-jobs/remove", { jobId }),
+};
 export const applicationsAPI = {
   apply: (jobId: string, coverLetter?: string) =>
     apiClient.post("/applications", { jobId, coverLetter }),
@@ -271,6 +339,33 @@ export const userAPI = {
       return apiClient.post("/users/profile/job-seeker", profileData);
     }
   },
+};
+
+// Attachment API endpoints
+export const attachmentAPI = {
+  upload: (files: File[], entityType: string, entityId?: string) => {
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append("files", file);
+    });
+    if (entityType) {
+      formData.append("entityType", entityType);
+    }
+    if (entityId) {
+      formData.append("entityId", entityId);
+    }
+
+    return apiClient.uploadFiles("/attachments/upload", formData);
+  },
+
+  getByEntity: (entityType: string, entityId: string) =>
+    apiClient.get(`/attachments/${entityType}/${entityId}`),
+
+  delete: (attachmentId: string) =>
+    apiClient.delete(`/attachments/${attachmentId}`),
+
+  getById: (attachmentId: string) =>
+    apiClient.get(`/attachments/${attachmentId}`),
 };
 
 // Export default instance

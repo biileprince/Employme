@@ -1,15 +1,11 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { useAuth } from '../../contexts/AuthContext';
-import { 
-  MdLocationOn, 
-  MdSearch, 
-  MdAdd, 
-  MdClose 
-} from 'react-icons/md';
-import PhoneInput from '../../components/ui/PhoneInput';
-import { INDUSTRIES, LOCATION_API_CONFIG } from '../../utils/constants';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { MdLocationOn, MdSearch, MdAdd, MdClose } from "react-icons/md";
+import PhoneInput from "../../components/ui/PhoneInput";
+import { ImageUpload } from "../../components/ui";
+import { attachmentAPI } from "../../services/api";
+import { INDUSTRIES, LOCATION_API_CONFIG } from "../../utils/constants";
 
 interface LocationResult {
   place_id: number;
@@ -20,33 +16,34 @@ interface LocationResult {
 
 const PostJob = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
-  const [currentBenefit, setCurrentBenefit] = useState('');
+  const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [currentBenefit, setCurrentBenefit] = useState("");
+  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
 
   // Location search states
-  const [locationSearch, setLocationSearch] = useState('');
+  const [locationSearch, setLocationSearch] = useState("");
   const [locationResults, setLocationResults] = useState<LocationResult[]>([]);
   const [isSearchingLocation, setIsSearchingLocation] = useState(false);
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
 
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    requirements: '',
+    title: "",
+    description: "",
+    requirements: "",
+    responsibilities: "",
     benefits: [] as string[],
-    location: '',
-    category: '',
-    experienceLevel: 'ENTRY_LEVEL',
-    type: 'FULL_TIME',
-    salaryMin: '',
-    salaryMax: '',
+    location: "",
+    category: "",
+    experienceLevel: "ENTRY_LEVEL",
+    type: "FULL_TIME",
+    salaryMin: "",
+    salaryMax: "",
     isRemote: false,
-    applicationDeadline: '',
-    contactPhone: '',
-    contactCountryCode: '+233'
+    applicationDeadline: "",
+    contactPhone: "",
+    contactCountryCode: "+233",
   });
 
   // Location search functionality
@@ -62,13 +59,15 @@ const PostJob = () => {
       const response = await fetch(
         `${LOCATION_API_CONFIG.baseUrl}?format=json&q=${encodeURIComponent(
           query
-        )}&limit=${LOCATION_API_CONFIG.limit}&countrycodes=${LOCATION_API_CONFIG.countryCodes}`
+        )}&limit=${LOCATION_API_CONFIG.limit}&countrycodes=${
+          LOCATION_API_CONFIG.countryCodes
+        }`
       );
       const data = await response.json();
       setLocationResults(data);
       setShowLocationDropdown(true);
     } catch (error) {
-      console.error('Error searching locations:', error);
+      console.error("Error searching locations:", error);
       setLocationResults([]);
     } finally {
       setIsSearchingLocation(false);
@@ -86,70 +85,102 @@ const PostJob = () => {
     return () => clearTimeout(timeoutId);
   }, [locationSearch, formData.isRemote]);
 
-  const handleLocationSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLocationSearchChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
     setLocationSearch(e.target.value);
   };
 
   const selectLocation = (location: LocationResult) => {
     // Extract only the city/town name (first part before comma)
-    const cityName = location.display_name.split(',')[0].trim();
-    
-    setFormData(prev => ({ ...prev, location: cityName }));
+    const cityName = location.display_name.split(",")[0].trim();
+
+    setFormData((prev) => ({ ...prev, location: cityName }));
     setLocationSearch(cityName);
     setShowLocationDropdown(false);
     setLocationResults([]);
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
+  ) => {
     const { name, value, type } = e.target;
-    
-    if (type === 'checkbox') {
+
+    if (type === "checkbox") {
       const checked = (e.target as HTMLInputElement).checked;
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        [name]: checked
+        [name]: checked,
       }));
     } else {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        [name]: value
+        [name]: value,
       }));
     }
   };
 
   const addBenefit = () => {
-    if (currentBenefit.trim() && !formData.benefits.includes(currentBenefit.trim())) {
-      setFormData(prev => ({
+    if (
+      currentBenefit.trim() &&
+      !formData.benefits.includes(currentBenefit.trim())
+    ) {
+      setFormData((prev) => ({
         ...prev,
-        benefits: [...prev.benefits, currentBenefit.trim()]
+        benefits: [...prev.benefits, currentBenefit.trim()],
       }));
-      setCurrentBenefit('');
+      setCurrentBenefit("");
     }
   };
 
   const removeBenefit = (benefitToRemove: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      benefits: prev.benefits.filter(benefit => benefit !== benefitToRemove)
+      benefits: prev.benefits.filter((benefit) => benefit !== benefitToRemove),
     }));
+  };
+
+  const handleImageUpload = async (files: File[]) => {
+    try {
+      const response = await attachmentAPI.upload(files, "JOB");
+      if (
+        response.success &&
+        response.data &&
+        typeof response.data === "object" &&
+        "attachments" in response.data
+      ) {
+        const responseData = response.data as {
+          attachments: Array<{ url: string }>;
+        };
+        const newImageUrls = responseData.attachments.map((att) => att.url);
+        setUploadedImages((prev) => [...prev, ...newImageUrls]);
+      }
+    } catch (err) {
+      console.error("Image upload failed:", err);
+      setError("Failed to upload images. Please try again.");
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setError('');
+    setError("");
 
     try {
       // Validation
       if (!formData.isRemote && !formData.location) {
-        throw new Error('Location is required for non-remote jobs');
+        throw new Error("Location is required for non-remote jobs");
       }
 
       if (formData.salaryMin && formData.salaryMax) {
         const minSalary = Number(formData.salaryMin);
         const maxSalary = Number(formData.salaryMax);
         if (minSalary > maxSalary) {
-          throw new Error('Minimum salary cannot be greater than maximum salary');
+          throw new Error(
+            "Minimum salary cannot be greater than maximum salary"
+          );
         }
       }
 
@@ -158,8 +189,9 @@ const PostJob = () => {
         title: formData.title,
         description: formData.description,
         requirements: formData.requirements,
+        responsibilities: formData.responsibilities,
         benefits: formData.benefits,
-        location: formData.isRemote ? 'Remote' : formData.location,
+        location: formData.isRemote ? "Remote" : formData.location,
         category: formData.category.toUpperCase(),
         experienceLevel: formData.experienceLevel,
         type: formData.type,
@@ -168,23 +200,25 @@ const PostJob = () => {
         isRemote: formData.isRemote,
         applicationDeadline: formData.applicationDeadline || null,
         contactPhone: formData.contactPhone || null,
-        contactCountryCode: formData.contactCountryCode
+        contactCountryCode: formData.contactCountryCode,
+        images: uploadedImages,
       };
 
-      console.log('Submitting job data:', jobData);
+      console.log("Submitting job data:", jobData);
 
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const API_BASE_URL =
+        import.meta.env.VITE_API_URL || "http://localhost:5000/api";
       const response = await fetch(`${API_BASE_URL}/jobs`, {
-        method: 'POST',
-        credentials: 'include', // Include cookies for JWT
+        method: "POST",
+        credentials: "include", // Include cookies for JWT
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(jobData),
       });
 
       if (!response.ok) {
-        let errorMessage = 'Failed to create job';
+        let errorMessage = "Failed to create job";
         try {
           const errorData = await response.json();
           errorMessage = errorData.message || errorMessage;
@@ -200,24 +234,24 @@ const PostJob = () => {
         result = await response.json();
       } catch {
         // If response is successful but no JSON body, create a default result
-        result = { message: 'Job created successfully' };
+        result = { message: "Job created successfully" };
       }
-      
-      console.log('Job created successfully:', result);
-      
+
+      console.log("Job created successfully:", result);
+
       // Show success message
-      setError(''); // Clear any previous errors
-      setSuccessMessage('Job posted successfully! Redirecting...');
-      
+      setError(""); // Clear any previous errors
+      setSuccessMessage("Job posted successfully! Redirecting...");
+
       // Wait a moment to show the success message before navigating
       setTimeout(() => {
-        navigate('/employer/dashboard', { 
-          state: { message: 'Job posted successfully!' }
+        navigate("/employer/dashboard", {
+          state: { message: "Job posted successfully!" },
         });
       }, 1500);
     } catch (err) {
-      console.error('Error creating job:', err);
-      setError(err instanceof Error ? err.message : 'Failed to create job');
+      console.error("Error creating job:", err);
+      setError(err instanceof Error ? err.message : "Failed to create job");
     } finally {
       setIsLoading(false);
     }
@@ -230,7 +264,9 @@ const PostJob = () => {
         animate={{ opacity: 1, y: 0 }}
         className="bg-card rounded-xl shadow-lg border border-border p-8"
       >
-        <h1 className="text-3xl font-bold text-foreground mb-8">Post a New Job</h1>
+        <h1 className="text-3xl font-bold text-foreground mb-8">
+          Post a New Job
+        </h1>
 
         <form onSubmit={handleSubmit} className="space-y-8">
           {error && (
@@ -255,7 +291,10 @@ const PostJob = () => {
 
           {/* Job Title */}
           <div>
-            <label htmlFor="title" className="block text-sm font-medium text-foreground mb-2">
+            <label
+              htmlFor="title"
+              className="block text-sm font-medium text-foreground mb-2"
+            >
               Job Title *
             </label>
             <input
@@ -273,7 +312,10 @@ const PostJob = () => {
           {/* Industry and Job Type */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label htmlFor="category" className="block text-sm font-medium text-foreground mb-2">
+              <label
+                htmlFor="category"
+                className="block text-sm font-medium text-foreground mb-2"
+              >
                 Industry *
               </label>
               <select
@@ -285,14 +327,19 @@ const PostJob = () => {
                 className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
               >
                 <option value="">Select Industry</option>
-                {INDUSTRIES.map(industry => (
-                  <option key={industry} value={industry}>{industry}</option>
+                {INDUSTRIES.map((industry) => (
+                  <option key={industry.value} value={industry.value}>
+                    {industry.label}
+                  </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label htmlFor="type" className="block text-sm font-medium text-foreground mb-2">
+              <label
+                htmlFor="type"
+                className="block text-sm font-medium text-foreground mb-2"
+              >
                 Job Type *
               </label>
               <select
@@ -322,7 +369,10 @@ const PostJob = () => {
               onChange={handleChange}
               className="h-4 w-4 text-primary focus:ring-primary border-border rounded"
             />
-            <label htmlFor="isRemote" className="text-sm font-medium text-foreground">
+            <label
+              htmlFor="isRemote"
+              className="text-sm font-medium text-foreground"
+            >
               This is a remote position
             </label>
           </div>
@@ -330,7 +380,10 @@ const PostJob = () => {
           {/* Location Search */}
           {!formData.isRemote && (
             <div className="relative">
-              <label htmlFor="location" className="block text-sm font-medium text-foreground mb-2">
+              <label
+                htmlFor="location"
+                className="block text-sm font-medium text-foreground mb-2"
+              >
                 Location *
               </label>
               <div className="relative">
@@ -348,7 +401,7 @@ const PostJob = () => {
                   <MdSearch className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5 animate-spin" />
                 )}
               </div>
-              
+
               {showLocationDropdown && locationResults.length > 0 && (
                 <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
                   {locationResults.map((location) => (
@@ -360,7 +413,9 @@ const PostJob = () => {
                     >
                       <div className="flex items-center">
                         <MdLocationOn className="w-4 h-4 text-muted-foreground mr-2" />
-                        <span className="truncate">{location.display_name.split(',')[0].trim()}</span>
+                        <span className="truncate">
+                          {location.display_name.split(",")[0].trim()}
+                        </span>
                       </div>
                     </button>
                   ))}
@@ -371,7 +426,10 @@ const PostJob = () => {
 
           {/* Experience Level */}
           <div>
-            <label htmlFor="experienceLevel" className="block text-sm font-medium text-foreground mb-2">
+            <label
+              htmlFor="experienceLevel"
+              className="block text-sm font-medium text-foreground mb-2"
+            >
               Experience Level *
             </label>
             <select
@@ -418,15 +476,22 @@ const PostJob = () => {
           <PhoneInput
             countryCode={formData.contactCountryCode}
             phoneNumber={formData.contactPhone}
-            onCountryCodeChange={(code) => setFormData(prev => ({ ...prev, contactCountryCode: code }))}
-            onPhoneNumberChange={(phone) => setFormData(prev => ({ ...prev, contactPhone: phone }))}
+            onCountryCodeChange={(code) =>
+              setFormData((prev) => ({ ...prev, contactCountryCode: code }))
+            }
+            onPhoneNumberChange={(phone) =>
+              setFormData((prev) => ({ ...prev, contactPhone: phone }))
+            }
             label="Contact Phone - Optional"
             placeholder="Phone number"
           />
 
           {/* Job Description */}
           <div>
-            <label htmlFor="description" className="block text-sm font-medium text-foreground mb-2">
+            <label
+              htmlFor="description"
+              className="block text-sm font-medium text-foreground mb-2"
+            >
               Job Description *
             </label>
             <textarea
@@ -443,7 +508,10 @@ const PostJob = () => {
 
           {/* Requirements */}
           <div>
-            <label htmlFor="requirements" className="block text-sm font-medium text-foreground mb-2">
+            <label
+              htmlFor="requirements"
+              className="block text-sm font-medium text-foreground mb-2"
+            >
               Requirements *
             </label>
             <textarea
@@ -455,6 +523,26 @@ const PostJob = () => {
               rows={4}
               className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground resize-vertical"
               placeholder="List the required skills, qualifications, and experience..."
+            />
+          </div>
+
+          {/* Responsibilities */}
+          <div>
+            <label
+              htmlFor="responsibilities"
+              className="block text-sm font-medium text-foreground mb-2"
+            >
+              Responsibilities *
+            </label>
+            <textarea
+              id="responsibilities"
+              name="responsibilities"
+              value={formData.responsibilities}
+              onChange={handleChange}
+              required
+              rows={4}
+              className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground resize-vertical"
+              placeholder="List the key responsibilities and duties for this role..."
             />
           </div>
 
@@ -470,7 +558,9 @@ const PostJob = () => {
                 onChange={(e) => setCurrentBenefit(e.target.value)}
                 placeholder="Add a benefit..."
                 className="flex-1 px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
-                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addBenefit())}
+                onKeyDown={(e) =>
+                  e.key === "Enter" && (e.preventDefault(), addBenefit())
+                }
               />
               <button
                 type="button"
@@ -480,7 +570,7 @@ const PostJob = () => {
                 <MdAdd className="w-5 h-5" />
               </button>
             </div>
-            
+
             {formData.benefits.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {formData.benefits.map((benefit, index) => (
@@ -502,9 +592,34 @@ const PostJob = () => {
             )}
           </div>
 
+          {/* Job Images */}
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Job Images (Optional)
+            </label>
+            <p className="text-sm text-muted-foreground mb-4">
+              Add images to showcase your workplace, team, or job environment.
+              This helps attract more candidates.
+            </p>
+            <ImageUpload
+              onFilesUpload={handleImageUpload}
+              maxFiles={5}
+              maxFileSize={5 * 1024 * 1024} // 5MB
+              acceptedTypes={[
+                "image/jpeg",
+                "image/jpg",
+                "image/png",
+                "image/webp",
+              ]}
+            />
+          </div>
+
           {/* Application Deadline */}
           <div>
-            <label htmlFor="applicationDeadline" className="block text-sm font-medium text-foreground mb-2">
+            <label
+              htmlFor="applicationDeadline"
+              className="block text-sm font-medium text-foreground mb-2"
+            >
               Application Deadline *
             </label>
             <input
@@ -514,7 +629,7 @@ const PostJob = () => {
               value={formData.applicationDeadline}
               onChange={handleChange}
               required
-              min={new Date().toISOString().split('T')[0]}
+              min={new Date().toISOString().split("T")[0]}
               className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
             />
           </div>
@@ -523,7 +638,7 @@ const PostJob = () => {
           <div className="flex justify-end space-x-4 pt-6">
             <button
               type="button"
-              onClick={() => navigate('/employer/dashboard')}
+              onClick={() => navigate("/employer/dashboard")}
               className="px-6 py-3 border border-border text-foreground rounded-lg hover:bg-muted transition-colors"
             >
               Cancel
@@ -533,7 +648,7 @@ const PostJob = () => {
               disabled={isLoading}
               className="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {isLoading ? 'Posting Job...' : 'Post Job'}
+              {isLoading ? "Posting Job..." : "Post Job"}
             </button>
           </div>
         </form>

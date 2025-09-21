@@ -1,6 +1,6 @@
-import { useAuth } from '../../contexts/AuthContext';
-import { Navigate, useLocation } from 'react-router-dom';
-import type { UserRole } from '../../types/auth';
+import { useAuth } from "../../contexts/AuthContext";
+import { Navigate, useLocation } from "react-router-dom";
+import type { UserRole } from "../../types/auth";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -8,10 +8,10 @@ interface ProtectedRouteProps {
   requireRole?: UserRole;
 }
 
-export function ProtectedRoute({ 
-  children, 
+export function ProtectedRoute({
+  children,
   requireOnboarding = false,
-  requireRole 
+  requireRole,
 }: ProtectedRouteProps) {
   const { user, isLoading } = useAuth();
   const location = useLocation();
@@ -31,7 +31,7 @@ export function ProtectedRoute({
   // Check role requirement
   if (requireRole && user.role !== requireRole) {
     // Redirect to appropriate dashboard based on their actual role
-    if (user.role === 'EMPLOYER') {
+    if (user.role === "EMPLOYER") {
       return <Navigate to="/employer/dashboard" replace />;
     } else {
       return <Navigate to="/job-seeker/dashboard" replace />;
@@ -39,13 +39,17 @@ export function ProtectedRoute({
   }
 
   // If user needs onboarding (doesn't have profile) and this route doesn't handle it, redirect to onboarding
-  if (!user.hasProfile && !requireOnboarding && location.pathname !== '/onboarding') {
+  if (
+    !user.hasProfile &&
+    !requireOnboarding &&
+    location.pathname !== "/onboarding"
+  ) {
     return <Navigate to="/onboarding" replace />;
   }
 
   // If user has completed onboarding but is trying to access onboarding page, redirect to appropriate dashboard
   if (user.hasProfile && requireOnboarding) {
-    if (user.role === 'EMPLOYER') {
+    if (user.role === "EMPLOYER") {
       return <Navigate to="/employer/dashboard" replace />;
     } else {
       return <Navigate to="/job-seeker/dashboard" replace />;

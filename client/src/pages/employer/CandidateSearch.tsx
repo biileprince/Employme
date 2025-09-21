@@ -1,19 +1,19 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { 
-  MdSearch, 
-  MdLocationOn, 
-  MdWork, 
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import {
+  MdSearch,
+  MdLocationOn,
+  MdWork,
   MdEmail,
   MdPhone,
   MdPerson,
   MdDescription,
   MdAttachMoney,
   MdCheckCircle,
-  MdFilterList
-} from 'react-icons/md';
-import { userAPI } from '../../services/api';
-import { INDUSTRIES } from '../../utils/constants';
+  MdFilterList,
+} from "react-icons/md";
+import { userAPI, formatImageUrl } from "../../services/api";
+import { INDUSTRIES } from "../../utils/constants";
 
 interface Candidate {
   id: string;
@@ -38,14 +38,14 @@ interface Candidate {
 export default function CandidateSearch() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [error, setError] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
-    location: '',
-    experience: '',
-    skills: '',
-    industry: '',
+    location: "",
+    experience: "",
+    skills: "",
+    industry: "",
     availabilityOnly: false,
   });
 
@@ -58,47 +58,69 @@ export default function CandidateSearch() {
       const response = await userAPI.getCandidates();
       setCandidates(response.data as Candidate[]);
     } catch (err) {
-      console.error('Failed to fetch candidates:', err);
-      setError('Failed to fetch candidates');
+      console.error("Failed to fetch candidates:", err);
+      setError("Failed to fetch candidates");
     } finally {
       setIsLoading(false);
     }
   };
 
   const clearFilters = () => {
-    setSearchTerm('');
+    setSearchTerm("");
     setFilters({
-      location: '',
-      experience: '',
-      skills: '',
-      industry: '',
+      location: "",
+      experience: "",
+      skills: "",
+      industry: "",
       availabilityOnly: false,
     });
   };
 
-  const filteredCandidates = candidates.filter(candidate => {
-    const matchesSearch = searchTerm === '' || 
+  const filteredCandidates = candidates.filter((candidate) => {
+    const matchesSearch =
+      searchTerm === "" ||
       candidate.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       candidate.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       candidate.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (candidate.profile?.skills || []).some((skill: string) => skill.toLowerCase().includes(searchTerm.toLowerCase()));
+      (candidate.profile?.skills || []).some((skill: string) =>
+        skill.toLowerCase().includes(searchTerm.toLowerCase())
+      );
 
-    const matchesLocation = filters.location === '' || 
-      (candidate.profile?.location || '').toLowerCase().includes(filters.location.toLowerCase());
+    const matchesLocation =
+      filters.location === "" ||
+      (candidate.profile?.location || "")
+        .toLowerCase()
+        .includes(filters.location.toLowerCase());
 
-    const matchesExperience = filters.experience === '' || 
-      (candidate.profile?.experience || '').toLowerCase().includes(filters.experience.toLowerCase());
+    const matchesExperience =
+      filters.experience === "" ||
+      (candidate.profile?.experience || "")
+        .toLowerCase()
+        .includes(filters.experience.toLowerCase());
 
-    const matchesSkills = filters.skills === '' || 
-      (candidate.profile?.skills || []).some((skill: string) => skill.toLowerCase().includes(filters.skills.toLowerCase()));
+    const matchesSkills =
+      filters.skills === "" ||
+      (candidate.profile?.skills || []).some((skill: string) =>
+        skill.toLowerCase().includes(filters.skills.toLowerCase())
+      );
 
-    const matchesIndustry = filters.industry === '' || 
-      (candidate.profile?.industry || '').toLowerCase().includes(filters.industry.toLowerCase());
+    const matchesIndustry =
+      filters.industry === "" ||
+      (candidate.profile?.industry || "")
+        .toLowerCase()
+        .includes(filters.industry.toLowerCase());
 
-    const matchesAvailability = !filters.availabilityOnly || candidate.profile?.isAvailable;
+    const matchesAvailability =
+      !filters.availabilityOnly || candidate.profile?.isAvailable;
 
-    return matchesSearch && matchesLocation && matchesExperience && 
-           matchesSkills && matchesIndustry && matchesAvailability;
+    return (
+      matchesSearch &&
+      matchesLocation &&
+      matchesExperience &&
+      matchesSkills &&
+      matchesIndustry &&
+      matchesAvailability
+    );
   });
 
   if (isLoading) {
@@ -121,7 +143,8 @@ export default function CandidateSearch() {
             Find Candidates
           </h1>
           <p className="text-muted-foreground">
-            Discover and connect with talented job seekers who match your requirements
+            Discover and connect with talented job seekers who match your
+            requirements
           </p>
         </div>
 
@@ -151,18 +174,19 @@ export default function CandidateSearch() {
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`inline-flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                showFilters 
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                showFilters
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
               }`}
             >
               <MdFilterList className="w-4 h-4" />
               Filters
-              {Object.values(filters).some(v => v !== '' && v !== false) && (
+              {Object.values(filters).some((v) => v !== "" && v !== false) && (
                 <span className="bg-background/20 rounded-full w-2 h-2"></span>
               )}
             </button>
-            {(searchTerm || Object.values(filters).some(v => v !== '' && v !== false)) && (
+            {(searchTerm ||
+              Object.values(filters).some((v) => v !== "" && v !== false)) && (
               <button
                 onClick={clearFilters}
                 className="px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
@@ -176,7 +200,7 @@ export default function CandidateSearch() {
           {showFilters && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
+              animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
               className="mt-6 pt-6 border-t border-border"
             >
@@ -191,7 +215,9 @@ export default function CandidateSearch() {
                     <input
                       type="text"
                       value={filters.location}
-                      onChange={(e) => setFilters({...filters, location: e.target.value})}
+                      onChange={(e) =>
+                        setFilters({ ...filters, location: e.target.value })
+                      }
                       placeholder="e.g., Accra, Remote..."
                       className="w-full pl-9 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                     />
@@ -205,7 +231,9 @@ export default function CandidateSearch() {
                   </label>
                   <select
                     value={filters.experience}
-                    onChange={(e) => setFilters({...filters, experience: e.target.value})}
+                    onChange={(e) =>
+                      setFilters({ ...filters, experience: e.target.value })
+                    }
                     className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                   >
                     <option value="">All Levels</option>
@@ -224,7 +252,9 @@ export default function CandidateSearch() {
                   <input
                     type="text"
                     value={filters.skills}
-                    onChange={(e) => setFilters({...filters, skills: e.target.value})}
+                    onChange={(e) =>
+                      setFilters({ ...filters, skills: e.target.value })
+                    }
                     placeholder="e.g., JavaScript, Design..."
                     className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                   />
@@ -237,13 +267,15 @@ export default function CandidateSearch() {
                   </label>
                   <select
                     value={filters.industry}
-                    onChange={(e) => setFilters({...filters, industry: e.target.value})}
+                    onChange={(e) =>
+                      setFilters({ ...filters, industry: e.target.value })
+                    }
                     className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                   >
                     <option value="">All Industries</option>
-                    {INDUSTRIES.map(industry => (
-                      <option key={industry} value={industry}>
-                        {industry}
+                    {INDUSTRIES.map((industry) => (
+                      <option key={industry.value} value={industry.value}>
+                        {industry.label}
                       </option>
                     ))}
                   </select>
@@ -255,10 +287,18 @@ export default function CandidateSearch() {
                     type="checkbox"
                     id="availabilityOnly"
                     checked={filters.availabilityOnly}
-                    onChange={(e) => setFilters({...filters, availabilityOnly: e.target.checked})}
+                    onChange={(e) =>
+                      setFilters({
+                        ...filters,
+                        availabilityOnly: e.target.checked,
+                      })
+                    }
                     className="w-4 h-4 text-primary bg-background border-border rounded focus:ring-primary focus:ring-2"
                   />
-                  <label htmlFor="availabilityOnly" className="ml-2 text-sm font-medium text-foreground">
+                  <label
+                    htmlFor="availabilityOnly"
+                    className="ml-2 text-sm font-medium text-foreground"
+                  >
                     Available candidates only
                   </label>
                 </div>
@@ -270,13 +310,23 @@ export default function CandidateSearch() {
           <div className="mt-4 pt-4 border-t border-border">
             <div className="flex items-center justify-between text-sm text-muted-foreground">
               <span>
-                Showing <span className="font-medium text-foreground">{filteredCandidates.length}</span> of{' '}
-                <span className="font-medium text-foreground">{candidates.length}</span> candidates
+                Showing{" "}
+                <span className="font-medium text-foreground">
+                  {filteredCandidates.length}
+                </span>{" "}
+                of{" "}
+                <span className="font-medium text-foreground">
+                  {candidates.length}
+                </span>{" "}
+                candidates
               </span>
               {filteredCandidates.length > 0 && (
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                  <span>{candidates.filter(c => c.profile?.isAvailable).length} available</span>
+                  <span>
+                    {candidates.filter((c) => c.profile?.isAvailable).length}{" "}
+                    available
+                  </span>
                 </div>
               )}
             </div>
@@ -292,14 +342,19 @@ export default function CandidateSearch() {
               className="text-center py-16"
             >
               <div className="text-muted-foreground text-lg mb-4">
-                {candidates.length === 0 ? 'No candidates found' : 'No candidates match your search criteria'}
+                {candidates.length === 0
+                  ? "No candidates found"
+                  : "No candidates match your search criteria"}
               </div>
               <p className="text-muted-foreground text-sm mb-6">
-                {candidates.length === 0 
-                  ? 'There are no registered job seekers yet.' 
-                  : 'Try adjusting your search terms or filters to find more candidates.'}
+                {candidates.length === 0
+                  ? "There are no registered job seekers yet."
+                  : "Try adjusting your search terms or filters to find more candidates."}
               </p>
-              {(searchTerm || Object.values(filters).some(v => v !== '' && v !== false)) && (
+              {(searchTerm ||
+                Object.values(filters).some(
+                  (v) => v !== "" && v !== false
+                )) && (
                 <button
                   onClick={clearFilters}
                   className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
@@ -323,8 +378,8 @@ export default function CandidateSearch() {
                     <div className="flex items-center gap-4 mb-4">
                       <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
                         {candidate.imageUrl ? (
-                          <img 
-                            src={candidate.imageUrl} 
+                          <img
+                            src={candidate.imageUrl}
                             alt={`${candidate.firstName} ${candidate.lastName}`}
                             className="w-16 h-16 rounded-full object-cover"
                           />
@@ -351,7 +406,7 @@ export default function CandidateSearch() {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-muted-foreground text-sm mb-4">
                       <div className="flex items-center gap-2">
                         <MdEmail className="w-4 h-4" />
@@ -360,7 +415,10 @@ export default function CandidateSearch() {
                       {candidate.profile?.phone && (
                         <div className="flex items-center gap-2">
                           <MdPhone className="w-4 h-4" />
-                          <span>{candidate.profile.phoneCountryCode || ''} {candidate.profile.phone}</span>
+                          <span>
+                            {candidate.profile.phoneCountryCode || ""}{" "}
+                            {candidate.profile.phone}
+                          </span>
                         </div>
                       )}
                       {candidate.profile?.location && (
@@ -380,7 +438,9 @@ export default function CandidateSearch() {
                     {candidate.profile?.preferredSalary && (
                       <div className="flex items-center gap-2 text-muted-foreground text-sm mb-4">
                         <MdAttachMoney className="w-4 h-4" />
-                        <span>Preferred Salary: {candidate.profile.preferredSalary}</span>
+                        <span>
+                          Preferred Salary: {candidate.profile.preferredSalary}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -388,7 +448,7 @@ export default function CandidateSearch() {
                   <div className="flex items-center space-x-3 ml-6">
                     {candidate.profile?.resumeUrl && (
                       <a
-                        href={candidate.profile.resumeUrl}
+                        href={formatImageUrl(candidate.profile.resumeUrl)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-200 dark:hover:bg-blue-900/30 transition-colors"
@@ -396,7 +456,7 @@ export default function CandidateSearch() {
                         View Resume
                       </a>
                     )}
-                    
+
                     <a
                       href={`mailto:${candidate.email}`}
                       className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
@@ -407,24 +467,25 @@ export default function CandidateSearch() {
                 </div>
 
                 {/* Skills */}
-                {candidate.profile?.skills && candidate.profile.skills.length > 0 && (
-                  <div className="mb-6">
-                    <h4 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
-                      <MdWork className="w-4 h-4" />
-                      Skills & Expertise
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {candidate.profile.skills.map((skill, skillIndex) => (
-                        <span
-                          key={skillIndex}
-                          className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-muted text-foreground border border-border"
-                        >
-                          {skill}
-                        </span>
-                      ))}
+                {candidate.profile?.skills &&
+                  candidate.profile.skills.length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+                        <MdWork className="w-4 h-4" />
+                        Skills & Expertise
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {candidate.profile.skills.map((skill, skillIndex) => (
+                          <span
+                            key={skillIndex}
+                            className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-muted text-foreground border border-border"
+                          >
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
                 {/* Bio */}
                 {candidate.profile?.bio && (

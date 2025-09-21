@@ -13,8 +13,9 @@ import {
   MdDescription,
   MdWork,
 } from "react-icons/md";
-import { userAPI } from "../../services/api";
+import { userAPI, attachmentAPI, formatImageUrl } from "../../services/api";
 import PhoneInput from "../../components/ui/PhoneInput";
+import ImageUpload from "../../components/ui/ImageUpload";
 import { INDUSTRIES } from "../../utils/constants";
 interface EmployerProfile {
   id: string;
@@ -82,7 +83,7 @@ export default function EmployerProfile() {
       console.log("Profile response:", response); // Debug log
 
       // Handle the backend response structure
-      const userData = response.data.user;
+      const userData = (response.data as { user: any }).user;
       const employerProfile = userData.profile;
 
       if (employerProfile && userData.role === "EMPLOYER") {
@@ -160,6 +161,22 @@ export default function EmployerProfile() {
       phone,
       countryCode,
     }));
+  };
+
+  const handleLogoUpload = async (files: File[]) => {
+    try {
+      const response = await attachmentAPI.upload(files, "USER");
+      if (response.success && (response.data as any).attachments.length > 0) {
+        const uploadedAttachment = (response.data as any).attachments[0];
+        setFormData((prev) => ({
+          ...prev,
+          logoUrl: uploadedAttachment.url,
+        }));
+      }
+    } catch (error) {
+      console.error("Failed to upload logo:", error);
+      setError("Failed to upload logo");
+    }
   };
 
   const handleSave = async () => {
@@ -243,15 +260,31 @@ export default function EmployerProfile() {
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">
-              Company Profile
-            </h1>
-            <p className="text-muted-foreground">
-              {profile
-                ? "Manage your company information and profile"
-                : "Create your company profile to get started"}
-            </p>
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">
+                Company Profile
+              </h1>
+              <p className="text-muted-foreground">
+                {profile
+                  ? "Manage your company information and profile"
+                  : "Create your company profile to get started"}
+              </p>
+            </div>
+
+            {/* Company Logo Display */}
+            {profile?.logoUrl && (
+              <div className="flex-shrink-0 ml-6">
+                <img
+                  src={formatImageUrl(profile.logoUrl)}
+                  alt="Company Logo"
+                  className="w-20 h-20 object-contain rounded-lg border border-border bg-background"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              </div>
+            )}
           </div>
 
           {!isEditing && (
@@ -358,7 +391,9 @@ export default function EmployerProfile() {
                   <PhoneInput
                     phoneNumber={formData.phone}
                     countryCode={formData.countryCode}
-                    onPhoneNumberChange={handlePhoneChange}
+                    onPhoneNumberChange={(phone) =>
+                      handlePhoneChange(phone, formData.countryCode)
+                    }
                     onCountryCodeChange={(code) =>
                       handlePhoneChange(formData.phone, code)
                     }
@@ -420,8 +455,8 @@ export default function EmployerProfile() {
                   >
                     <option value="">Select Industry</option>
                     {INDUSTRIES.map((industry) => (
-                      <option key={industry} value={industry}>
-                        {industry}
+                      <option key={industry.value} value={industry.value}>
+                        {industry.label}
                       </option>
                     ))}
                   </select>
@@ -558,35 +593,33 @@ export default function EmployerProfile() {
               )}
             </div>
 
-            {/* Company Logo URL */}
+            {/* Company Logo Upload */}
             <div className="mt-6">
               <label className="block text-sm font-medium text-foreground mb-2">
-                Company Logo URL
+                Company Logo
               </label>
               {isEditing ? (
-                <input
-                  type="url"
-                  name="logoUrl"
-                  value={formData.logoUrl}
-                  onChange={handleInputChange}
-                  placeholder="https://example.com/logo.png"
-                  className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                <ImageUpload
+                  onFilesUpload={handleLogoUpload}
+                  accept="image/*"
+                  maxFiles={1}
+                  label="Upload Company Logo"
+                  existingImages={formData.logoUrl ? [formData.logoUrl] : []}
                 />
               ) : (
                 <div className="flex items-center gap-4">
-                  {profile?.logoUrl && (
+                  {profile?.logoUrl ? (
                     <img
-                      src={profile.logoUrl}
+                      src={formatImageUrl(profile.logoUrl)}
                       alt="Company Logo"
                       className="w-16 h-16 object-contain rounded-lg border border-border"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = "none";
                       }}
                     />
+                  ) : (
+                    <p className="text-muted-foreground">No logo provided</p>
                   )}
-                  <p className="text-foreground">
-                    {profile?.logoUrl || "No logo provided"}
-                  </p>
                 </div>
               )}
             </div>
