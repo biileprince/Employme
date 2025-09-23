@@ -68,6 +68,8 @@ interface UpdateProfileData {
 class ApiClient {
   private baseURL: string;
   private token: string | null = null;
+  private pendingRequests: Map<string, Promise<ApiResponse<unknown>>> =
+    new Map();
 
   constructor(baseURL: string) {
     this.baseURL = baseURL;
@@ -86,12 +88,20 @@ class ApiClient {
     localStorage.removeItem("auth_token");
   }
 
-  // Make API request
+  // Make API request with deduplication
   private async request<T>(
     endpoint: string,
     method: HttpMethod = "GET",
     data?: RequestData
   ): Promise<ApiResponse<T>> {
+    // Create a unique key for request deduplication
+    const requestKey = `${method}:${endpoint}:${JSON.stringify(data || {})}`;
+
+    // If the same request is already pending, return that promise
+    if (this.pendingRequests.has(requestKey)) {
+      return this.pendingRequests.get(requestKey) as Promise<ApiResponse<T>>;
+    }
+
     const url = `${this.baseURL}${endpoint}`;
 
     const headers: HeadersInit = {
@@ -112,32 +122,76 @@ class ApiClient {
       config.body = JSON.stringify(data);
     }
 
-    try {
-      const response = await fetch(url, config);
+    const requestPromise = (async () => {
+      let retryCount = 0;
+      const maxRetries = 3;
 
-      // Check if response is ok first
-      if (!response.ok) {
-        // Handle non-JSON error responses (like 429 Too Many Requests)
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
+      while (retryCount <= maxRetries) {
+        try {
+          const response = await fetch(url, config);
+
+          // Handle rate limiting with exponential backoff
+          if (response.status === 429) {
+            if (retryCount < maxRetries) {
+              const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s
+              console.warn(`Rate limited. Retrying in ${delay}ms...`);
+              await new Promise((resolve) => setTimeout(resolve, delay));
+              retryCount++;
+              continue;
+            } else {
+              throw new Error("Too many requests. Please try again later.");
+            }
+          }
+
+          // Check if response is ok first
+          if (!response.ok) {
+            // Handle non-JSON error responses
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.includes("application/json")) {
+              const result = await response.json();
+              throw new Error(
+                result.message ||
+                  `API request failed with status ${response.status}`
+              );
+            } else {
+              // Non-JSON response (like plain text error messages)
+              const text = await response.text();
+              throw new Error(
+                `API request failed: ${response.status} - ${text}`
+              );
+            }
+          }
+
           const result = await response.json();
-          throw new Error(
-            result.message ||
-              `API request failed with status ${response.status}`
-          );
-        } else {
-          // Non-JSON response (like plain text error messages)
-          const text = await response.text();
-          throw new Error(`API request failed: ${response.status} - ${text}`);
+          return result;
+        } catch (error) {
+          if (
+            retryCount >= maxRetries ||
+            !(error instanceof Error) ||
+            !error.message.includes("fetch")
+          ) {
+            console.error("API request error:", error);
+            throw error;
+          }
+
+          // Network error, retry with exponential backoff
+          const delay = Math.pow(2, retryCount) * 1000;
+          console.warn(`Network error. Retrying in ${delay}ms...`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          retryCount++;
         }
       }
 
-      const result = await response.json();
-      return result;
-    } catch (error) {
-      console.error("API request error:", error);
-      throw error;
-    }
+      throw new Error("Request failed after maximum retries");
+    })().finally(() => {
+      // Remove from pending requests when complete
+      this.pendingRequests.delete(requestKey);
+    });
+
+    // Store the promise to prevent duplicate requests
+    this.pendingRequests.set(requestKey, requestPromise);
+
+    return requestPromise;
   }
 
   // GET request

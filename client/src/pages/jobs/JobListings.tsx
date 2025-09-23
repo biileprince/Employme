@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   HiFilter,
@@ -80,6 +80,16 @@ const JobListings = () => {
     categories: [] as string[],
   });
 
+  // Ref to track if component is mounted to prevent state updates after unmount
+  const isMountedRef = useRef(true);
+
+  // Cleanup effect to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // Location search states
   const [locationSearch, setLocationSearch] = useState("");
   const [locationResults, setLocationResults] = useState<
@@ -149,46 +159,94 @@ const JobListings = () => {
     }
   }, [searchParams]);
 
+  // Memoize API parameters to prevent unnecessary recreations
+  const apiParams = useMemo(() => {
+    const params: Record<string, string | number> = {
+      limit: 50, // Get more jobs to show
+    };
+
+    // Add search and filter parameters only if they have meaningful values
+    if (searchTerm && searchTerm.trim()) params.search = searchTerm.trim();
+    if (filter.categories && filter.categories.length > 0)
+      params.category = filter.categories[0];
+    if (filter.location && filter.location.trim())
+      params.location = filter.location.trim();
+    if (filter.jobType && filter.jobType.trim()) {
+      params.jobType = filter.jobType.toUpperCase().replace("-", "_");
+    }
+    if (filter.experience && filter.experience.trim()) {
+      const expMap: Record<string, string> = {
+        "Entry Level": "ENTRY_LEVEL",
+        "Mid Level": "MID_LEVEL",
+        "Senior Level": "SENIOR_LEVEL",
+        Executive: "EXECUTIVE",
+      };
+      const mappedExp = expMap[filter.experience];
+      if (mappedExp) {
+        params.experience = mappedExp;
+      }
+    }
+
+    return params;
+  }, [
+    searchTerm,
+    filter.categories,
+    filter.location,
+    filter.jobType,
+    filter.experience,
+  ]);
+
+  // Debug component state (simplified)
+  console.log("=== JobListings Debug ===");
+  console.log("Jobs count:", jobs.length);
+  console.log("Loading:", loading);
+  console.log("First job:", jobs[0]?.title || "No jobs");
+  console.log("========================");
+
   // Fetch jobs from backend
   const fetchJobs = useCallback(async () => {
+    if (!isMountedRef.current) return;
+
     try {
       setLoading(true);
+      console.log("Fetching jobs with params:", apiParams);
 
-      const params: Record<string, string | number> = {
-        limit: 50, // Get more jobs to show
-      };
+      const response = await jobsAPI.getAll(apiParams);
+      console.log("Jobs API response:", response);
 
-      // Add search and filter parameters
-      if (searchTerm) params.search = searchTerm;
-      if (filter.categories.length > 0) params.category = filter.categories[0]; // Use first category for now
-      if (filter.location) params.location = filter.location;
-      if (filter.jobType)
-        params.jobType = filter.jobType.toUpperCase().replace("-", "_");
-      if (filter.experience) {
-        const expMap: Record<string, string> = {
-          "Entry Level": "ENTRY",
-          "Mid Level": "MID",
-          "Senior Level": "SENIOR",
-          Executive: "EXECUTIVE",
-        };
-        params.experienceLevel = expMap[filter.experience];
+      if (response.success && response.data) {
+        const data = response.data as JobsResponse;
+        console.log("Jobs data:", data.jobs, "Count:", data.jobs?.length);
+
+        if (isMountedRef.current) {
+          setJobs(data.jobs || []);
+          console.log("Jobs set to state, count:", data.jobs?.length || 0);
+        }
+      } else {
+        console.error("Jobs API returned unsuccessful response:", response);
+        if (isMountedRef.current) {
+          setJobs([]);
+        }
       }
-
-      const response = await jobsAPI.getAll(params);
-      const data = response.data as JobsResponse;
-
-      setJobs(data.jobs);
     } catch (error) {
-      console.error("Error fetching jobs:", error);
+      if (isMountedRef.current) {
+        console.error("Error fetching jobs:", error);
+        setJobs([]);
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
-  }, [searchTerm, filter]);
+  }, [apiParams]);
 
   // Fetch saved jobs
   const fetchSavedJobs = useCallback(async () => {
-    if (!user) {
-      setSavedJobs(new Set());
+    // Only fetch saved jobs for job seekers
+    if (!user || user.role !== "JOB_SEEKER") {
+      if (isMountedRef.current) {
+        setSavedJobs(new Set());
+      }
       return;
     }
 
@@ -203,10 +261,15 @@ const JobListings = () => {
       const savedJobIds = new Set(
         savedJobsData.map((savedJob) => savedJob.jobId || savedJob.job.id)
       );
-      setSavedJobs(savedJobIds);
+
+      if (isMountedRef.current) {
+        setSavedJobs(savedJobIds);
+      }
     } catch (error) {
-      console.error("Error fetching saved jobs:", error);
-      setSavedJobs(new Set());
+      if (isMountedRef.current) {
+        console.error("Error fetching saved jobs:", error);
+        setSavedJobs(new Set());
+      }
     }
   }, [user]);
 
@@ -215,6 +278,12 @@ const JobListings = () => {
     if (!user) {
       setAuthModalType("save");
       setShowAuthModal(true);
+      return;
+    }
+
+    // Only allow job seekers to save jobs
+    if (user.role !== "JOB_SEEKER") {
+      alert("Only job seekers can save jobs.");
       return;
     }
 
@@ -250,14 +319,50 @@ const JobListings = () => {
     window.location.href = `/jobs/${jobId}`;
   };
 
+  // Simple initial fetch on component mount
+  useEffect(() => {
+    const simpleInitialFetch = async () => {
+      console.log("Simple initial fetch starting...");
+      try {
+        setLoading(true);
+        const response = await jobsAPI.getAll({ limit: 50 });
+        console.log("Simple fetch response:", response);
+
+        if (response.success && response.data) {
+          const data = response.data as JobsResponse;
+          console.log("Setting jobs:", data.jobs?.length || 0, "jobs");
+          setJobs(data.jobs || []);
+        }
+      } catch (error) {
+        console.error("Simple fetch error:", error);
+        setJobs([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    simpleInitialFetch();
+  }, []); // Only run once on mount
+
   // Fetch jobs when component mounts or filters change
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      fetchJobs();
-    }, 800); // Increased debounce to reduce API calls
+    // Skip the first render since we handle it above
+    if (jobs.length === 0 && loading) return;
 
-    return () => clearTimeout(timeoutId);
-  }, [fetchJobs]);
+    // Initial fetch without debouncing
+    if (Object.keys(apiParams).length === 1 && apiParams.limit === 50) {
+      // Only has limit parameter, so this is the initial load
+      console.log("Initial fetch triggered");
+      fetchJobs();
+    } else {
+      // Has filters, so use debouncing
+      const timeoutId = setTimeout(() => {
+        console.log("Debounced fetch triggered");
+        fetchJobs();
+      }, 800);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [fetchJobs, apiParams, jobs.length, loading]);
 
   // Fetch saved jobs when authentication state changes
   useEffect(() => {
@@ -304,57 +409,69 @@ const JobListings = () => {
   const jobCategories = INDUSTRIES;
 
   // Filter jobs based on search term and filters (client-side for additional filtering)
-  const filteredJobs = jobs.filter((job) => {
-    const matchesSearch =
-      !searchTerm ||
-      job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.employer.companyName
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      job.description.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredJobs = useMemo(() => {
+    console.log("Filtering jobs:", jobs.length, "jobs available");
+    console.log("Filter criteria:", { searchTerm, filter });
 
-    const matchesJobType =
-      !filter.jobType ||
-      job.jobType.toLowerCase().replace("_", "-") ===
-        filter.jobType.toLowerCase();
-    const matchesLocation =
-      !filter.location ||
-      job.location.toLowerCase().includes(filter.location.toLowerCase());
+    const filtered = jobs.filter((job) => {
+      const matchesSearch =
+        !searchTerm ||
+        job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        job.employer.companyName
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        job.description.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesCategories =
-      filter.categories.length === 0 ||
-      filter.categories.some(
-        (category) => job.category.toLowerCase() === category.toLowerCase()
-      );
+      const matchesJobType =
+        !filter.jobType ||
+        job.jobType.toLowerCase().replace("_", "-") ===
+          filter.jobType.toLowerCase();
+      const matchesLocation =
+        !filter.location ||
+        job.location.toLowerCase().includes(filter.location.toLowerCase());
 
-    // Handle salary range filtering
-    let matchesSalary = true;
-    if (filter.salaryRange && job.salaryMin && job.salaryMax) {
-      const avgSalary = (job.salaryMin + job.salaryMax) / 2;
-      switch (filter.salaryRange) {
-        case "Under GHS 2,000":
-          matchesSalary = avgSalary < 2000;
-          break;
-        case "GHS 2,000 - 5,000":
-          matchesSalary = avgSalary >= 2000 && avgSalary <= 5000;
-          break;
-        case "GHS 5,000 - 10,000":
-          matchesSalary = avgSalary >= 5000 && avgSalary <= 10000;
-          break;
-        case "Above GHS 10,000":
-          matchesSalary = avgSalary > 10000;
-          break;
+      const matchesCategories =
+        filter.categories.length === 0 ||
+        filter.categories.some(
+          (category) => job.category.toLowerCase() === category.toLowerCase()
+        );
+
+      // Handle salary range filtering
+      let matchesSalary = true;
+      if (filter.salaryRange && job.salaryMin && job.salaryMax) {
+        const avgSalary = (job.salaryMin + job.salaryMax) / 2;
+        switch (filter.salaryRange) {
+          case "Under GHS 2,000":
+            matchesSalary = avgSalary < 2000;
+            break;
+          case "GHS 2,000 - 5,000":
+            matchesSalary = avgSalary >= 2000 && avgSalary <= 5000;
+            break;
+          case "GHS 5,000 - 10,000":
+            matchesSalary = avgSalary >= 5000 && avgSalary <= 10000;
+            break;
+          case "Above GHS 10,000":
+            matchesSalary = avgSalary > 10000;
+            break;
+        }
       }
-    }
 
-    return (
-      matchesSearch &&
-      matchesJobType &&
-      matchesLocation &&
-      matchesCategories &&
-      matchesSalary
+      return (
+        matchesSearch &&
+        matchesJobType &&
+        matchesLocation &&
+        matchesCategories &&
+        matchesSalary
+      );
+    });
+
+    console.log(
+      "Filtered jobs result:",
+      filtered.length,
+      "jobs match criteria"
     );
-  });
+    return filtered;
+  }, [jobs, searchTerm, filter]);
 
   // Handle category toggle
   const toggleCategory = (category: string) => {
@@ -416,7 +533,7 @@ const JobListings = () => {
             </h1>
             <p className="text-xl text-white/95 max-w-2xl mx-auto drop-shadow-md">
               {loading
-                ? "Loading jobs..."
+                ? `Loading jobs... (${jobs.length} found)`
                 : `${filteredJobs.length} jobs available across Ghana`}
             </p>
           </div>
@@ -732,7 +849,9 @@ const JobListings = () => {
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h2 className="text-2xl font-semibold text-foreground dark:text-white">
-                  {loading ? "Loading..." : `${filteredJobs.length} Jobs Found`}
+                  {loading
+                    ? `Loading jobs... (${jobs.length} loaded so far)`
+                    : `${filteredJobs.length} Jobs Found (${jobs.length} total loaded)`}
                 </h2>
                 <p className="text-muted-foreground dark:text-gray-400">
                   Best jobs matching your criteria
@@ -925,7 +1044,7 @@ const JobListings = () => {
                             </div>
 
                             <div className="flex gap-2">
-                              {user?.role === "JOB_SEEKER" && (
+                              {(!user || user?.role !== "EMPLOYER") && (
                                 <>
                                   <Button
                                     variant="outline"

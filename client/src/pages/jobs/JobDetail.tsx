@@ -20,6 +20,7 @@ import {
 import Button from "../../components/ui/Button";
 import { AttachmentViewer } from "../../components/ui";
 import { AuthModal } from "../../components/auth";
+import JobApplicationModal from "../../components/features/JobApplicationModal";
 import {
   applicationsAPI,
   savedJobsAPI,
@@ -93,7 +94,7 @@ const JobDetail = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showApplyModal, setShowApplyModal] = useState(false);
-  const [isApplying, setIsApplying] = useState(false);
+  const [showJobApplicationModal, setShowJobApplicationModal] = useState(false);
   const [hasApplied, setHasApplied] = useState(false);
 
   // Type guard to check if job is from database
@@ -104,6 +105,10 @@ const JobDetail = () => {
   // Helper functions to extract data from either job type
   const getCompanyName = (job: Job) => {
     return isDatabaseJob(job) ? job.employer.companyName : job.company;
+  };
+
+  const getCompanyId = (job: Job) => {
+    return isDatabaseJob(job) ? job.employer.id : null;
   };
 
   const getJobType = (job: Job) => {
@@ -128,29 +133,39 @@ const JobDetail = () => {
       if (!user) return;
 
       try {
-        // Check if job is saved
-        const savedResponse = await savedJobsAPI.getSavedJobs();
-        const savedJobs =
-          (
-            savedResponse as {
-              data: { savedJobs: { jobId: string; id: string }[] };
-            }
-          ).data.savedJobs || [];
-        const isJobSaved = savedJobs.some(
-          (savedJob) => (savedJob.jobId || savedJob.id) === job.id
-        );
-        setIsSaved(isJobSaved);
+        // Only check saved jobs for job seekers
+        if (user.role === "JOB_SEEKER") {
+          // Check if job is saved
+          const savedResponse = await savedJobsAPI.getSavedJobs();
+          const savedJobs =
+            (
+              savedResponse as {
+                data: { savedJobs: { jobId: string; id: string }[] };
+              }
+            ).data.savedJobs || [];
+          const isJobSaved = savedJobs.some(
+            (savedJob) => (savedJob.jobId || savedJob.id) === job.id
+          );
+          setIsSaved(isJobSaved);
 
-        // Check if user has already applied
-        const applicationsResponse = await applicationsAPI.getMyApplications();
-        const applications =
-          (
-            applicationsResponse as {
-              data: { applications: { jobId: string }[] };
-            }
-          ).data.applications || [];
-        const hasUserApplied = applications.some((app) => app.jobId === job.id);
-        setHasApplied(hasUserApplied);
+          // Check if user has already applied
+          const applicationsResponse =
+            await applicationsAPI.getMyApplications();
+          const applications =
+            (
+              applicationsResponse as {
+                data: { applications: { jobId: string }[] };
+              }
+            ).data.applications || [];
+          const hasUserApplied = applications.some(
+            (app) => app.jobId === job.id
+          );
+          setHasApplied(hasUserApplied);
+        } else {
+          // For employers, don't check saved jobs but they can still see the job
+          setIsSaved(false);
+          setHasApplied(false);
+        }
       } catch (error) {
         console.error("Error checking job status:", error);
       }
@@ -162,6 +177,12 @@ const JobDetail = () => {
   const handleSaveJob = async () => {
     if (!user) {
       setShowAuthModal(true);
+      return;
+    }
+
+    // Only allow job seekers to save jobs
+    if (user.role !== "JOB_SEEKER") {
+      alert("Only job seekers can save jobs.");
       return;
     }
 
@@ -193,17 +214,12 @@ const JobDetail = () => {
       return;
     }
 
-    setIsApplying(true);
-    try {
-      await applicationsAPI.apply(job.id);
-      setHasApplied(true);
-      alert("Application submitted successfully!");
-    } catch (error) {
-      console.error("Error applying for job:", error);
-      alert("Failed to submit application. Please try again.");
-    } finally {
-      setIsApplying(false);
-    }
+    // Open the job application modal
+    setShowJobApplicationModal(true);
+  };
+
+  const handleApplicationSuccess = () => {
+    setHasApplied(true);
   };
 
   const getRequirements = (job: Job) => {
@@ -315,9 +331,18 @@ const JobDetail = () => {
                     {job.title}
                   </h1>
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-4">
-                    <h2 className="text-lg md:text-xl font-semibold text-primary">
-                      {getCompanyName(job)}
-                    </h2>
+                    {getCompanyId(job) ? (
+                      <Link
+                        to={`/company/${getCompanyId(job)}`}
+                        className="text-lg md:text-xl font-semibold text-primary hover:text-primary/80 transition-colors"
+                      >
+                        {getCompanyName(job)}
+                      </Link>
+                    ) : (
+                      <h2 className="text-lg md:text-xl font-semibold text-primary">
+                        {getCompanyName(job)}
+                      </h2>
+                    )}
                     <div className="flex items-center gap-1">
                       <HiStar className="w-4 h-4 md:w-5 md:h-5 text-yellow-500" />
                       <span className="text-xs md:text-sm text-muted-foreground">
@@ -364,7 +389,7 @@ const JobDetail = () => {
 
                 {/* Action Buttons */}
                 <div className="flex md:flex-col lg:flex-row   gap-2 md:gap-3 md:flex-shrink-0">
-                  {user?.role === "JOB_SEEKER" && (
+                  {(!user || user?.role !== "EMPLOYER") && (
                     <button
                       onClick={handleSaveJob}
                       disabled={isSaving}
@@ -396,27 +421,18 @@ const JobDetail = () => {
                     <span className="hidden sm:inline">Share</span>
                   </button>
 
-                  {user?.role === "JOB_SEEKER" && (
+                  {(!user || user?.role !== "EMPLOYER") && (
                     <Button
                       size="md"
                       onClick={handleApplyJob}
-                      disabled={isApplying || hasApplied}
+                      disabled={hasApplied}
                       className={`px-4 md:px-6 text-sm font-medium whitespace-nowrap ${
                         hasApplied
                           ? "bg-secondary/20 text-secondary cursor-not-allowed"
                           : ""
                       }`}
                     >
-                      {isApplying ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
-                          Applying...
-                        </>
-                      ) : hasApplied ? (
-                        "Applied ✓"
-                      ) : (
-                        "Apply Now"
-                      )}
+                      {hasApplied ? "Applied ✓" : "Apply Now"}
                     </Button>
                   )}
                 </div>
@@ -554,7 +570,7 @@ const JobDetail = () => {
           {/* Sidebar */}
           <div className="lg:w-80 space-y-6">
             {/* Company Info */}
-            <div className="bg-card dark:bg-gray-900 rounded-xl border border-border dark:border-gray-800 p-6 sticky top-4">
+            <div className="bg-card dark:bg-gray-900 rounded-xl border border-border dark:border-gray-800 p-6">
               <h3 className="text-lg font-semibold text-foreground dark:text-white mb-4">
                 About {getCompanyName(job)}
               </h3>
@@ -671,8 +687,8 @@ const JobDetail = () => {
         </div>
       </div>
 
-      {/* Sticky Apply Button (Mobile) - Only for Job Seekers */}
-      {user?.role === "JOB_SEEKER" && (
+      {/* Sticky Apply Button (Mobile) - Show for all users except employers */}
+      {(!user || user?.role !== "EMPLOYER") && (
         <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-border dark:border-gray-800 p-3 sm:p-4 lg:hidden">
           <div className="flex gap-2 sm:gap-3 max-w-screen-sm mx-auto">
             <button
@@ -699,18 +715,9 @@ const JobDetail = () => {
               fullWidth
               className="flex-1"
               onClick={handleApplyJob}
-              disabled={isApplying || hasApplied}
+              disabled={hasApplied}
             >
-              {isApplying ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
-                  Applying...
-                </>
-              ) : hasApplied ? (
-                "Applied ✓"
-              ) : (
-                "Apply Now"
-              )}
+              {hasApplied ? "Applied ✓" : "Apply Now"}
             </Button>
           </div>
         </div>
@@ -730,6 +737,19 @@ const JobDetail = () => {
         onClose={() => setShowApplyModal(false)}
         title="Login to Apply"
         actionType="apply"
+      />
+
+      {/* Job Application Modal */}
+      <JobApplicationModal
+        isOpen={showJobApplicationModal}
+        onClose={() => setShowJobApplicationModal(false)}
+        job={{
+          id: job.id,
+          title: job.title,
+          company: getCompanyName(job),
+          location: job.location,
+        }}
+        onApplicationSuccess={handleApplicationSuccess}
       />
     </div>
   );

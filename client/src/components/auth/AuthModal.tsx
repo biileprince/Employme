@@ -1,7 +1,15 @@
 import { useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { HiX, HiLockClosed, HiUserAdd } from "react-icons/hi";
+import {
+  HiX,
+  HiLockClosed,
+  HiUserAdd,
+  HiSave,
+  HiDocumentText,
+  HiEye,
+  HiShieldCheck,
+} from "react-icons/hi";
 import Button from "../ui/Button";
 
 interface AuthModalProps {
@@ -76,13 +84,13 @@ const AuthModal = ({
   const getActionIcon = () => {
     switch (actionType) {
       case "save":
-        return "💾";
+        return <HiSave className="w-6 h-6 text-primary" />;
       case "apply":
-        return "📝";
+        return <HiDocumentText className="w-6 h-6 text-primary" />;
       case "view":
-        return "👁️";
+        return <HiEye className="w-6 h-6 text-primary" />;
       default:
-        return "🔐";
+        return <HiShieldCheck className="w-6 h-6 text-primary" />;
     }
   };
 
@@ -111,7 +119,7 @@ const AuthModal = ({
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-border">
               <div className="flex items-center space-x-3">
-                <div className="text-2xl">{getActionIcon()}</div>
+                <div>{getActionIcon()}</div>
                 <h2 className="text-xl font-bold text-foreground">{title}</h2>
               </div>
               <button

@@ -1,68 +1,19 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
-import { jobsAPI, userAPI } from '../../services/api';
-
-// Icon components (using simple SVG icons for consistency)
-const BriefcaseIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25A8.966 8.966 0 0118 3.75c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0118 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
-  </svg>
-);
-
-const CheckCircleIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
-
-const DocumentIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-  </svg>
-);
-
-const ClockIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
-
-const UsersIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-  </svg>
-);
-
-const PlusIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-  </svg>
-);
-
-const ClipboardIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-  </svg>
-);
-
-const SearchIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-  </svg>
-);
-
-const ChartIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-  </svg>
-);
-
-const LightBulbIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-  </svg>
-);
+import { useState, useEffect, useCallback } from "react";
+import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
+import {
+  MdWork,
+  MdCheckCircle,
+  MdDescription,
+  MdAdd,
+  MdAccessTime,
+  MdPeople,
+  MdAssignment,
+  MdSearch,
+  MdBarChart,
+  MdLightbulb,
+} from "react-icons/md";
+import { jobsAPI, userAPI } from "../../services/api";
 
 interface DashboardStats {
   totalJobs: number;
@@ -97,18 +48,16 @@ export default function EmployerDashboard() {
     totalCandidates: 0,
   });
   const [recentJobs, setRecentJobs] = useState<RecentJob[]>([]);
-  const [recentApplications, setRecentApplications] = useState<RecentApplication[]>([]);
+  const [recentApplications, setRecentApplications] = useState<
+    RecentApplication[]
+  >([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       setIsLoading(true);
-      
+
       // Fetch all data in parallel
       const [jobsResponse, candidatesResponse] = await Promise.all([
         jobsAPI.getMyJobs(),
@@ -122,11 +71,14 @@ export default function EmployerDashboard() {
 
       // Calculate stats
       const totalJobs = jobs.length;
-      const activeJobs = jobs.filter(job => job.status === 'ACTIVE').length;
-      
+      const activeJobs = jobs.filter((job) => job.status === "ACTIVE").length;
+
       // Get recent jobs (last 5)
       const sortedJobs = jobs
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )
         .slice(0, 5);
 
       // Calculate application stats
@@ -135,7 +87,10 @@ export default function EmployerDashboard() {
 
       // For now, we'll use mock data for applications since we need to fetch from multiple jobs
       // In a real implementation, you'd have a dashboard API endpoint that aggregates this data
-      totalApplications = jobs.reduce((sum, job) => sum + (job.applicationsCount || 0), 0);
+      totalApplications = jobs.reduce(
+        (sum, job) => sum + (job.applicationsCount || 0),
+        0
+      );
       pendingApplications = Math.floor(totalApplications * 0.6); // Mock data
 
       setStats({
@@ -150,46 +105,57 @@ export default function EmployerDashboard() {
       // For demo, create some mock recent applications
       setRecentApplications([
         {
-          id: '1',
-          applicantName: 'John Doe',
-          jobTitle: 'Software Engineer',
-          status: 'PENDING',
+          id: "1",
+          applicantName: "John Doe",
+          jobTitle: "Software Engineer",
+          status: "PENDING",
           appliedAt: new Date().toISOString(),
         },
         {
-          id: '2',
-          applicantName: 'Jane Smith',
-          jobTitle: 'Product Manager',
-          status: 'REVIEWING',
+          id: "2",
+          applicantName: "Jane Smith",
+          jobTitle: "Product Manager",
+          status: "REVIEWING",
           appliedAt: new Date(Date.now() - 86400000).toISOString(),
         },
         {
-          id: '3',
-          applicantName: 'Mike Johnson',
-          jobTitle: 'UX Designer',
-          status: 'ACCEPTED',
+          id: "3",
+          applicantName: "Mike Johnson",
+          jobTitle: "UX Designer",
+          status: "ACCEPTED",
           appliedAt: new Date(Date.now() - 172800000).toISOString(),
         },
       ]);
-
     } catch (err) {
-      console.error('Failed to fetch dashboard data:', err);
-      setError('Failed to load dashboard data');
+      console.error("Failed to fetch dashboard data:", err);
+      setError("Failed to load dashboard data");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []); // Empty dependency array since this function doesn't depend on any props or state
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'ACTIVE': return 'text-success bg-success/10 border-success/20';
-      case 'PAUSED': return 'text-yellow-600 bg-yellow-50 border-yellow-200 dark:text-yellow-400 dark:bg-yellow-900/10 dark:border-yellow-800/20';
-      case 'CLOSED': return 'text-muted-foreground bg-muted/50 border-border';
-      case 'PENDING': return 'text-yellow-600 bg-yellow-50 border-yellow-200 dark:text-yellow-400 dark:bg-yellow-900/10 dark:border-yellow-800/20';
-      case 'REVIEWING': return 'text-blue-600 bg-blue-50 border-blue-200 dark:text-blue-400 dark:bg-blue-900/10 dark:border-blue-800/20';
-      case 'ACCEPTED': return 'text-success bg-success/10 border-success/20';
-      case 'REJECTED': return 'text-destructive bg-destructive/10 border-destructive/20';
-      default: return 'text-muted-foreground bg-muted/50 border-border';
+      case "ACTIVE":
+        return "text-success bg-success/10 border-success/20";
+      case "PAUSED":
+        return "text-yellow-600 bg-yellow-50 border-yellow-200 dark:text-yellow-400 dark:bg-yellow-900/10 dark:border-yellow-800/20";
+      case "CLOSED":
+        return "text-muted-foreground bg-muted/50 border-border";
+      case "PENDING":
+        return "text-yellow-600 bg-yellow-50 border-yellow-200 dark:text-yellow-400 dark:bg-yellow-900/10 dark:border-yellow-800/20";
+      case "REVIEWING":
+        return "text-blue-600 bg-blue-50 border-blue-200 dark:text-blue-400 dark:bg-blue-900/10 dark:border-blue-800/20";
+      case "ACCEPTED":
+        return "text-success bg-success/10 border-success/20";
+      case "REJECTED":
+        return "text-destructive bg-destructive/10 border-destructive/20";
+      default:
+        return "text-muted-foreground bg-muted/50 border-border";
     }
   };
 
@@ -205,9 +171,7 @@ export default function EmployerDashboard() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2">
-          Dashboard
-        </h1>
+        <h1 className="text-3xl font-bold text-foreground mb-2">Dashboard</h1>
         <p className="text-muted-foreground">
           Welcome back! Here's an overview of your hiring activity.
         </p>
@@ -229,11 +193,15 @@ export default function EmployerDashboard() {
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Total Jobs</p>
-              <p className="text-2xl font-bold text-foreground">{stats.totalJobs}</p>
+              <p className="text-sm font-medium text-muted-foreground">
+                Total Jobs
+              </p>
+              <p className="text-2xl font-bold text-foreground">
+                {stats.totalJobs}
+              </p>
             </div>
             <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center">
-              <BriefcaseIcon />
+              <MdWork className="w-6 h-6 text-blue-600" />
             </div>
           </div>
         </motion.div>
@@ -246,11 +214,15 @@ export default function EmployerDashboard() {
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Active Jobs</p>
-              <p className="text-2xl font-bold text-foreground">{stats.activeJobs}</p>
+              <p className="text-sm font-medium text-muted-foreground">
+                Active Jobs
+              </p>
+              <p className="text-2xl font-bold text-foreground">
+                {stats.activeJobs}
+              </p>
             </div>
             <div className="h-12 w-12 bg-success/10 rounded-lg flex items-center justify-center">
-              <CheckCircleIcon />
+              <MdCheckCircle className="w-6 h-6 text-green-600" />
             </div>
           </div>
         </motion.div>
@@ -263,11 +235,15 @@ export default function EmployerDashboard() {
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Applications</p>
-              <p className="text-2xl font-bold text-foreground">{stats.totalApplications}</p>
+              <p className="text-sm font-medium text-muted-foreground">
+                Applications
+              </p>
+              <p className="text-2xl font-bold text-foreground">
+                {stats.totalApplications}
+              </p>
             </div>
             <div className="h-12 w-12 bg-blue-500/10 rounded-lg flex items-center justify-center">
-              <DocumentIcon />
+              <MdDescription className="w-6 h-6 text-blue-600" />
             </div>
           </div>
         </motion.div>
@@ -280,11 +256,15 @@ export default function EmployerDashboard() {
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Pending</p>
-              <p className="text-2xl font-bold text-foreground">{stats.pendingApplications}</p>
+              <p className="text-sm font-medium text-muted-foreground">
+                Pending
+              </p>
+              <p className="text-2xl font-bold text-foreground">
+                {stats.pendingApplications}
+              </p>
             </div>
             <div className="h-12 w-12 bg-yellow-500/10 rounded-lg flex items-center justify-center">
-              <ClockIcon />
+              <MdAccessTime className="w-6 h-6 text-yellow-600" />
             </div>
           </div>
         </motion.div>
@@ -297,11 +277,15 @@ export default function EmployerDashboard() {
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Candidates</p>
-              <p className="text-2xl font-bold text-foreground">{stats.totalCandidates}</p>
+              <p className="text-sm font-medium text-muted-foreground">
+                Candidates
+              </p>
+              <p className="text-2xl font-bold text-foreground">
+                {stats.totalCandidates}
+              </p>
             </div>
             <div className="h-12 w-12 bg-purple-500/10 rounded-lg flex items-center justify-center">
-              <UsersIcon />
+              <MdPeople className="w-6 h-6 text-purple-600" />
             </div>
           </div>
         </motion.div>
@@ -314,13 +298,15 @@ export default function EmployerDashboard() {
         transition={{ delay: 0.6 }}
         className="bg-card border border-border rounded-lg p-6"
       >
-        <h2 className="text-xl font-semibold text-foreground mb-4">Quick Actions</h2>
+        <h2 className="text-xl font-semibold text-foreground mb-4">
+          Quick Actions
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Link
             to="/employer/post-job"
             className="flex items-center justify-center p-4 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors group"
           >
-            <PlusIcon />
+            <MdAdd className="w-5 h-5" />
             <span className="font-medium ml-2">Post New Job</span>
           </Link>
 
@@ -328,7 +314,7 @@ export default function EmployerDashboard() {
             to="/employer/applications"
             className="flex items-center justify-center p-4 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/90 transition-colors group"
           >
-            <ClipboardIcon />
+            <MdAssignment className="w-5 h-5" />
             <span className="font-medium ml-2">Review Applications</span>
           </Link>
 
@@ -336,7 +322,7 @@ export default function EmployerDashboard() {
             to="/employer/candidates"
             className="flex items-center justify-center p-4 bg-accent text-accent-foreground rounded-lg hover:bg-accent/90 transition-colors group"
           >
-            <SearchIcon />
+            <MdSearch className="w-5 h-5" />
             <span className="font-medium ml-2">Find Candidates</span>
           </Link>
 
@@ -344,7 +330,7 @@ export default function EmployerDashboard() {
             to="/employer/my-jobs"
             className="flex items-center justify-center p-4 bg-muted text-foreground rounded-lg hover:bg-muted/80 transition-colors group"
           >
-            <ChartIcon />
+            <MdBarChart className="w-5 h-5" />
             <span className="font-medium ml-2">Manage Jobs</span>
           </Link>
         </div>
@@ -360,7 +346,9 @@ export default function EmployerDashboard() {
           className="bg-card border border-border rounded-lg p-6"
         >
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-foreground">Recent Jobs</h2>
+            <h2 className="text-xl font-semibold text-foreground">
+              Recent Jobs
+            </h2>
             <Link
               to="/employer/my-jobs"
               className="text-primary hover:text-primary/80 text-sm font-medium"
@@ -372,7 +360,9 @@ export default function EmployerDashboard() {
           <div className="space-y-4">
             {recentJobs.length === 0 ? (
               <div className="text-center py-8">
-                <div className="text-muted-foreground text-sm">No jobs posted yet</div>
+                <div className="text-muted-foreground text-sm">
+                  No jobs posted yet
+                </div>
                 <Link
                   to="/employer/post-job"
                   className="text-primary hover:text-primary/80 text-sm font-medium mt-2 inline-block"
@@ -392,7 +382,11 @@ export default function EmployerDashboard() {
                   <div className="flex-1">
                     <h3 className="font-medium text-foreground">{job.title}</h3>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(job.status)}`}>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(
+                          job.status
+                        )}`}
+                      >
                         {job.status}
                       </span>
                       <span className="text-muted-foreground text-xs">
@@ -417,7 +411,9 @@ export default function EmployerDashboard() {
           className="bg-card border border-border rounded-lg p-6"
         >
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-foreground">Recent Applications</h2>
+            <h2 className="text-xl font-semibold text-foreground">
+              Recent Applications
+            </h2>
             <Link
               to="/employer/applications"
               className="text-primary hover:text-primary/80 text-sm font-medium"
@@ -429,7 +425,9 @@ export default function EmployerDashboard() {
           <div className="space-y-4">
             {recentApplications.length === 0 ? (
               <div className="text-center py-8">
-                <div className="text-muted-foreground text-sm">No applications yet</div>
+                <div className="text-muted-foreground text-sm">
+                  No applications yet
+                </div>
               </div>
             ) : (
               recentApplications.map((application, index) => (
@@ -441,11 +439,19 @@ export default function EmployerDashboard() {
                   className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted/70 transition-colors"
                 >
                   <div className="flex-1">
-                    <h3 className="font-medium text-foreground">{application.applicantName}</h3>
+                    <h3 className="font-medium text-foreground">
+                      {application.applicantName}
+                    </h3>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-muted-foreground text-sm">{application.jobTitle}</span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(application.status)}`}>
-                        {application.status.replace('_', ' ')}
+                      <span className="text-muted-foreground text-sm">
+                        {application.jobTitle}
+                      </span>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(
+                          application.status
+                        )}`}
+                      >
+                        {application.status.replace("_", " ")}
                       </span>
                     </div>
                   </div>
@@ -467,20 +473,24 @@ export default function EmployerDashboard() {
         className="bg-gradient-to-r from-primary/5 to-secondary/5 border border-border rounded-lg p-6"
       >
         <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center">
-          <LightBulbIcon />
+          <MdLightbulb className="w-6 h-6 text-blue-600" />
           <span className="ml-2">Hiring Tips</span>
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <h3 className="font-medium text-foreground">Optimize Your Job Posts</h3>
+            <h3 className="font-medium text-foreground">
+              Optimize Your Job Posts
+            </h3>
             <p className="text-sm text-muted-foreground">
-              Include clear requirements, competitive salary ranges, and company benefits to attract quality candidates.
+              Include clear requirements, competitive salary ranges, and company
+              benefits to attract quality candidates.
             </p>
           </div>
           <div className="space-y-2">
             <h3 className="font-medium text-foreground">Quick Response Time</h3>
             <p className="text-sm text-muted-foreground">
-              Respond to applications within 2-3 days to maintain candidate interest and improve your employer brand.
+              Respond to applications within 2-3 days to maintain candidate
+              interest and improve your employer brand.
             </p>
           </div>
         </div>

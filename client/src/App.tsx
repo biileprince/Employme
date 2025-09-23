@@ -24,6 +24,7 @@ import {
   SavedJobs,
   JobListings,
   JobDetail,
+  CompanyProfile,
   EmployerDashboard,
   EmployerProfile,
   PostJob,
@@ -34,7 +35,7 @@ import {
 } from "./pages";
 
 // Import loaders
-import { jobsLoader, jobDetailLoader } from "./loaders/jobsLoaders";
+import { jobDetailLoader } from "./loaders/jobsLoaders";
 
 // Import providers
 import { ProtectedRoute } from "./components/common/ProtectedRoute";
@@ -53,12 +54,15 @@ const router = createBrowserRouter(
         {
           path: "/jobs",
           element: <JobListings />,
-          loader: jobsLoader,
         },
         {
           path: "/jobs/:id",
           element: <JobDetail />,
           loader: jobDetailLoader,
+        },
+        {
+          path: "/company/:id",
+          element: <CompanyProfile />,
         },
         {
           path: "/login",

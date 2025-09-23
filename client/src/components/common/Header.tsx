@@ -1,6 +1,18 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
-import { HiChevronDown, HiMenu, HiX, HiUser, HiLogout } from "react-icons/hi";
+import {
+  HiChevronDown,
+  HiMenu,
+  HiX,
+  HiUser,
+  HiLogout,
+  HiViewGrid,
+  HiBriefcase,
+  HiOfficeBuilding,
+  HiAcademicCap,
+  HiLocationMarker,
+  HiGlobeAlt,
+} from "react-icons/hi";
 import ThemeToggle from "../ui/ThemeToggle";
 import Button from "../ui/Button";
 import { useAuth } from "../../contexts/AuthContext";
@@ -69,10 +81,11 @@ const Header = () => {
                     to={
                       user?.role === "EMPLOYER"
                         ? "/employer/dashboard"
-                        : "/dashboard"
+                        : "/job-seeker/dashboard"
                     }
-                    className="text-foreground hover:text-primary transition-colors font-medium text-base px-3 py-2 rounded-lg hover:bg-muted/50"
+                    className="flex items-center gap-2 text-foreground hover:text-primary transition-colors font-medium text-base px-3 py-2 rounded-lg hover:bg-muted/50"
                   >
+                    <HiViewGrid className="w-4 h-4" />
                     Dashboard
                   </Link>
 
@@ -162,19 +175,19 @@ const Header = () => {
                       >
                         <div className="space-y-2">
                           <Link
-                            to="/post-job"
+                            to="/employer/post-job"
                             className="block text-foreground hover:text-primary transition-colors text-sm p-2 rounded-lg hover:bg-muted/50"
                           >
                             Post a Job
                           </Link>
                           <Link
-                            to="/browse-candidates"
+                            to="/employer/candidates"
                             className="block text-foreground hover:text-primary transition-colors text-sm p-2 rounded-lg hover:bg-muted/50"
                           >
                             Browse Candidates
                           </Link>
                           <Link
-                            to="/employer-dashboard"
+                            to="/employer/dashboard"
                             className="block text-foreground hover:text-primary transition-colors text-sm p-2 rounded-lg hover:bg-muted/50"
                           >
                             Employer Dashboard
@@ -532,22 +545,28 @@ const Header = () => {
                           ) : (
                             <>
                               <Link
-                                to="/profile"
+                                to="/job-seeker/profile"
                                 className="block text-foreground hover:text-primary transition-colors text-sm p-2 rounded-lg hover:bg-muted/50"
                               >
                                 Profile
                               </Link>
                               <Link
-                                to="/dashboard"
+                                to="/job-seeker/dashboard"
                                 className="block text-foreground hover:text-primary transition-colors text-sm p-2 rounded-lg hover:bg-muted/50"
                               >
                                 Dashboard
                               </Link>
                               <Link
-                                to="/my-applications"
+                                to="/job-seeker/applications"
                                 className="block text-foreground hover:text-primary transition-colors text-sm p-2 rounded-lg hover:bg-muted/50"
                               >
                                 My Applications
+                              </Link>
+                              <Link
+                                to="/job-seeker/saved-jobs"
+                                className="block text-foreground hover:text-primary transition-colors text-sm p-2 rounded-lg hover:bg-muted/50"
+                              >
+                                Saved Jobs
                               </Link>
                             </>
                           )}
@@ -652,7 +671,7 @@ const Header = () => {
                   </h3>
                   <div className="space-y-2 pl-4">
                     <Link
-                      to="/dashboard"
+                      to="/job-seeker/dashboard"
                       className="block text-foreground hover:text-primary transition-colors font-medium p-2 rounded-lg hover:bg-muted/50"
                     >
                       Dashboard
@@ -664,13 +683,19 @@ const Header = () => {
                       Browse Jobs
                     </Link>
                     <Link
-                      to="/my-applications"
+                      to="/job-seeker/applications"
                       className="block text-foreground hover:text-primary transition-colors font-medium p-2 rounded-lg hover:bg-muted/50"
                     >
                       My Applications
                     </Link>
                     <Link
-                      to="/profile"
+                      to="/job-seeker/saved-jobs"
+                      className="block text-foreground hover:text-primary transition-colors font-medium p-2 rounded-lg hover:bg-muted/50"
+                    >
+                      Saved Jobs
+                    </Link>
+                    <Link
+                      to="/job-seeker/profile"
                       className="block text-foreground hover:text-primary transition-colors font-medium p-2 rounded-lg hover:bg-muted/50"
                     >
                       Profile

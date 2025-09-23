@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import { Navigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  FiUser,
   FiBriefcase,
   FiBookmark,
   FiTrendingUp,
@@ -366,33 +365,6 @@ const Dashboard = () => {
             transition={{ delay: 0.3 }}
             className="space-y-6"
           >
-            {/* Profile Card */}
-            <div className="bg-card border border-border rounded-xl p-6">
-              <h3 className="text-lg font-semibold text-foreground mb-4">
-                Your Profile
-              </h3>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="h-12 w-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                  <FiUser className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <p className="font-medium text-foreground">
-                    {userProfile?.firstName} {userProfile?.lastName}
-                  </p>
-                  <p className="text-sm text-muted-foreground capitalize">
-                    {userProfile?.role?.toLowerCase().replace("_", " ")}
-                  </p>
-                </div>
-              </div>
-
-              <Link
-                to="/profile"
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-2 px-4 rounded-lg text-sm font-medium transition-colors block text-center"
-              >
-                Edit Profile
-              </Link>
-            </div>
-
             {/* Quick Actions */}
             <div className="bg-card border border-border rounded-xl p-6">
               <h3 className="text-lg font-semibold text-foreground mb-4">
@@ -408,14 +380,14 @@ const Dashboard = () => {
                 </Link>
 
                 <Link
-                  to="/saved-jobs"
+                  to="/job-seeker/saved-jobs"
                   className="w-full border border-border hover:bg-muted/50 py-2 px-4 rounded-lg text-sm font-medium transition-colors block text-center"
                 >
                   Saved Jobs
                 </Link>
 
                 <Link
-                  to="/applications"
+                  to="/job-seeker/applications"
                   className="w-full border border-border hover:bg-muted/50 py-2 px-4 rounded-lg text-sm font-medium transition-colors block text-center"
                 >
                   My Applications
