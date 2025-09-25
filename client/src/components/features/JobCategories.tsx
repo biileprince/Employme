@@ -1,13 +1,25 @@
-import { Link } from 'react-router-dom';
-import { HiCode, HiHeart, HiBriefcase, HiAcademicCap, HiSpeakerphone, HiTrendingUp } from 'react-icons/hi';
+import { Link } from "react-router-dom";
+import {
+  HiCode,
+  HiHeart,
+  HiBriefcase,
+  HiAcademicCap,
+  HiSpeakerphone,
+  HiTrendingUp,
+} from "react-icons/hi";
 
-const CategoryCard = ({ category, icon, count, description }: {
+const CategoryCard = ({
+  category,
+  icon,
+  count,
+  description,
+}: {
   category: string;
   icon: React.ReactNode;
   count: number;
   description: string;
 }) => (
-  <Link 
+  <Link
     to={`/jobs?category=${encodeURIComponent(category)}`}
     className="group block bg-card dark:bg-gray-800 rounded-xl border border-border dark:border-gray-700 p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
   >
@@ -33,41 +45,42 @@ const CategoryCard = ({ category, icon, count, description }: {
 const JobCategories = () => {
   const categories = [
     {
-      category: 'Technology',
+      category: "Technology",
       icon: <HiCode className="w-6 h-6" />,
       count: 45,
-      description: 'Software development, IT support, data science, and more'
+      description: "Software development, IT support, data science, and more",
     },
     {
-      category: 'Healthcare',
+      category: "Healthcare",
       icon: <HiHeart className="w-6 h-6" />,
       count: 23,
-      description: 'Medical professionals, healthcare administration, nursing'
+      description: "Medical professionals, healthcare administration, nursing",
     },
     {
-      category: 'Finance',
+      category: "Finance",
       icon: <HiBriefcase className="w-6 h-6" />,
       count: 18,
-      description: 'Banking, accounting, financial planning, investment'
+      description: "Banking, accounting, financial planning, investment",
     },
     {
-      category: 'Education',
+      category: "Education",
       icon: <HiAcademicCap className="w-6 h-6" />,
       count: 31,
-      description: 'Teaching positions, educational administration, tutoring'
+      description: "Teaching positions, educational administration, tutoring",
     },
     {
-      category: 'Marketing',
+      category: "Marketing",
       icon: <HiSpeakerphone className="w-6 h-6" />,
       count: 27,
-      description: 'Digital marketing, brand management, content creation'
+      description: "Digital marketing, brand management, content creation",
     },
     {
-      category: 'Sales',
+      category: "Sales",
       icon: <HiTrendingUp className="w-6 h-6" />,
       count: 19,
-      description: 'Sales representatives, business development, account management'
-    }
+      description:
+        "Sales representatives, business development, account management",
+    },
   ];
 
   return (
@@ -78,18 +91,19 @@ const JobCategories = () => {
             Browse Jobs by Category
           </h2>
           <p className="text-xl text-muted-foreground dark:text-gray-400 max-w-2xl mx-auto">
-            Find opportunities in your field of expertise across Ghana's growing job market
+            Find opportunities in your field of expertise across Ghana's growing
+            job market
           </p>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {categories.map((cat) => (
             <CategoryCard key={cat.category} {...cat} />
           ))}
         </div>
-        
+
         <div className="text-center mt-12">
-          <Link 
+          <Link
             to="/jobs"
             className="inline-flex items-center px-8 py-3 bg-primary text-white font-semibold rounded-lg hover:bg-primary/90 transition-colors"
           >

@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { HiX, HiUpload, HiDocumentText, HiUser } from "react-icons/hi";
 import { MdAttachFile, MdDelete } from "react-icons/md";
 import Button from "../ui/Button";
-import { applicationsAPI } from "../../services/api";
+import { applicationsAPI, attachmentAPI } from "../../services/api";
 
 interface JobApplicationModalProps {
   isOpen: boolean;
@@ -86,21 +86,27 @@ const JobApplicationModal = ({
   };
 
   const handleSubmit = async () => {
-    if (uploadedFiles.length === 0) {
-      alert("Please upload your resume or cover letter.");
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
-      // For now, just submit without files
-      // In a full implementation, you'd upload files to your backend first
-      await applicationsAPI.apply(
-        job.id,
-        "Application submitted with attachments"
-      );
+      // First upload files if any
+      if (uploadedFiles.length > 0) {
+        const files = uploadedFiles.map((upload) => upload.file);
+        const uploadResponse = await attachmentAPI.upload(
+          files,
+          "APPLICATION",
+          undefined
+        );
 
+        if (!uploadResponse.success) {
+          throw new Error("Failed to upload files");
+        }
+      }
+
+      // Submit application
+      await applicationsAPI.apply(job.id);
+
+      alert("Application submitted successfully!");
       onApplicationSuccess();
       onClose();
 

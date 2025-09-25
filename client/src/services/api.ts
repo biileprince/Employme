@@ -338,7 +338,7 @@ export const savedJobsAPI = {
 };
 export const applicationsAPI = {
   apply: (jobId: string, coverLetter?: string) =>
-    apiClient.post("/applications", { jobId, coverLetter }),
+    apiClient.post("/applications/apply", { jobId, coverLetter }),
 
   getMyApplications: () => apiClient.get("/applications/my-applications"),
 

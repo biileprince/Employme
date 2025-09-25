@@ -84,6 +84,11 @@ interface LegacyJob {
 
 type Job = DatabaseJob | LegacyJob;
 
+// Narrow type when employer.id may be present
+interface DatabaseJobWithEmployerId extends DatabaseJob {
+  employer: DatabaseJob["employer"] & { id?: string };
+}
+
 const JobDetail = () => {
   const { job, relatedJobs } = useLoaderData() as {
     job: Job;
@@ -108,7 +113,11 @@ const JobDetail = () => {
   };
 
   const getCompanyId = (job: Job) => {
-    return isDatabaseJob(job) ? job.employer.id : null;
+    if (isDatabaseJob(job)) {
+      const employer = (job as DatabaseJobWithEmployerId).employer;
+      return employer && "id" in employer ? employer.id ?? null : null;
+    }
+    return null;
   };
 
   const getJobType = (job: Job) => {
@@ -140,11 +149,11 @@ const JobDetail = () => {
           const savedJobs =
             (
               savedResponse as {
-                data: { savedJobs: { jobId: string; id: string }[] };
+                data: { savedJobs: { jobId?: string; job?: { id: string } }[] };
               }
             ).data.savedJobs || [];
           const isJobSaved = savedJobs.some(
-            (savedJob) => (savedJob.jobId || savedJob.id) === job.id
+            (savedJob) => (savedJob.jobId || savedJob.job?.id) === job.id
           );
           setIsSaved(isJobSaved);
 

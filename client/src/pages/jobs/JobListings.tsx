@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   HiFilter,
@@ -8,12 +8,18 @@ import {
   HiCurrencyDollar,
   HiStar,
   HiX,
-  HiHeart,
-  HiOutlineHeart,
+  HiUpload,
+  HiDocumentText,
+  HiTrash,
 } from "react-icons/hi";
 import Button from "../../components/ui/Button";
 import { AuthModal } from "../../components/auth";
-import { jobsAPI, savedJobsAPI, formatImageUrl } from "../../services/api";
+import {
+  jobsAPI,
+  applicationsAPI,
+  attachmentAPI,
+  formatImageUrl,
+} from "../../services/api";
 import { useAuth } from "../../contexts/AuthContext";
 import {
   INDUSTRIES,
@@ -66,12 +72,17 @@ const JobListings = () => {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set());
-  const [savingJobId, setSavingJobId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authModalType, setAuthModalType] = useState<"save" | "apply">("save");
   const [searchTerm, setSearchTerm] = useState("");
+
+  // Job Application Modal State
+  const [showApplicationModal, setShowApplicationModal] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [isSubmittingApplication, setIsSubmittingApplication] = useState(false);
+  const [appliedJobs, setAppliedJobs] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState({
     jobType: "",
     location: "",
@@ -80,15 +91,34 @@ const JobListings = () => {
     categories: [] as string[],
   });
 
-  // Ref to track if component is mounted to prevent state updates after unmount
-  const isMountedRef = useRef(true);
+  // Ref to track previous API params to prevent duplicate requests
+  const prevParamsRef = useRef<string>("");
 
-  // Cleanup effect to prevent memory leaks
+  // Component mounted effect for debugging
   useEffect(() => {
-    return () => {
-      isMountedRef.current = false;
-    };
+    console.log("🚀 JobListings component mounted");
   }, []);
+
+  // Load user's applications when user changes
+  useEffect(() => {
+    const loadUserApplications = async () => {
+      if (!user || user.role !== "JOB_SEEKER") return;
+
+      try {
+        const response = await applicationsAPI.getMyApplications();
+        if (response.success && response.data) {
+          const data = response.data as { applications?: { jobId: string }[] };
+          const applications = data.applications || [];
+          const jobIds = applications.map((app) => app.jobId);
+          setAppliedJobs(new Set(jobIds));
+        }
+      } catch (error) {
+        console.error("Failed to load user applications:", error);
+      }
+    };
+
+    loadUserApplications();
+  }, [user]);
 
   // Location search states
   const [locationSearch, setLocationSearch] = useState("");
@@ -196,178 +226,180 @@ const JobListings = () => {
     filter.experience,
   ]);
 
-  // Debug component state (simplified)
-  console.log("=== JobListings Debug ===");
-  console.log("Jobs count:", jobs.length);
-  console.log("Loading:", loading);
-  console.log("First job:", jobs[0]?.title || "No jobs");
-  console.log("========================");
-
-  // Fetch jobs from backend
-  const fetchJobs = useCallback(async () => {
-    if (!isMountedRef.current) return;
-
-    try {
-      setLoading(true);
-      console.log("Fetching jobs with params:", apiParams);
-
-      const response = await jobsAPI.getAll(apiParams);
-      console.log("Jobs API response:", response);
-
-      if (response.success && response.data) {
-        const data = response.data as JobsResponse;
-        console.log("Jobs data:", data.jobs, "Count:", data.jobs?.length);
-
-        if (isMountedRef.current) {
-          setJobs(data.jobs || []);
-          console.log("Jobs set to state, count:", data.jobs?.length || 0);
-        }
-      } else {
-        console.error("Jobs API returned unsuccessful response:", response);
-        if (isMountedRef.current) {
-          setJobs([]);
-        }
-      }
-    } catch (error) {
-      if (isMountedRef.current) {
-        console.error("Error fetching jobs:", error);
-        setJobs([]);
-      }
-    } finally {
-      if (isMountedRef.current) {
-        setLoading(false);
-      }
-    }
-  }, [apiParams]);
-
-  // Fetch saved jobs
-  const fetchSavedJobs = useCallback(async () => {
-    // Only fetch saved jobs for job seekers
-    if (!user || user.role !== "JOB_SEEKER") {
-      if (isMountedRef.current) {
-        setSavedJobs(new Set());
-      }
-      return;
-    }
-
-    try {
-      const response = await savedJobsAPI.getSavedJobs();
-      const savedJobsData =
-        (
-          response as {
-            data: { savedJobs: { jobId: string; job: { id: string } }[] };
-          }
-        ).data.savedJobs || [];
-      const savedJobIds = new Set(
-        savedJobsData.map((savedJob) => savedJob.jobId || savedJob.job.id)
-      );
-
-      if (isMountedRef.current) {
-        setSavedJobs(savedJobIds);
-      }
-    } catch (error) {
-      if (isMountedRef.current) {
-        console.error("Error fetching saved jobs:", error);
-        setSavedJobs(new Set());
-      }
-    }
-  }, [user]);
-
-  // Handle save/unsave job
-  const handleSaveJob = async (jobId: string, isSaved: boolean) => {
-    if (!user) {
-      setAuthModalType("save");
-      setShowAuthModal(true);
-      return;
-    }
-
-    // Only allow job seekers to save jobs
-    if (user.role !== "JOB_SEEKER") {
-      alert("Only job seekers can save jobs.");
-      return;
-    }
-
-    setSavingJobId(jobId);
-    try {
-      if (isSaved) {
-        await savedJobsAPI.unsaveJob(jobId);
-        setSavedJobs((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(jobId);
-          return newSet;
-        });
-      } else {
-        await savedJobsAPI.saveJob(jobId);
-        setSavedJobs((prev) => new Set(prev).add(jobId));
-      }
-    } catch (error) {
-      console.error("Error saving/unsaving job:", error);
-      alert("Failed to save job. Please try again.");
-    } finally {
-      setSavingJobId(null);
-    }
-  };
-
   // Handle apply to job
-  const handleApplyJob = (jobId: string) => {
+  const handleApplyJob = (job: Job) => {
     if (!user) {
       setAuthModalType("apply");
       setShowAuthModal(true);
       return;
     }
-    // Redirect to job details page for full application
-    window.location.href = `/jobs/${jobId}`;
+
+    // Only allow job seekers to apply
+    if (user.role !== "JOB_SEEKER") {
+      alert("Only job seekers can apply for jobs.");
+      return;
+    }
+
+    setSelectedJob(job);
+    setShowApplicationModal(true);
   };
 
-  // Simple initial fetch on component mount
-  useEffect(() => {
-    const simpleInitialFetch = async () => {
-      console.log("Simple initial fetch starting...");
-      try {
-        setLoading(true);
-        const response = await jobsAPI.getAll({ limit: 50 });
-        console.log("Simple fetch response:", response);
+  // Handle file upload
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
 
-        if (response.success && response.data) {
-          const data = response.data as JobsResponse;
-          console.log("Setting jobs:", data.jobs?.length || 0, "jobs");
-          setJobs(data.jobs || []);
-        }
-      } catch (error) {
-        console.error("Simple fetch error:", error);
-        setJobs([]);
-      } finally {
-        setLoading(false);
+    const validFiles: File[] = [];
+    Array.from(files).forEach((file) => {
+      // Validate file type
+      const allowedTypes = [
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "text/plain",
+      ];
+
+      if (!allowedTypes.includes(file.type)) {
+        alert(
+          `Invalid file type for ${file.name}. Please upload PDF, DOC, DOCX, or TXT files only.`
+        );
+        return;
       }
-    };
 
-    simpleInitialFetch();
+      // Validate file size (5MB max)
+      if (file.size > 5 * 1024 * 1024) {
+        alert(`File ${file.name} is too large. Maximum size is 5MB.`);
+        return;
+      }
+
+      validFiles.push(file);
+    });
+
+    setUploadedFiles((prev) => [...prev, ...validFiles]);
+
+    // Reset file input
+    if (event.target) {
+      event.target.value = "";
+    }
+  };
+
+  // Remove uploaded file
+  const removeFile = (index: number) => {
+    setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Handle application submission
+  const handleApplicationSubmit = async () => {
+    if (!selectedJob || !user) return;
+
+    setIsSubmittingApplication(true);
+    try {
+      // First upload files if any
+      if (uploadedFiles.length > 0) {
+        const uploadResponse = await attachmentAPI.upload(
+          uploadedFiles,
+          "APPLICATION",
+          undefined
+        );
+
+        if (!uploadResponse.success) {
+          throw new Error("Failed to upload files");
+        }
+      }
+
+      // Submit application with attachment IDs
+      const applicationResponse = await applicationsAPI.apply(
+        selectedJob.id,
+        undefined // No cover letter text, only file uploads
+      );
+
+      if (applicationResponse.success) {
+        alert("Application submitted successfully!");
+        setAppliedJobs((prev) => new Set([...prev, selectedJob.id]));
+        setShowApplicationModal(false);
+        setSelectedJob(null);
+        setUploadedFiles([]);
+      } else {
+        throw new Error(
+          applicationResponse.message || "Failed to submit application"
+        );
+      }
+    } catch (error) {
+      console.error("Application submission error:", error);
+      alert("Failed to submit application. Please try again.");
+    } finally {
+      setIsSubmittingApplication(false);
+    }
+  };
+
+  // Fetch jobs function without useCallback to avoid circular dependencies
+  const fetchJobsInternal = async (params: Record<string, string | number>) => {
+    try {
+      setLoading(true);
+      console.log("🔍 Fetching jobs with params:", params);
+      const response = await jobsAPI.getAll(params);
+      console.log("📡 API response:", response);
+
+      if (response.success && response.data) {
+        const data = response.data as JobsResponse;
+        console.log("✅ Jobs data received:", data.jobs?.length, "jobs");
+        console.log(
+          "📝 Setting jobs state with",
+          data.jobs?.length || 0,
+          "jobs"
+        );
+        setJobs(data.jobs || []);
+      } else {
+        console.log("❌ API response not successful:", response);
+        setJobs([]);
+      }
+    } catch (error) {
+      console.error("💥 Error fetching jobs:", error);
+      setJobs([]);
+    } finally {
+      console.log("✅ Setting loading to false");
+      setLoading(false);
+    }
+  };
+
+  // Initial fetch on component mount
+  useEffect(() => {
+    console.log("⚡ Initial fetch useEffect triggered");
+    fetchJobsInternal({ limit: 50 });
   }, []); // Only run once on mount
 
-  // Fetch jobs when component mounts or filters change
+  // Debounced fetch when filters change
   useEffect(() => {
-    // Skip the first render since we handle it above
-    if (jobs.length === 0 && loading) return;
+    const paramsString = JSON.stringify(apiParams);
+    console.log("🎛️ Debounced fetch effect - apiParams:", apiParams);
+    console.log("📊 apiParams keys length:", Object.keys(apiParams).length);
+    console.log("🔄 Previous params:", prevParamsRef.current);
+    console.log("📝 Current params string:", paramsString);
 
-    // Initial fetch without debouncing
-    if (Object.keys(apiParams).length === 1 && apiParams.limit === 50) {
-      // Only has limit parameter, so this is the initial load
-      console.log("Initial fetch triggered");
-      fetchJobs();
-    } else {
-      // Has filters, so use debouncing
-      const timeoutId = setTimeout(() => {
-        console.log("Debounced fetch triggered");
-        fetchJobs();
-      }, 800);
-      return () => clearTimeout(timeoutId);
+    // Skip if this is just the default params (no filters applied) or if params haven't changed
+    if (
+      (Object.keys(apiParams).length === 1 && apiParams.limit === 50) ||
+      paramsString === prevParamsRef.current
+    ) {
+      console.log("⏭️ Skipping debounced fetch (default params or no change)");
+      return;
     }
-  }, [fetchJobs, apiParams, jobs.length, loading]);
 
-  // Fetch saved jobs when authentication state changes
-  useEffect(() => {
-    fetchSavedJobs();
-  }, [fetchSavedJobs]);
+    console.log("🔄 Params changed, scheduling debounced fetch");
+    // Update previous params
+    prevParamsRef.current = paramsString;
+
+    // Use debouncing for filter changes
+    const timeoutId = setTimeout(() => {
+      console.log("⏰ Debounced fetch executing");
+      fetchJobsInternal(apiParams);
+    }, 500);
+
+    return () => {
+      console.log("🚫 Clearing debounced fetch timeout");
+      clearTimeout(timeoutId);
+    };
+  }, [apiParams]);
 
   // Enhanced company logo function that prioritizes actual employer logos
   const getCompanyLogo = (job: Job) => {
@@ -410,9 +442,6 @@ const JobListings = () => {
 
   // Filter jobs based on search term and filters (client-side for additional filtering)
   const filteredJobs = useMemo(() => {
-    console.log("Filtering jobs:", jobs.length, "jobs available");
-    console.log("Filter criteria:", { searchTerm, filter });
-
     const filtered = jobs.filter((job) => {
       const matchesSearch =
         !searchTerm ||
@@ -424,8 +453,9 @@ const JobListings = () => {
 
       const matchesJobType =
         !filter.jobType ||
-        job.jobType.toLowerCase().replace("_", "-") ===
-          filter.jobType.toLowerCase();
+        (job.jobType &&
+          job.jobType.toLowerCase().replace("_", "-") ===
+            filter.jobType.toLowerCase());
       const matchesLocation =
         !filter.location ||
         job.location.toLowerCase().includes(filter.location.toLowerCase());
@@ -465,11 +495,6 @@ const JobListings = () => {
       );
     });
 
-    console.log(
-      "Filtered jobs result:",
-      filtered.length,
-      "jobs match criteria"
-    );
     return filtered;
   }, [jobs, searchTerm, filter]);
 
@@ -492,7 +517,8 @@ const JobListings = () => {
   };
 
   // Format job type for display
-  const formatJobType = (jobType: string) => {
+  const formatJobType = (jobType: string | undefined) => {
+    if (!jobType) return "Not specified";
     return jobType.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
@@ -617,7 +643,11 @@ const JobListings = () => {
                   <HiFilter className="w-5 h-5" />
                   {showFilters ? "Hide Filters" : "More Filters"}
                 </button>
-                <Button size="lg" className="px-8" onClick={fetchJobs}>
+                <Button
+                  size="lg"
+                  className="px-8"
+                  onClick={() => fetchJobsInternal(apiParams)}
+                >
                   Search Jobs
                 </Button>
               </div>
@@ -888,6 +918,14 @@ const JobListings = () => {
             )}
 
             {/* Job Cards Grid */}
+            {(() => {
+              console.log("🎯 Render state:", {
+                loading,
+                jobsLength: jobs.length,
+                filteredJobsLength: filteredJobs.length,
+              });
+              return null;
+            })()}
             {!loading && (
               <div className="space-y-4">
                 {filteredJobs.length === 0 ? (
@@ -1045,45 +1083,21 @@ const JobListings = () => {
 
                             <div className="flex gap-2">
                               {(!user || user?.role !== "EMPLOYER") && (
-                                <>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                      handleSaveJob(
-                                        job.id,
-                                        savedJobs.has(job.id)
-                                      )
-                                    }
-                                    disabled={savingJobId === job.id}
-                                    className={`${
-                                      savedJobs.has(job.id)
-                                        ? "bg-red-50 border-red-200 text-red-600 hover:bg-red-100"
-                                        : ""
-                                    }`}
-                                  >
-                                    {savingJobId === job.id ? (
-                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-                                    ) : savedJobs.has(job.id) ? (
-                                      <>
-                                        <HiHeart className="w-4 h-4 mr-1" />
-                                        Saved
-                                      </>
-                                    ) : (
-                                      <>
-                                        <HiOutlineHeart className="w-4 h-4 mr-1" />
-                                        Save
-                                      </>
-                                    )}
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    className="font-medium"
-                                    onClick={() => handleApplyJob(job.id)}
-                                  >
-                                    Apply Now
-                                  </Button>
-                                </>
+                                <Button
+                                  size="sm"
+                                  className="font-medium"
+                                  onClick={() => handleApplyJob(job)}
+                                  disabled={appliedJobs.has(job.id)}
+                                  variant={
+                                    appliedJobs.has(job.id)
+                                      ? "outline"
+                                      : "primary"
+                                  }
+                                >
+                                  {appliedJobs.has(job.id)
+                                    ? "Applied"
+                                    : "Apply Now"}
+                                </Button>
                               )}
                               <Link to={`/jobs/${job.id}`}>
                                 <Button
@@ -1180,6 +1194,166 @@ const JobListings = () => {
         }
         actionType={authModalType}
       />
+
+      {/* Job Application Modal */}
+      {showApplicationModal && selectedJob && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  Apply for {selectedJob.title}
+                </h2>
+                <p className="text-gray-600 dark:text-gray-400">
+                  at {selectedJob.employer.companyName}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowApplicationModal(false);
+                  setSelectedJob(null);
+                  setUploadedFiles([]);
+                }}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                <HiX className="w-6 h-6 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              {/* File Upload Section */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Upload Resume & Cover Letter
+                </label>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                  Upload your resume and cover letter files. Both documents are
+                  optional but recommended to increase your chances.
+                </p>
+                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center hover:border-blue-500 dark:hover:border-blue-400 transition-colors">
+                  <HiUpload className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    Drag and drop files here, or click to select
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-500 mb-4">
+                    Supported formats: PDF, DOC, DOCX, TXT (Max 5MB each)
+                  </p>
+                  <input
+                    type="file"
+                    multiple
+                    accept=".pdf,.doc,.docx,.txt"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    id="file-upload"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      document.getElementById("file-upload")?.click()
+                    }
+                  >
+                    Select Files
+                  </Button>
+                </div>
+
+                {/* Uploaded Files List */}
+                {uploadedFiles.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Uploaded Files:
+                    </p>
+                    {uploadedFiles.map((file, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <HiDocumentText className="w-5 h-5 text-blue-500" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">
+                              {file.name}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {(file.size / 1024 / 1024).toFixed(2)} MB
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => removeFile(index)}
+                          className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
+                        >
+                          <HiTrash className="w-4 h-4 text-red-500" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Job Summary */}
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-6">
+                <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                  Job Summary
+                </h4>
+                <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                  <p>
+                    <strong>Location:</strong>{" "}
+                    {selectedJob.location || "Not specified"}
+                  </p>
+                  <p>
+                    <strong>Type:</strong>{" "}
+                    {selectedJob.jobType?.replace("_", " ") || "Not specified"}
+                  </p>
+                  <p>
+                    <strong>Experience:</strong>{" "}
+                    {selectedJob.experienceLevel?.replace("_", " ") ||
+                      "Not specified"}
+                  </p>
+                  {selectedJob.salaryMin && selectedJob.salaryMax && (
+                    <p>
+                      <strong>Salary:</strong> GHS{" "}
+                      {selectedJob.salaryMin.toLocaleString()} - GHS{" "}
+                      {selectedJob.salaryMax.toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowApplicationModal(false);
+                  setSelectedJob(null);
+                  setUploadedFiles([]);
+                }}
+                disabled={isSubmittingApplication}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleApplicationSubmit}
+                disabled={isSubmittingApplication}
+                className="min-w-[120px]"
+              >
+                {isSubmittingApplication ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Submitting...</span>
+                  </div>
+                ) : (
+                  "Submit Application"
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
