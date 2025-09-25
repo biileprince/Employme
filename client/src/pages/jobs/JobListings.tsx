@@ -292,9 +292,15 @@ const JobListings = () => {
   const handleApplicationSubmit = async () => {
     if (!selectedJob || !user) return;
 
+    // Validate that at least one file is uploaded (resume required)
+    if (uploadedFiles.length === 0) {
+      alert("Please upload your resume before submitting the application.");
+      return;
+    }
+
     setIsSubmittingApplication(true);
     try {
-      // First upload files if any
+      // Upload files (required)
       if (uploadedFiles.length > 0) {
         const uploadResponse = await attachmentAPI.upload(
           uploadedFiles,
@@ -936,15 +942,18 @@ const JobListings = () => {
                     <Button
                       variant="outline"
                       className="mt-4"
-                      onClick={() =>
+                      onClick={async () => {
+                        setSearchTerm("");
                         setFilter({
                           jobType: "",
                           location: "",
                           salaryRange: "",
                           experience: "",
                           categories: [],
-                        })
-                      }
+                        });
+                        // Force refresh by fetching all jobs
+                        await fetchJobsInternal({ limit: 50 });
+                      }}
                     >
                       Clear filters and try again
                     </Button>
@@ -1226,11 +1235,11 @@ const JobListings = () => {
               {/* File Upload Section */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Upload Resume & Cover Letter
+                  Upload Documents <span className="text-red-500">*</span>
                 </label>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                  Upload your resume and cover letter files. Both documents are
-                  optional but recommended to increase your chances.
+                  Resume is required. You can also upload additional documents
+                  such as cover letter, portfolio, or certificates.
                 </p>
                 <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center hover:border-blue-500 dark:hover:border-blue-400 transition-colors">
                   <HiUpload className="w-12 h-12 text-gray-400 mx-auto mb-3" />
@@ -1338,7 +1347,7 @@ const JobListings = () => {
               <Button
                 variant="primary"
                 onClick={handleApplicationSubmit}
-                disabled={isSubmittingApplication}
+                disabled={isSubmittingApplication || uploadedFiles.length === 0}
                 className="min-w-[120px]"
               >
                 {isSubmittingApplication ? (

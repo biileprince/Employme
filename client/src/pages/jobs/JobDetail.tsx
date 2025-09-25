@@ -16,14 +16,19 @@ import {
   HiCheckCircle,
   HiArrowLeft,
   HiEye,
+  HiX,
+  HiUpload,
+  HiDocumentText,
+  HiTrash,
 } from "react-icons/hi";
 import Button from "../../components/ui/Button";
 import { AttachmentViewer } from "../../components/ui";
 import { AuthModal } from "../../components/auth";
-import JobApplicationModal from "../../components/features/JobApplicationModal";
+
 import {
   applicationsAPI,
   savedJobsAPI,
+  attachmentAPI,
   formatImageUrl,
 } from "../../services/api";
 import { useAuth } from "../../contexts/AuthContext";
@@ -99,7 +104,9 @@ const JobDetail = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showApplyModal, setShowApplyModal] = useState(false);
-  const [showJobApplicationModal, setShowJobApplicationModal] = useState(false);
+  const [showApplicationModal, setShowApplicationModal] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [isSubmittingApplication, setIsSubmittingApplication] = useState(false);
   const [hasApplied, setHasApplied] = useState(false);
 
   // Type guard to check if job is from database
@@ -224,11 +231,98 @@ const JobDetail = () => {
     }
 
     // Open the job application modal
-    setShowJobApplicationModal(true);
+    setShowApplicationModal(true);
   };
 
-  const handleApplicationSuccess = () => {
-    setHasApplied(true);
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
+
+    const validFiles: File[] = [];
+    Array.from(files).forEach((file) => {
+      // Validate file type
+      const allowedTypes = [
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "text/plain",
+      ];
+
+      if (!allowedTypes.includes(file.type)) {
+        alert(
+          `Invalid file type for ${file.name}. Please upload PDF, DOC, DOCX, or TXT files only.`
+        );
+        return;
+      }
+
+      // Validate file size (5MB max)
+      if (file.size > 5 * 1024 * 1024) {
+        alert(`File ${file.name} is too large. Maximum size is 5MB.`);
+        return;
+      }
+
+      validFiles.push(file);
+    });
+
+    setUploadedFiles((prev) => [...prev, ...validFiles]);
+
+    // Reset file input
+    if (event.target) {
+      event.target.value = "";
+    }
+  };
+
+  // Remove uploaded file
+  const removeFile = (index: number) => {
+    setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Handle application submission
+  const handleApplicationSubmit = async () => {
+    if (!job || !user) return;
+
+    // Validate that at least one file is uploaded (resume required)
+    if (uploadedFiles.length === 0) {
+      alert("Please upload your resume before submitting the application.");
+      return;
+    }
+
+    setIsSubmittingApplication(true);
+    try {
+      // Upload files (required)
+      if (uploadedFiles.length > 0) {
+        const uploadResponse = await attachmentAPI.upload(
+          uploadedFiles,
+          "APPLICATION"
+        );
+
+        if (!uploadResponse.success) {
+          throw new Error("Failed to upload files");
+        }
+      }
+
+      // Submit application with attachment IDs
+      const applicationResponse = await applicationsAPI.apply(
+        job.id,
+        undefined // No cover letter text, only file uploads
+      );
+
+      if (applicationResponse.success) {
+        alert("Application submitted successfully!");
+        setHasApplied(true);
+        setShowApplicationModal(false);
+        setUploadedFiles([]);
+      } else {
+        throw new Error(
+          applicationResponse.message || "Failed to submit application"
+        );
+      }
+    } catch (error) {
+      console.error("Error submitting application:", error);
+      alert("Failed to submit application. Please try again.");
+    } finally {
+      setIsSubmittingApplication(false);
+    }
   };
 
   const getRequirements = (job: Job) => {
@@ -749,17 +843,158 @@ const JobDetail = () => {
       />
 
       {/* Job Application Modal */}
-      <JobApplicationModal
-        isOpen={showJobApplicationModal}
-        onClose={() => setShowJobApplicationModal(false)}
-        job={{
-          id: job.id,
-          title: job.title,
-          company: getCompanyName(job),
-          location: job.location,
-        }}
-        onApplicationSuccess={handleApplicationSuccess}
-      />
+      {showApplicationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  Apply for {job.title}
+                </h2>
+                <p className="text-gray-600 dark:text-gray-400">
+                  at {getCompanyName(job)}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowApplicationModal(false);
+                  setUploadedFiles([]);
+                }}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                <HiX className="w-6 h-6 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              {/* File Upload Section */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Upload Documents <span className="text-red-500">*</span>
+                </label>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                  Resume is required. You can also upload additional documents
+                  such as cover letter, portfolio, or certificates.
+                </p>
+                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center hover:border-blue-500 dark:hover:border-blue-400 transition-colors">
+                  <HiUpload className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    Drag and drop files here, or click to select
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-500 mb-4">
+                    Supported formats: PDF, DOC, DOCX, TXT (Max 5MB each)
+                  </p>
+                  <input
+                    type="file"
+                    multiple
+                    accept=".pdf,.doc,.docx,.txt"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    id="file-upload"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      document.getElementById("file-upload")?.click()
+                    }
+                  >
+                    Select Files
+                  </Button>
+                </div>
+
+                {/* Uploaded Files List */}
+                {uploadedFiles.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Uploaded Files:
+                    </p>
+                    {uploadedFiles.map((file, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <HiDocumentText className="w-5 h-5 text-blue-500" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">
+                              {file.name}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {(file.size / 1024 / 1024).toFixed(2)} MB
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => removeFile(index)}
+                          className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
+                        >
+                          <HiTrash className="w-4 h-4 text-red-500" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Job Summary */}
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-6">
+                <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                  Job Summary
+                </h4>
+                <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                  <p>
+                    <strong>Location:</strong> {job.location || "Not specified"}
+                  </p>
+                  <p>
+                    <strong>Type:</strong>{" "}
+                    {getJobType(job).replace("_", " ") || "Not specified"}
+                  </p>
+                  <p>
+                    <strong>Experience:</strong>{" "}
+                    {isDatabaseJob(job) && job.experience
+                      ? job.experience.replace("_", " ")
+                      : "Not specified"}
+                  </p>
+                  <p>
+                    <strong>Salary:</strong> {getSalary(job)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowApplicationModal(false);
+                  setUploadedFiles([]);
+                }}
+                disabled={isSubmittingApplication}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleApplicationSubmit}
+                disabled={isSubmittingApplication || uploadedFiles.length === 0}
+                className="min-w-[120px]"
+              >
+                {isSubmittingApplication ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Submitting...</span>
+                  </div>
+                ) : (
+                  "Submit Application"
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

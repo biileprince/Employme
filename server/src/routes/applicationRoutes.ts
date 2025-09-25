@@ -17,10 +17,10 @@ router.use(authMiddleware);
 // Job seeker routes
 router.post('/apply', applyForJob);
 router.get('/my-applications', getMyApplications);
-router.get('/:id', getApplicationById);
 
-// Employer routes
+// Employer routes (must come before /:id route)
 router.get('/employer', employerOnly, getEmployerApplications);
+router.get('/:id', getApplicationById);
 router.get('/job/:jobId', employerOnly, getJobApplications);
 router.patch('/:id/status', employerOnly, updateApplicationStatus);
 

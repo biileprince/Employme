@@ -8,6 +8,9 @@ import {
   MdWork,
   MdDescription,
   MdPerson,
+  MdAttachFile,
+  MdVisibility,
+  MdPhone,
 } from "react-icons/md";
 import { applicationsAPI, formatImageUrl } from "../../services/api";
 
@@ -25,15 +28,25 @@ interface Application {
   jobTitle?: string; // For employer applications view
   jobLocation?: string; // For employer applications view
   jobType?: string; // For employer applications view
+  attachments?: Array<{
+    id: string;
+    filename: string;
+    url: string;
+    fileType: string;
+    fileSize: number;
+  }>;
   user?: {
     firstName?: string;
     lastName?: string;
     email?: string;
+    imageUrl?: string;
     profile?: {
       bio?: string;
       skills?: string[];
       experience?: string;
       location?: string;
+      phone?: string;
+      countryCode?: string;
     };
   };
 }
@@ -53,6 +66,18 @@ export default function JobApplications() {
   const [filter, setFilter] = useState<
     "ALL" | "PENDING" | "REVIEWING" | "ACCEPTED" | "REJECTED"
   >("ALL");
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 1) return "1 day ago";
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.ceil(diffDays / 7)} weeks ago`;
+    return date.toLocaleDateString();
+  };
 
   const fetchApplications = useCallback(async () => {
     setIsLoading(true);
@@ -88,8 +113,11 @@ export default function JobApplications() {
               skills: string[];
               experience?: string;
               cvUrl?: string;
+              phone?: string;
+              countryCode?: string;
               user: {
                 email: string;
+                imageUrl?: string;
               };
             };
           }) => ({
@@ -109,15 +137,30 @@ export default function JobApplications() {
             skills: app.jobSeeker?.skills || [],
             experience: app.jobSeeker?.experience || "",
             location: app.jobSeeker?.location || "",
+            attachments:
+              (
+                app as {
+                  attachments?: Array<{
+                    id: string;
+                    filename: string;
+                    url: string;
+                    fileType: string;
+                    fileSize: number;
+                  }>;
+                }
+              ).attachments || [],
             user: {
               firstName: app.jobSeeker?.firstName,
               lastName: app.jobSeeker?.lastName,
               email: app.jobSeeker?.user?.email,
+              imageUrl: app.jobSeeker?.user?.imageUrl,
               profile: {
                 bio: app.jobSeeker?.bio,
                 skills: app.jobSeeker?.skills,
                 experience: app.jobSeeker?.experience,
                 location: app.jobSeeker?.location,
+                phone: app.jobSeeker?.phone,
+                countryCode: app.jobSeeker?.countryCode,
               },
             },
           })
@@ -168,8 +211,11 @@ export default function JobApplications() {
               skills: string[];
               experience?: string;
               cvUrl?: string;
+              phone?: string;
+              countryCode?: string;
               user: {
                 email: string;
+                imageUrl?: string;
               };
             };
           }) => ({
@@ -189,6 +235,18 @@ export default function JobApplications() {
             skills: app.jobSeeker?.skills || [],
             experience: app.jobSeeker?.experience || "",
             location: app.jobSeeker?.location || "",
+            attachments:
+              (
+                app as {
+                  attachments?: Array<{
+                    id: string;
+                    filename: string;
+                    url: string;
+                    fileType: string;
+                    fileSize: number;
+                  }>;
+                }
+              ).attachments || [],
             jobTitle: app.job?.title || "Unknown Position",
             jobLocation: app.job?.location || "",
             jobType: app.job?.jobType || "",
@@ -196,11 +254,14 @@ export default function JobApplications() {
               firstName: app.jobSeeker?.firstName,
               lastName: app.jobSeeker?.lastName,
               email: app.jobSeeker?.user?.email,
+              imageUrl: app.jobSeeker?.user?.imageUrl,
               profile: {
                 bio: app.jobSeeker?.bio,
                 skills: app.jobSeeker?.skills,
                 experience: app.jobSeeker?.experience,
                 location: app.jobSeeker?.location,
+                phone: app.jobSeeker?.phone,
+                countryCode: app.jobSeeker?.countryCode,
               },
             },
           })
@@ -390,24 +451,57 @@ export default function JobApplications() {
               >
                 <div className="flex justify-between items-start mb-6">
                   <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                        <MdPerson className="w-6 h-6 text-primary" />
+                    <div className="flex items-center gap-4 mb-4">
+                      {/* Profile Image */}
+                      <div className="relative">
+                        {application.user?.imageUrl ? (
+                          <img
+                            src={formatImageUrl(application.user.imageUrl)}
+                            alt={`${application.applicantName} profile`}
+                            className="w-16 h-16 rounded-full object-cover border-2 border-border"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                              e.currentTarget.nextElementSibling?.classList.remove(
+                                "hidden"
+                              );
+                            }}
+                          />
+                        ) : null}
+                        <div
+                          className={`w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center border-2 border-border ${
+                            application.user?.imageUrl ? "hidden" : ""
+                          }`}
+                        >
+                          <MdPerson className="w-8 h-8 text-primary" />
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="text-xl font-semibold text-foreground">
+
+                      <div className="flex-1">
+                        <h3 className="text-xl font-semibold text-foreground mb-1">
                           {application.user?.firstName &&
                           application.user?.lastName
                             ? `${application.user.firstName} ${application.user.lastName}`
                             : application.applicantName}
                         </h3>
-                        <span
-                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(
-                            application.status
-                          )}`}
-                        >
-                          {application.status.replace("_", " ")}
-                        </span>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span
+                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(
+                              application.status
+                            )}`}
+                          >
+                            {application.status.replace("_", " ")}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            Applied {formatDate(application.appliedAt)}
+                          </span>
+                        </div>
+
+                        {/* Bio/Description if available */}
+                        {application.user?.profile?.bio && (
+                          <p className="text-sm text-muted-foreground line-clamp-2">
+                            {application.user.profile.bio}
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -436,12 +530,23 @@ export default function JobApplications() {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-muted-foreground text-sm mb-4">
+                    {/* Contact Information */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-muted-foreground text-sm mb-4">
                       <div className="flex items-center gap-2">
                         <MdEmail className="w-4 h-4" />
                         <span>
                           {application.user?.email ||
                             application.applicantEmail}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <MdPhone className="w-4 h-4" />
+                        <span>
+                          {application.user?.profile?.countryCode &&
+                          application.user?.profile?.phone
+                            ? `${application.user.profile.countryCode} ${application.user.profile.phone}`
+                            : application.user?.profile?.phone ||
+                              "Not provided"}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -490,17 +595,43 @@ export default function JobApplications() {
                       <option value="REJECTED">Rejected</option>
                     </select>
 
-                    {/* View Resume */}
-                    {application.resumeUrl && (
-                      <a
-                        href={formatImageUrl(application.resumeUrl)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-200 dark:hover:bg-blue-900/30 transition-colors"
-                      >
-                        View Resume
-                      </a>
-                    )}
+                    {/* Documents */}
+                    {application.attachments &&
+                      application.attachments.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {application.attachments.map((attachment, index) => (
+                            <a
+                              key={index}
+                              href={formatImageUrl(attachment.url)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-3 py-2 rounded-lg text-sm border border-blue-200 dark:border-blue-800 transition-colors"
+                            >
+                              <MdAttachFile className="w-4 h-4" />
+                              <span className="max-w-32 truncate">
+                                {attachment.filename}
+                              </span>
+                              <MdVisibility className="w-4 h-4" />
+                            </a>
+                          ))}
+                        </div>
+                      )}
+
+                    {/* Fallback to old resume URL if no attachments */}
+                    {(!application.attachments ||
+                      application.attachments.length === 0) &&
+                      application.resumeUrl && (
+                        <a
+                          href={formatImageUrl(application.resumeUrl)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-3 py-2 rounded-lg text-sm border border-blue-200 dark:border-blue-800 transition-colors"
+                        >
+                          <MdAttachFile className="w-4 h-4" />
+                          Resume
+                          <MdVisibility className="w-4 h-4" />
+                        </a>
+                      )}
                   </div>
                 </div>
 

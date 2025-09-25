@@ -31,6 +31,7 @@ import {
   EditJob,
   MyJobs,
   JobApplications,
+  AllApplications,
   CandidateSearch,
 } from "./pages";
 
@@ -141,7 +142,7 @@ const router = createBrowserRouter(
           path: "applications",
           element: (
             <ProtectedRoute requireRole="EMPLOYER">
-              <JobApplications />
+              <AllApplications />
             </ProtectedRoute>
           ),
         },

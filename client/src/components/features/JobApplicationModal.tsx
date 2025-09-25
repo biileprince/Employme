@@ -86,10 +86,16 @@ const JobApplicationModal = ({
   };
 
   const handleSubmit = async () => {
+    // Validate that at least one file is uploaded (resume required)
+    if (uploadedFiles.length === 0) {
+      alert("Please upload your resume before submitting the application.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      // First upload files if any
+      // Upload files (required)
       if (uploadedFiles.length > 0) {
         const files = uploadedFiles.map((upload) => upload.file);
         const uploadResponse = await attachmentAPI.upload(
@@ -181,8 +187,8 @@ const JobApplicationModal = ({
                         : "text-muted-foreground"
                     }`}
                   >
-                    {step === 1 && "Upload Resume"}
-                    {step === 2 && "Upload Cover Letter"}
+                    {step === 1 && "Upload Documents"}
+                    {step === 2 && "Additional Files"}
                     {step === 3 && "Review & Submit"}
                   </p>
                 </div>
@@ -286,10 +292,10 @@ const JobApplicationModal = ({
               >
                 <HiDocumentText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-foreground mb-2">
-                  Upload Your Cover Letter
+                  Upload Additional Documents
                 </h3>
                 <p className="text-muted-foreground mb-4">
-                  Drag and drop your cover letter here, or click to browse
+                  Upload cover letter, portfolio, or other supporting documents
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Supported formats: PDF, DOC, DOCX, TXT (Max 5MB)
