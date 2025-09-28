@@ -13,7 +13,7 @@ import {
   MdBarChart,
   MdLightbulb,
 } from "react-icons/md";
-import { jobsAPI, userAPI } from "../../services/api";
+import { jobsAPI, userAPI, applicationsAPI } from "../../services/api";
 
 interface DashboardStats {
   totalJobs: number;
@@ -102,30 +102,55 @@ export default function EmployerDashboard() {
       });
 
       setRecentJobs(sortedJobs);
-      // For demo, create some mock recent applications
-      setRecentApplications([
-        {
-          id: "1",
-          applicantName: "John Doe",
-          jobTitle: "Software Engineer",
-          status: "PENDING",
-          appliedAt: new Date().toISOString(),
-        },
-        {
-          id: "2",
-          applicantName: "Jane Smith",
-          jobTitle: "Product Manager",
-          status: "REVIEWING",
-          appliedAt: new Date(Date.now() - 86400000).toISOString(),
-        },
-        {
-          id: "3",
-          applicantName: "Mike Johnson",
-          jobTitle: "UX Designer",
-          status: "ACCEPTED",
-          appliedAt: new Date(Date.now() - 172800000).toISOString(),
-        },
-      ]);
+
+      // Fetch recent applications
+      try {
+        const applicationsResponse =
+          await applicationsAPI.getEmployerApplications();
+        if (applicationsResponse.success && applicationsResponse.data) {
+          const data = applicationsResponse.data as {
+            applications: Array<{
+              id: string;
+              status: string;
+              appliedAt?: string;
+              createdAt?: string;
+              jobSeeker?: {
+                firstName?: string;
+                lastName?: string;
+                user?: {
+                  firstName?: string;
+                  lastName?: string;
+                  email?: string;
+                };
+              };
+              job?: { title?: string };
+            }>;
+          };
+          const applications = data.applications || [];
+          // Get the 5 most recent applications
+          const recentApps = applications.slice(0, 5).map((app) => {
+            const firstName =
+              app.jobSeeker?.firstName || app.jobSeeker?.user?.firstName || "";
+            const lastName =
+              app.jobSeeker?.lastName || app.jobSeeker?.user?.lastName || "";
+            const fullName = `${firstName} ${lastName}`.trim();
+
+            return {
+              id: app.id,
+              applicantName: fullName || "Unknown Applicant",
+              jobTitle: app.job?.title || "Unknown Job",
+              status: app.status,
+              appliedAt:
+                app.appliedAt || app.createdAt || new Date().toISOString(),
+            };
+          });
+          setRecentApplications(recentApps);
+        }
+      } catch (err) {
+        console.error("Failed to fetch applications:", err);
+        // Fallback to empty array on error
+        setRecentApplications([]);
+      }
     } catch (err) {
       console.error("Failed to fetch dashboard data:", err);
       setError("Failed to load dashboard data");

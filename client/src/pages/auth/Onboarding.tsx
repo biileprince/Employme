@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { FiUpload, FiCamera } from "react-icons/fi";
 import { useAuth } from "../../contexts/AuthContext";
-import { userAPI } from "../../services/api";
+import { userAPI, attachmentAPI } from "../../services/api";
 import PhoneInput from "../../components/ui/PhoneInput";
 import { INDUSTRIES } from "../../utils/constants";
 import imagegreet from "../../assets/images/imagegreet.jpg";
@@ -18,13 +19,12 @@ interface JobSeekerProfile {
   experience: string;
   skills: string[];
   education: string;
-  desiredJobTitle: string;
-  desiredSalary: string;
-  availability: string;
+  cvUrl?: string;
 }
 
 interface EmployerProfile {
   companyName: string;
+  title: string;
   companySize: string;
   industry: string;
   website: string;
@@ -32,8 +32,7 @@ interface EmployerProfile {
   countryCode: string;
   location: string;
   description: string;
-  contactPersonName: string;
-  contactPersonTitle: string;
+  founded: number;
 }
 
 export default function Onboarding() {
@@ -53,13 +52,12 @@ export default function Onboarding() {
     experience: "",
     skills: [],
     education: "",
-    desiredJobTitle: "",
-    desiredSalary: "",
-    availability: "FULL_TIME",
+    cvUrl: "",
   });
 
   const [employerData, setEmployerData] = useState<EmployerProfile>({
     companyName: "",
+    title: "",
     companySize: "",
     industry: "",
     website: "",
@@ -67,12 +65,19 @@ export default function Onboarding() {
     countryCode: "+233",
     location: "",
     description: "",
-    contactPersonName: "",
-    contactPersonTitle: "",
+    founded: 0,
   });
 
   // Current skill input
   const [currentSkill, setCurrentSkill] = useState("");
+
+  // Image upload states
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  // CV upload states
+  const [cvFile, setCvFile] = useState<File | null>(null);
+  const [cvFileName, setCvFileName] = useState<string>("");
 
   useEffect(() => {
     if (!user) {
@@ -97,10 +102,7 @@ export default function Onboarding() {
         fullName: `${user.firstName} ${user.lastName}`.trim(),
       }));
     } else if (user.role === "EMPLOYER") {
-      setEmployerData((prev) => ({
-        ...prev,
-        contactPersonName: `${user.firstName} ${user.lastName}`.trim(),
-      }));
+      // No need to pre-fill any employer fields since title and founded are user-specific
     }
   }, [user, navigate]);
 
@@ -120,9 +122,10 @@ export default function Onboarding() {
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
     >
   ) => {
+    const { name, value } = e.target;
     setEmployerData({
       ...employerData,
-      [e.target.name]: e.target.value,
+      [name]: name === "founded" ? parseInt(value) || 0 : value,
     });
   };
 
@@ -146,6 +149,90 @@ export default function Onboarding() {
     });
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadImageToCloudinary = async (file: File): Promise<string> => {
+    try {
+      const response = await attachmentAPI.upload([file], "USER");
+      if (
+        response.success &&
+        response.data &&
+        typeof response.data === "object" &&
+        "attachments" in response.data
+      ) {
+        const responseData = response.data as {
+          attachments: Array<{ url: string }>;
+        };
+        if (responseData.attachments.length > 0) {
+          return responseData.attachments[0].url;
+        }
+      }
+      throw new Error("Failed to upload image");
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      throw error;
+    }
+  };
+
+  const handleCvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      const isValidFile =
+        file.type === "application/pdf" ||
+        file.type === "application/msword" ||
+        file.type ===
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+      if (!isValidFile) {
+        alert("Please upload PDF, DOC, or DOCX files only.");
+        return;
+      }
+
+      // Validate file size (5MB max)
+      if (file.size > 5 * 1024 * 1024) {
+        alert("File size must be less than 5MB.");
+        return;
+      }
+
+      setCvFile(file);
+      setCvFileName(file.name);
+    }
+  };
+
+  const uploadCvToCloudinary = async (file: File): Promise<string> => {
+    try {
+      const response = await attachmentAPI.upload([file], "CV");
+      if (
+        response.success &&
+        response.data &&
+        typeof response.data === "object" &&
+        "attachments" in response.data
+      ) {
+        const responseData = response.data as {
+          attachments: Array<{ url: string }>;
+        };
+        if (responseData.attachments.length > 0) {
+          return responseData.attachments[0].url;
+        }
+      }
+      throw new Error("Failed to upload CV");
+    } catch (error) {
+      console.error("Error uploading CV:", error);
+      throw error;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -153,13 +240,30 @@ export default function Onboarding() {
     setSuccess("");
 
     try {
+      // Upload image first if provided
+      let imageUrl = "";
+      if (imageFile) {
+        imageUrl = await uploadImageToCloudinary(imageFile);
+      }
+
+      // Upload CV for job seekers if provided
+      let cvUrl = "";
+      if (user?.role === "JOB_SEEKER" && cvFile) {
+        cvUrl = await uploadCvToCloudinary(cvFile);
+      }
+
       const profileData =
         user?.role === "JOB_SEEKER" ? jobSeekerData : employerData;
 
-      // Add the role to the profile data so the API knows which endpoint to use
+      // Add the role and appropriate file URLs to the profile data
       const profileDataWithRole = {
         ...profileData,
         role: user?.role,
+        // For job seekers: save as imageUrl (profile picture)
+        // For employers: save as logoUrl (company logo)
+        ...(imageUrl && user?.role === "JOB_SEEKER" && { imageUrl }),
+        ...(imageUrl && user?.role === "EMPLOYER" && { logoUrl: imageUrl }),
+        ...(cvUrl && { cvUrl }),
       };
 
       await userAPI.createProfile(
@@ -317,6 +421,37 @@ export default function Onboarding() {
                 </div>
               )}
 
+              {/* Profile Picture Upload */}
+              <div className="text-center">
+                <div className="relative inline-block">
+                  {imagePreview ? (
+                    <img
+                      src={imagePreview}
+                      alt="Profile preview"
+                      className="w-24 h-24 rounded-full object-cover border-4 border-border"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center border-4 border-border">
+                      <FiCamera className="text-2xl text-muted-foreground" />
+                    </div>
+                  )}
+                  <label className="absolute bottom-0 right-0 bg-primary text-primary-foreground p-2 rounded-full cursor-pointer hover:bg-primary/90 transition-colors">
+                    <FiUpload className="text-sm" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {isEmployer
+                    ? "Upload company logo (optional)"
+                    : "Upload profile picture (optional)"}
+                </p>
+              </div>
+
               {isJobSeeker ? (
                 // Job Seeker Form
                 <>
@@ -334,7 +469,7 @@ export default function Onboarding() {
                       value={jobSeekerData.fullName}
                       onChange={handleJobSeekerChange}
                       required
-                      className="w-full px-3 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                      className="w-full px-3 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                     />
                   </div>
 
@@ -368,49 +503,9 @@ export default function Onboarding() {
                       value={jobSeekerData.location}
                       onChange={handleJobSeekerChange}
                       required
-                      className="w-full px-3 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                      className="w-full px-3 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                       placeholder="e.g., Accra, Ghana"
                     />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="desiredJobTitle"
-                      className="block text-sm font-medium text-foreground mb-1"
-                    >
-                      Desired Job Title
-                    </label>
-                    <input
-                      id="desiredJobTitle"
-                      name="desiredJobTitle"
-                      type="text"
-                      value={jobSeekerData.desiredJobTitle}
-                      onChange={handleJobSeekerChange}
-                      required
-                      className="w-full px-3 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
-                      placeholder="e.g., Software Developer"
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="availability"
-                      className="block text-sm font-medium text-foreground mb-1"
-                    >
-                      Availability
-                    </label>
-                    <select
-                      id="availability"
-                      name="availability"
-                      value={jobSeekerData.availability}
-                      onChange={handleJobSeekerChange}
-                      className="w-full px-3 py-2 border border-input rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
-                    >
-                      <option value="FULL_TIME">Full Time</option>
-                      <option value="PART_TIME">Part Time</option>
-                      <option value="CONTRACT">Contract</option>
-                      <option value="INTERNSHIP">Internship</option>
-                    </select>
                   </div>
 
                   <div>
@@ -478,7 +573,7 @@ export default function Onboarding() {
                         onKeyPress={(e) =>
                           e.key === "Enter" && (e.preventDefault(), addSkill())
                         }
-                        className="flex-1 px-3 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                        className="flex-1 px-3 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                         placeholder="Add a skill"
                       />
                       <button
@@ -510,24 +605,6 @@ export default function Onboarding() {
 
                   <div>
                     <label
-                      htmlFor="desiredSalary"
-                      className="block text-sm font-medium text-foreground mb-1"
-                    >
-                      Desired Salary (GHS/month)
-                    </label>
-                    <input
-                      id="desiredSalary"
-                      name="desiredSalary"
-                      type="text"
-                      value={jobSeekerData.desiredSalary}
-                      onChange={handleJobSeekerChange}
-                      className="w-full px-3 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
-                      placeholder="e.g., 5000"
-                    />
-                  </div>
-
-                  <div>
-                    <label
                       htmlFor="bio"
                       className="block text-sm font-medium text-foreground mb-1"
                     >
@@ -540,9 +617,56 @@ export default function Onboarding() {
                       value={jobSeekerData.bio}
                       onChange={handleJobSeekerChange}
                       required
-                      className="w-full px-3 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                      className="w-full px-3 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                       placeholder="Describe your professional background and career goals..."
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Upload CV/Resume (Optional)
+                    </label>
+                    <div className="border-2 border-dashed border-input rounded-lg p-4 text-center">
+                      {cvFileName ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="text-sm text-foreground">
+                            📄 {cvFileName}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCvFile(null);
+                              setCvFileName("");
+                            }}
+                            className="text-destructive hover:text-destructive/80 text-sm"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="cursor-pointer">
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                              📄
+                            </div>
+                            <div>
+                              <span className="text-sm font-medium text-primary">
+                                Choose file
+                              </span>
+                              <p className="text-xs text-muted-foreground">
+                                PDF, DOC, DOCX (Max 5MB)
+                              </p>
+                            </div>
+                          </div>
+                          <input
+                            type="file"
+                            accept=".pdf,.doc,.docx"
+                            onChange={handleCvUpload}
+                            className="hidden"
+                          />
+                        </label>
+                      )}
+                    </div>
                   </div>
                 </>
               ) : (
@@ -550,38 +674,40 @@ export default function Onboarding() {
                 <>
                   <div>
                     <label
-                      htmlFor="contactPersonName"
-                      className="block text-sm font-medium text-foreground mb-1"
-                    >
-                      Contact Person Name
-                    </label>
-                    <input
-                      id="contactPersonName"
-                      name="contactPersonName"
-                      type="text"
-                      value={employerData.contactPersonName}
-                      onChange={handleEmployerChange}
-                      required
-                      className="w-full px-3 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="contactPersonTitle"
+                      htmlFor="title"
                       className="block text-sm font-medium text-foreground mb-1"
                     >
                       Your Title
                     </label>
                     <input
-                      id="contactPersonTitle"
-                      name="contactPersonTitle"
+                      id="title"
+                      name="title"
                       type="text"
-                      value={employerData.contactPersonTitle}
+                      value={employerData.title}
                       onChange={handleEmployerChange}
                       required
-                      className="w-full px-3 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
-                      placeholder="e.g., HR Manager, CEO"
+                      className="w-full px-3 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                      placeholder="e.g., HR Manager, CEO, Recruiter"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="founded"
+                      className="block text-sm font-medium text-foreground mb-1"
+                    >
+                      Company Founded Year
+                    </label>
+                    <input
+                      id="founded"
+                      name="founded"
+                      type="number"
+                      value={employerData.founded || ""}
+                      onChange={handleEmployerChange}
+                      min="1800"
+                      max={new Date().getFullYear()}
+                      className="w-full px-3 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                      placeholder={`e.g., ${new Date().getFullYear() - 10}`}
                     />
                   </div>
 
@@ -615,7 +741,7 @@ export default function Onboarding() {
                       value={employerData.companyName}
                       onChange={handleEmployerChange}
                       required
-                      className="w-full px-3 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                      className="w-full px-3 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                     />
                   </div>
 
@@ -681,7 +807,7 @@ export default function Onboarding() {
                       value={employerData.location}
                       onChange={handleEmployerChange}
                       required
-                      className="w-full px-3 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                      className="w-full px-3 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                       placeholder="e.g., Accra, Ghana"
                     />
                   </div>
@@ -699,7 +825,7 @@ export default function Onboarding() {
                       type="url"
                       value={employerData.website}
                       onChange={handleEmployerChange}
-                      className="w-full px-3 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                      className="w-full px-3 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                       placeholder="https://www.company.com"
                     />
                   </div>
@@ -718,7 +844,7 @@ export default function Onboarding() {
                       value={employerData.description}
                       onChange={handleEmployerChange}
                       required
-                      className="w-full px-3 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                      className="w-full px-3 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                       placeholder="Describe your company, mission, and what makes it a great place to work..."
                     />
                   </div>

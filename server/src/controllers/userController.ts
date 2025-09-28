@@ -212,13 +212,53 @@ export const createJobSeekerProfile = catchAsync(
       education,
       cvUrl,
       profileImageUrl,
+      imageUrl,
+      phone,
+      countryCode,
     } = req.body;
+
+    // Get current user data to check for existing names
+    const currentUser = await prisma.user.findUnique({
+      where: { id: req.user.id },
+    });
+
+    if (!currentUser) {
+      throw new AppError("User not found", 404);
+    }
+
+    // Determine final firstName and lastName values
+    const finalFirstName = firstName || currentUser.firstName;
+    const finalLastName = lastName || currentUser.lastName;
+
+    // Validate that we have both names
+    if (!finalFirstName || !finalLastName) {
+      throw new AppError("First name and last name are required", 400);
+    }
+
+    // Update User table with basic info and image
+    const userUpdateData: any = {};
+    if (firstName && firstName !== currentUser.firstName) {
+      userUpdateData.firstName = firstName;
+    }
+    if (lastName && lastName !== currentUser.lastName) {
+      userUpdateData.lastName = lastName;
+    }
+    if (imageUrl && imageUrl !== currentUser.imageUrl) {
+      userUpdateData.imageUrl = imageUrl;
+    }
+
+    if (Object.keys(userUpdateData).length > 0) {
+      await prisma.user.update({
+        where: { id: req.user.id },
+        data: userUpdateData,
+      });
+    }
 
     const profile = await prisma.jobSeeker.create({
       data: {
         userId: req.user.id,
-        firstName: firstName || "",
-        lastName: lastName || "",
+        firstName: finalFirstName,
+        lastName: finalLastName,
         dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
         location: location || null,
         bio: bio || null,
@@ -227,6 +267,8 @@ export const createJobSeekerProfile = catchAsync(
         education: education || null,
         cvUrl: cvUrl || null,
         profileImageUrl: profileImageUrl || null,
+        phone: phone || null,
+        countryCode: countryCode || null,
       },
     });
 
@@ -259,31 +301,53 @@ export const createEmployerProfile = catchAsync(
     }
 
     const {
+      firstName,
+      lastName,
       companyName,
+      title,
       industry,
       location,
       website,
       description,
+      companyDescription,
       logoUrl,
+      imageUrl,
       founded,
       companySize,
+      phone,
+      countryCode,
     } = req.body;
 
     if (!companyName) {
       throw new AppError("Company name is required", 400);
     }
 
+    // Update User table with basic info and image
+    if (firstName || lastName || imageUrl) {
+      await prisma.user.update({
+        where: { id: req.user.id },
+        data: {
+          ...(firstName && { firstName }),
+          ...(lastName && { lastName }),
+          ...(imageUrl && { imageUrl }),
+        },
+      });
+    }
+
     const profile = await prisma.employer.create({
       data: {
         userId: req.user.id,
         companyName,
+        title: title || null,
         industry: industry || null,
         location: location || null,
         website: website || null,
-        description: description || null,
+        description: companyDescription || description || null,
         logoUrl: logoUrl || null,
         founded: founded || null,
         companySize: companySize || null,
+        phone: phone || null,
+        countryCode: countryCode || null,
       },
     });
 
@@ -325,7 +389,25 @@ export const updateJobSeekerProfile = catchAsync(
       education,
       cvUrl,
       profileImageUrl,
+      phone,
+      countryCode,
     } = req.body;
+
+    // Update User table if firstName or lastName changed
+    const userUpdateData: any = {};
+    if (firstName !== undefined && firstName !== profile.firstName) {
+      userUpdateData.firstName = firstName;
+    }
+    if (lastName !== undefined && lastName !== profile.lastName) {
+      userUpdateData.lastName = lastName;
+    }
+
+    if (Object.keys(userUpdateData).length > 0) {
+      await prisma.user.update({
+        where: { id: req.user.id },
+        data: userUpdateData,
+      });
+    }
 
     const updatedProfile = await prisma.jobSeeker.update({
       where: { userId: req.user.id },
@@ -348,6 +430,9 @@ export const updateJobSeekerProfile = catchAsync(
           profileImageUrl !== undefined
             ? profileImageUrl
             : profile.profileImageUrl,
+        phone: phone !== undefined ? phone : profile.phone,
+        countryCode:
+          countryCode !== undefined ? countryCode : profile.countryCode,
       },
     });
 
@@ -380,6 +465,7 @@ export const updateEmployerProfile = catchAsync(
 
     const {
       companyName,
+      title,
       industry,
       location,
       website,
@@ -398,6 +484,7 @@ export const updateEmployerProfile = catchAsync(
       data: {
         companyName:
           companyName !== undefined ? companyName : profile.companyName,
+        title: title !== undefined ? title : profile.title,
         industry: industry !== undefined ? industry : profile.industry,
         location: location !== undefined ? location : profile.location,
         website: website !== undefined ? website : profile.website,

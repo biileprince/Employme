@@ -15,7 +15,8 @@ import { applicationsAPI } from "../../services/api";
 interface Application {
   id: string;
   status: "PENDING" | "REVIEWED" | "SHORTLISTED" | "REJECTED" | "HIRED";
-  createdAt: string;
+  appliedAt: string;
+  createdAt?: string;
   coverLetter?: string;
   job: {
     id: string;
@@ -298,7 +299,7 @@ export default function EmployerApplications() {
                         </div>
                         <div className="flex items-center gap-1">
                           <MdDateRange className="w-4 h-4" />
-                          Applied {formatDate(application.createdAt)}
+                          Applied {formatDate(application.appliedAt)}
                         </div>
                       </div>
                     </div>

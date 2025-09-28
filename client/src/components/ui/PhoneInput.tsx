@@ -51,6 +51,27 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
     loadCountryCodes();
   }, []);
 
+  // Phone number validation
+  const validatePhoneNumber = (value: string) => {
+    if (!value) return "";
+
+    // Remove any non-digit characters
+    const cleanNumber = value.replace(/\D/g, "");
+
+    // For Ghana (+233), local numbers should start with 0
+    if (countryCode === "+233" && cleanNumber && !cleanNumber.startsWith("0")) {
+      return "Phone number should start with 0 (e.g., 0241234567)";
+    }
+
+    return "";
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const validationError = validatePhoneNumber(value);
+    onPhoneNumberChange(value);
+  };
+
   return (
     <div className={className}>
       {label && (
@@ -77,17 +98,22 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
         <div className="relative flex-1">
           <MdPhone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
           <input
-            type="tel"
+            type="number"
             value={phoneNumber}
-            onChange={(e) => onPhoneNumberChange(e.target.value)}
+            onChange={handlePhoneChange}
             placeholder={placeholder}
             pattern="[0-9]{7,15}"
             required={required}
-            className="w-full pl-10 pr-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+            min="0"
+            className="w-full pl-10 pr-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           />
         </div>
       </div>
-      {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+      {(error || validatePhoneNumber(phoneNumber)) && (
+        <p className="text-red-500 text-xs mt-1">
+          {error || validatePhoneNumber(phoneNumber)}
+        </p>
+      )}
     </div>
   );
 };

@@ -10,10 +10,14 @@ const prisma = new PrismaClient();
 export const applyForJob = [
   body("jobId").notEmpty().withMessage("Job ID is required"),
   body("coverLetter").optional().trim(),
+  body("attachmentIds")
+    .optional()
+    .isArray()
+    .withMessage("Attachment IDs must be an array"),
   handleValidationErrors,
 
   catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const { jobId, coverLetter } = req.body;
+    const { jobId, coverLetter, attachmentIds } = req.body;
 
     // For now, use a mock job seeker ID until auth is properly implemented
     const jobSeekerId = req.user?.profile?.id || "mock-jobseeker-id";
@@ -59,32 +63,61 @@ export const applyForJob = [
       throw new AppError("You have already applied for this job", 400);
     }
 
-    // Create application
-    const application = await prisma.application.create({
-      data: {
-        jobId,
-        jobSeekerId,
-        coverLetter,
-      },
-      include: {
-        job: {
-          select: {
-            title: true,
-            employer: {
-              select: {
-                companyName: true,
+    // Create application with transaction to handle attachments
+    const application = await prisma.$transaction(async (prisma) => {
+      // Create the application first
+      const newApplication = await prisma.application.create({
+        data: {
+          jobId,
+          jobSeekerId,
+          coverLetter,
+        },
+      });
+
+      // If attachment IDs are provided, link them to the application
+      if (attachmentIds && attachmentIds.length > 0) {
+        await prisma.attachment.updateMany({
+          where: {
+            id: { in: attachmentIds },
+          },
+          data: {
+            applicationId: newApplication.id,
+          },
+        });
+      }
+
+      // Return the application with all related data
+      return prisma.application.findUnique({
+        where: { id: newApplication.id },
+        include: {
+          job: {
+            select: {
+              title: true,
+              employer: {
+                select: {
+                  companyName: true,
+                },
               },
             },
           },
-        },
-        jobSeeker: {
-          select: {
-            firstName: true,
-            lastName: true,
-            cvUrl: true,
+          jobSeeker: {
+            select: {
+              firstName: true,
+              lastName: true,
+              cvUrl: true,
+            },
+          },
+          attachments: {
+            select: {
+              id: true,
+              filename: true,
+              url: true,
+              fileType: true,
+              fileSize: true,
+            },
           },
         },
-      },
+      });
     });
 
     res.status(201).json({
@@ -178,6 +211,16 @@ export const getEmployerApplications = catchAsync(
               },
             },
           },
+          attachments: {
+            select: {
+              id: true,
+              filename: true,
+              url: true,
+              fileType: true,
+              fileSize: true,
+              mimeType: true,
+            },
+          },
         },
         orderBy: {
           appliedAt: "desc",
@@ -258,6 +301,16 @@ export const getJobApplications = catchAsync(
                     imageUrl: true,
                   },
                 },
+              },
+            },
+            attachments: {
+              select: {
+                id: true,
+                filename: true,
+                url: true,
+                fileType: true,
+                fileSize: true,
+                mimeType: true,
               },
             },
           },

@@ -6,9 +6,29 @@ import { handleValidationErrors } from "../middleware/validation.js";
 
 const prisma = new PrismaClient();
 
+// Helper function to update expired jobs
+const updateExpiredJobs = async () => {
+  const now = new Date();
+
+  await prisma.job.updateMany({
+    where: {
+      deadline: {
+        lt: now,
+      },
+      isActive: true,
+    },
+    data: {
+      isActive: false,
+    },
+  });
+};
+
 // Get all jobs with filtering and pagination
 export const getJobs = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
+    // Update expired jobs before fetching
+    await updateExpiredJobs();
+
     const {
       page = 1,
       limit = 10,
@@ -180,6 +200,9 @@ export const getJobById = catchAsync(
 // Get current user's jobs (employers only)
 export const getMyJobs = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
+    // Update expired jobs before fetching
+    await updateExpiredJobs();
+
     if (!req.user) {
       throw new AppError("User not authenticated", 401);
     }
@@ -203,6 +226,15 @@ export const getMyJobs = catchAsync(
         _count: {
           select: {
             applications: true,
+          },
+        },
+        attachments: {
+          select: {
+            id: true,
+            filename: true,
+            url: true,
+            fileType: true,
+            fileSize: true,
           },
         },
       },
@@ -385,8 +417,27 @@ export const createJob = [
             location: true,
           },
         },
+        attachments: true,
       },
     });
+
+    // Handle image attachments if provided
+    const { images } = req.body;
+    if (images && Array.isArray(images) && images.length > 0) {
+      // Only take the first image as hiring flyer (limit to one)
+      const imageUrl = images[0];
+
+      await prisma.attachment.create({
+        data: {
+          filename: "hiring-flyer.jpg",
+          url: imageUrl,
+          fileType: "IMAGE",
+          mimeType: "image/jpeg",
+          uploadedBy: req.user?.id,
+          jobId: job.id,
+        },
+      });
+    }
 
     res.status(201).json({
       success: true,

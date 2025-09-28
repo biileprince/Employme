@@ -21,6 +21,7 @@ interface EmployerProfile {
   id: string;
   userId: string;
   companyName: string;
+  title?: string;
   industry?: string;
   location?: string;
   website?: string;
@@ -58,6 +59,7 @@ export default function EmployerProfile() {
 
   const [formData, setFormData] = useState({
     companyName: "",
+    title: "",
     industry: "",
     location: "",
     website: "",
@@ -101,6 +103,7 @@ export default function EmployerProfile() {
         setProfile(fullProfile);
         setFormData({
           companyName: employerProfile.companyName || "",
+          title: employerProfile.title || "",
           industry: employerProfile.industry || "",
           location: employerProfile.location || "",
           website: employerProfile.website || "",
@@ -121,6 +124,7 @@ export default function EmployerProfile() {
         setProfile(null);
         setFormData({
           companyName: "",
+          title: "",
           industry: "",
           location: "",
           website: "",
@@ -187,6 +191,7 @@ export default function EmployerProfile() {
 
       const updateData = {
         companyName: formData.companyName,
+        title: formData.title,
         industry: formData.industry,
         location: formData.location,
         website: formData.website,
@@ -226,6 +231,7 @@ export default function EmployerProfile() {
     if (profile) {
       setFormData({
         companyName: profile.companyName || "",
+        title: profile.title || "",
         industry: profile.industry || "",
         location: profile.location || "",
         website: profile.website || "",
@@ -278,7 +284,7 @@ export default function EmployerProfile() {
                 <img
                   src={formatImageUrl(profile.logoUrl)}
                   alt="Company Logo"
-                  className="w-20 h-20 object-contain rounded-lg border border-border bg-background"
+                  className="w-32 h-32 object-contain rounded-lg border border-border bg-background"
                   onError={(e) => {
                     (e.target as HTMLImageElement).style.display = "none";
                   }}
@@ -286,18 +292,6 @@ export default function EmployerProfile() {
               </div>
             )}
           </div>
-
-          {!isEditing && (
-            <div className="mt-4">
-              <button
-                onClick={() => setIsEditing(true)}
-                className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
-              >
-                <MdEdit className="w-4 h-4" />
-                {profile ? "Edit Profile" : "Create Profile"}
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Messages */}
@@ -423,7 +417,7 @@ export default function EmployerProfile() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
+                <label className="block text-sm font-semibold text-blue-600 mb-2">
                   Company Name *
                 </label>
                 {isEditing ? (
@@ -432,7 +426,7 @@ export default function EmployerProfile() {
                     name="companyName"
                     value={formData.companyName}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                    className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-background text-foreground"
                     required
                   />
                 ) : (
@@ -443,7 +437,27 @@ export default function EmployerProfile() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
+                <label className="block text-sm font-semibold text-purple-600 mb-2">
+                  Your Title
+                </label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    name="title"
+                    value={formData.title}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-background text-foreground"
+                    placeholder="CEO, Founder, HR Manager..."
+                  />
+                ) : (
+                  <p className="text-foreground py-3">
+                    {profile?.title || "Not provided"}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-green-600 mb-2">
                   Industry
                 </label>
                 {isEditing ? (
@@ -451,7 +465,7 @@ export default function EmployerProfile() {
                     name="industry"
                     value={formData.industry}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                    className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-background text-foreground"
                   >
                     <option value="">Select Industry</option>
                     {INDUSTRIES.map((industry) => (
@@ -468,7 +482,7 @@ export default function EmployerProfile() {
               </div>
 
               <div>
-                <label className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
+                <label className="text-sm font-semibold text-indigo-600 mb-2 flex items-center gap-2">
                   <MdLocationOn className="w-4 h-4" />
                   Location
                 </label>
@@ -479,7 +493,7 @@ export default function EmployerProfile() {
                     value={formData.location}
                     onChange={handleInputChange}
                     placeholder="e.g., Accra, Ghana"
-                    className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                    className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-background text-foreground"
                   />
                 ) : (
                   <p className="text-foreground py-3">
@@ -489,7 +503,7 @@ export default function EmployerProfile() {
               </div>
 
               <div>
-                <label className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
+                <label className="text-sm font-semibold text-teal-600 mb-2 flex items-center gap-2">
                   <MdLanguage className="w-4 h-4" />
                   Website
                 </label>
@@ -500,7 +514,7 @@ export default function EmployerProfile() {
                     value={formData.website}
                     onChange={handleInputChange}
                     placeholder="https://www.company.com"
-                    className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                    className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-background text-foreground"
                   />
                 ) : (
                   <p className="text-foreground py-3">
@@ -521,7 +535,7 @@ export default function EmployerProfile() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
+                <label className="block text-sm font-semibold text-orange-600 mb-2">
                   Founded Year
                 </label>
                 {isEditing ? (
@@ -533,7 +547,7 @@ export default function EmployerProfile() {
                     placeholder="e.g., 2020"
                     min="1800"
                     max={new Date().getFullYear()}
-                    className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                    className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-background text-foreground"
                   />
                 ) : (
                   <p className="text-foreground py-3">
@@ -543,7 +557,7 @@ export default function EmployerProfile() {
               </div>
 
               <div>
-                <label className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
+                <label className="text-sm font-semibold text-pink-600 mb-2 flex items-center gap-2">
                   <MdWork className="w-4 h-4" />
                   Company Size
                 </label>
@@ -567,11 +581,38 @@ export default function EmployerProfile() {
                   </p>
                 )}
               </div>
+
+              {/* Phone Number */}
+              <div className="col-span-2">
+                <label className="block text-sm font-semibold text-red-600 mb-2">
+                  Company Phone Number
+                </label>
+                {isEditing ? (
+                  <PhoneInput
+                    countryCode={formData.countryCode}
+                    phoneNumber={formData.phone}
+                    onCountryCodeChange={(code) =>
+                      setFormData((prev) => ({ ...prev, countryCode: code }))
+                    }
+                    onPhoneNumberChange={(phone) =>
+                      setFormData((prev) => ({ ...prev, phone }))
+                    }
+                    label=""
+                    placeholder="Enter company phone number (e.g., 0241234567)"
+                  />
+                ) : (
+                  <p className="text-foreground py-3">
+                    {profile?.phone
+                      ? `${profile?.countryCode || "+233"} ${profile.phone}`
+                      : "Not provided"}
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Company Description */}
             <div className="mt-6">
-              <label className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
+              <label className="text-sm font-semibold text-slate-600 mb-2 flex items-center gap-2">
                 <MdDescription className="w-4 h-4" />
                 Company Description
               </label>
@@ -612,7 +653,7 @@ export default function EmployerProfile() {
                     <img
                       src={formatImageUrl(profile.logoUrl)}
                       alt="Company Logo"
-                      className="w-16 h-16 object-contain rounded-lg border border-border"
+                      className="w-24 h-24 object-contain rounded-lg border border-border"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = "none";
                       }}
@@ -655,31 +696,41 @@ export default function EmployerProfile() {
         </div>
 
         {/* Action Buttons - Bottom of Page */}
-        {isEditing && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="mt-8 flex justify-end gap-4 sticky bottom-4 bg-background/90 backdrop-blur-sm p-4 rounded-lg border border-border"
-          >
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="mt-8 flex justify-center gap-4"
+        >
+          {!isEditing ? (
             <button
-              onClick={handleCancel}
-              disabled={isSaving}
-              className="inline-flex items-center gap-2 bg-muted text-muted-foreground px-6 py-3 rounded-lg hover:bg-muted/80 transition-colors"
+              onClick={() => setIsEditing(true)}
+              className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 transition-colors"
             >
-              <MdCancel className="w-4 h-4" />
-              Cancel
+              <MdEdit className="w-4 h-4" />
+              {profile ? "Edit Profile" : "Create Profile"}
             </button>
-            <button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
-            >
-              <MdSave className="w-4 h-4" />
-              {isSaving ? "Saving..." : "Save Changes"}
-            </button>
-          </motion.div>
-        )}
+          ) : (
+            <>
+              <button
+                onClick={handleCancel}
+                disabled={isSaving}
+                className="inline-flex items-center gap-2 bg-muted text-muted-foreground px-6 py-3 rounded-lg hover:bg-muted/80 transition-colors"
+              >
+                <MdCancel className="w-4 h-4" />
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              >
+                <MdSave className="w-4 h-4" />
+                {isSaving ? "Saving..." : "Save Changes"}
+              </button>
+            </>
+          )}
+        </motion.div>
       </div>
     </div>
   );

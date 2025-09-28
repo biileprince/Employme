@@ -78,6 +78,7 @@ model Employer {
   id          String   @id @default(cuid())
   userId      String   @unique
   companyName String
+  title       String?
   industry    String?
   location    String?
   website     String?

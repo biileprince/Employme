@@ -144,7 +144,11 @@ const PostJob = () => {
 
   const handleImageUpload = async (files: File[]) => {
     try {
-      const response = await attachmentAPI.upload(files, "JOB");
+      // Only take the first file for hiring flyer (single image only)
+      const fileToUpload = files[0];
+      if (!fileToUpload) return;
+
+      const response = await attachmentAPI.upload([fileToUpload], "JOB");
       if (
         response.success &&
         response.data &&
@@ -154,13 +158,22 @@ const PostJob = () => {
         const responseData = response.data as {
           attachments: Array<{ url: string }>;
         };
-        const newImageUrls = responseData.attachments.map((att) => att.url);
-        setUploadedImages((prev) => [...prev, ...newImageUrls]);
+        // Replace existing image with new one (single image only)
+        const newImageUrl = responseData.attachments[0]?.url;
+        if (newImageUrl) {
+          setUploadedImages([newImageUrl]);
+        }
       }
     } catch (err) {
       console.error("Image upload failed:", err);
-      setError("Failed to upload images. Please try again.");
+      setError("Failed to upload hiring flyer. Please try again.");
     }
+  };
+
+  // Remove image handler
+  const handleRemoveImage = () => {
+    setUploadedImages([]);
+    setError("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -592,18 +605,17 @@ const PostJob = () => {
             )}
           </div>
 
-          {/* Job Images */}
+          {/* Hiring Flyer */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
-              Job Images (Optional)
+              Job Image (Optional)
             </label>
             <p className="text-sm text-muted-foreground mb-4">
-              Add images to showcase your workplace, team, or job environment.
-              This helps attract more candidates.
+              Upload a job image or promotional image for this job posting.
             </p>
             <ImageUpload
               onFilesUpload={handleImageUpload}
-              maxFiles={5}
+              maxFiles={1}
               maxFileSize={5 * 1024 * 1024} // 5MB
               acceptedTypes={[
                 "image/jpeg",
@@ -611,7 +623,21 @@ const PostJob = () => {
                 "image/png",
                 "image/webp",
               ]}
+              existingImages={uploadedImages}
+              label="Upload Hiring Flyer"
             />
+            {uploadedImages.length > 0 && (
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={handleRemoveImage}
+                  className="text-sm text-red-600 hover:text-red-800 flex items-center gap-1"
+                >
+                  <MdClose className="w-4 h-4" />
+                  Remove Hiring Flyer
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Application Deadline */}

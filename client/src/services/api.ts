@@ -337,8 +337,12 @@ export const savedJobsAPI = {
   unsaveJob: (jobId: string) => apiClient.post("/saved-jobs/remove", { jobId }),
 };
 export const applicationsAPI = {
-  apply: (jobId: string, coverLetter?: string) =>
-    apiClient.post("/applications/apply", { jobId, coverLetter }),
+  apply: (jobId: string, coverLetter?: string, attachmentIds?: string[]) =>
+    apiClient.post("/applications/apply", {
+      jobId,
+      coverLetter,
+      attachmentIds,
+    }),
 
   getMyApplications: () => apiClient.get("/applications/my-applications"),
 

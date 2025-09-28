@@ -123,8 +123,10 @@ export default function JobApplications() {
           }) => ({
             id: app.id,
             applicantName: app.jobSeeker
-              ? `${app.jobSeeker.firstName} ${app.jobSeeker.lastName}`
-              : "Unknown",
+              ? `${app.jobSeeker.firstName || ""} ${
+                  app.jobSeeker.lastName || ""
+                }`.trim() || "Unknown Applicant"
+              : "Unknown Applicant",
             applicantEmail: app.jobSeeker?.user?.email || "Unknown",
             coverLetter: app.coverLetter || "",
             status: app.status as
@@ -221,8 +223,10 @@ export default function JobApplications() {
           }) => ({
             id: app.id,
             applicantName: app.jobSeeker
-              ? `${app.jobSeeker.firstName} ${app.jobSeeker.lastName}`
-              : "Unknown",
+              ? `${app.jobSeeker.firstName || ""} ${
+                  app.jobSeeker.lastName || ""
+                }`.trim() || "Unknown Applicant"
+              : "Unknown Applicant",
             applicantEmail: app.jobSeeker?.user?.email || "Unknown",
             coverLetter: app.coverLetter || "",
             status: app.status as
@@ -495,13 +499,6 @@ export default function JobApplications() {
                             Applied {formatDate(application.appliedAt)}
                           </span>
                         </div>
-
-                        {/* Bio/Description if available */}
-                        {application.user?.profile?.bio && (
-                          <p className="text-sm text-muted-foreground line-clamp-2">
-                            {application.user.profile.bio}
-                          </p>
-                        )}
                       </div>
                     </div>
 
@@ -595,43 +592,81 @@ export default function JobApplications() {
                       <option value="REJECTED">Rejected</option>
                     </select>
 
-                    {/* Documents */}
-                    {application.attachments &&
-                      application.attachments.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                          {application.attachments.map((attachment, index) => (
-                            <a
-                              key={index}
-                              href={formatImageUrl(attachment.url)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-3 py-2 rounded-lg text-sm border border-blue-200 dark:border-blue-800 transition-colors"
-                            >
-                              <MdAttachFile className="w-4 h-4" />
-                              <span className="max-w-32 truncate">
-                                {attachment.filename}
-                              </span>
-                              <MdVisibility className="w-4 h-4" />
-                            </a>
-                          ))}
-                        </div>
-                      )}
+                    {/* Documents Section */}
+                    <div className="mb-6">
+                      <h4 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+                        <MdAttachFile className="w-4 h-4" />
+                        Documents & Resume
+                      </h4>
 
-                    {/* Fallback to old resume URL if no attachments */}
-                    {(!application.attachments ||
-                      application.attachments.length === 0) &&
-                      application.resumeUrl && (
-                        <a
-                          href={formatImageUrl(application.resumeUrl)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-3 py-2 rounded-lg text-sm border border-blue-200 dark:border-blue-800 transition-colors"
-                        >
-                          <MdAttachFile className="w-4 h-4" />
-                          Resume
-                          <MdVisibility className="w-4 h-4" />
-                        </a>
-                      )}
+                      <div className="space-y-2">
+                        {/* Profile CV */}
+                        {application.resumeUrl && (
+                          <a
+                            href={formatImageUrl(application.resumeUrl)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-3 bg-green-50 hover:bg-green-100 text-green-700 px-4 py-3 rounded-lg border border-green-200 transition-colors"
+                          >
+                            <MdAttachFile className="w-5 h-5" />
+                            <div className="flex-1">
+                              <p className="font-medium text-sm">
+                                Profile Resume/CV
+                              </p>
+                              <p className="text-xs opacity-80">
+                                From candidate's profile
+                              </p>
+                            </div>
+                            <MdVisibility className="w-4 h-4" />
+                          </a>
+                        )}
+
+                        {/* Application Documents */}
+                        {application.attachments &&
+                          application.attachments.length > 0 && (
+                            <>
+                              {application.attachments.map(
+                                (attachment, index) => (
+                                  <a
+                                    key={index}
+                                    href={formatImageUrl(attachment.url)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-3 bg-blue-50 hover:bg-blue-100 text-blue-700 px-4 py-3 rounded-lg border border-blue-200 transition-colors"
+                                  >
+                                    <MdAttachFile className="w-5 h-5" />
+                                    <div className="flex-1">
+                                      <p className="font-medium text-sm truncate max-w-48">
+                                        {attachment.filename}
+                                      </p>
+                                      <p className="text-xs opacity-80">
+                                        Uploaded with application •{" "}
+                                        {(
+                                          attachment.fileSize /
+                                          1024 /
+                                          1024
+                                        ).toFixed(2)}{" "}
+                                        MB
+                                      </p>
+                                    </div>
+                                    <MdVisibility className="w-4 h-4" />
+                                  </a>
+                                )
+                              )}
+                            </>
+                          )}
+
+                        {/* No documents message */}
+                        {!application.resumeUrl &&
+                          (!application.attachments ||
+                            application.attachments.length === 0) && (
+                            <div className="text-center py-4 text-muted-foreground border border-dashed rounded-lg">
+                              <MdAttachFile className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                              <p className="text-sm">No documents uploaded</p>
+                            </div>
+                          )}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
