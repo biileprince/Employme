@@ -221,6 +221,22 @@ export const getEmployerApplications = catchAsync(
               mimeType: true,
             },
           },
+          interviews: {
+            select: {
+              id: true,
+              scheduledDate: true,
+              scheduledTime: true,
+              description: true,
+              location: true,
+              isVirtual: true,
+              meetingLink: true,
+              status: true,
+              createdAt: true,
+            },
+            orderBy: {
+              scheduledDate: "asc",
+            },
+          },
         },
         orderBy: {
           appliedAt: "desc",
@@ -311,6 +327,23 @@ export const getJobApplications = catchAsync(
                 fileType: true,
                 fileSize: true,
                 mimeType: true,
+              },
+            },
+            interviews: {
+              select: {
+                id: true,
+                scheduledDate: true,
+                scheduledTime: true,
+                description: true,
+                location: true,
+                isVirtual: true,
+                meetingLink: true,
+                status: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+              orderBy: {
+                scheduledDate: "asc",
               },
             },
           },
@@ -441,8 +474,10 @@ export const getMyApplications = catchAsync(
 // Update application status (employers only)
 export const updateApplicationStatus = [
   body("status")
-    .isIn(["PENDING", "REVIEWING", "ACCEPTED", "REJECTED"])
-    .withMessage("Invalid status value"),
+    .isIn(["PENDING", "REVIEWED", "SHORTLISTED", "HIRED", "REJECTED"])
+    .withMessage(
+      "Invalid status value. Must be one of: PENDING, REVIEWED, SHORTLISTED, HIRED, REJECTED"
+    ),
   handleValidationErrors,
 
   catchAsync(async (req: Request, res: Response): Promise<void> => {
@@ -570,6 +605,143 @@ export const getApplicationById = catchAsync(
     res.status(200).json({
       success: true,
       data: { application },
+    });
+  }
+);
+
+// Schedule an interview for an application
+export const scheduleInterview = [
+  body("scheduledDate").isISO8601().withMessage("Valid date is required"),
+  body("scheduledTime").notEmpty().withMessage("Time is required"),
+  body("description").optional().trim(),
+  body("location").optional().trim(),
+  body("isVirtual").optional().isBoolean(),
+  body("meetingLink")
+    .optional()
+    .if((value: string) => value && value.trim() !== "")
+    .isURL()
+    .withMessage("Valid meeting link required"),
+  handleValidationErrors,
+
+  catchAsync(async (req: Request, res: Response): Promise<void> => {
+    const { id: applicationId } = req.params;
+    const {
+      scheduledDate,
+      scheduledTime,
+      description,
+      location,
+      isVirtual,
+      meetingLink,
+    } = req.body;
+
+    // Verify the application exists and belongs to employer's job
+    if (!applicationId) {
+      throw new AppError("Application ID is required", 400);
+    }
+
+    const application = await prisma.application.findFirst({
+      where: {
+        id: applicationId,
+        job: {
+          employer: {
+            userId: req.user?.id || "",
+          },
+        },
+      },
+      include: {
+        job: {
+          select: {
+            id: true,
+            title: true,
+          },
+          include: {
+            employer: {
+              select: {
+                companyName: true,
+              },
+            },
+          },
+        },
+        jobSeeker: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!application) {
+      throw new AppError("Application not found or unauthorized", 404);
+    }
+
+    // Create the interview
+    const interview = await prisma.interview.create({
+      data: {
+        applicationId,
+        scheduledDate: new Date(scheduledDate),
+        scheduledTime,
+        description: description || `Interview for ${application.job.title}`,
+        location: location || (isVirtual ? "Virtual Meeting" : ""),
+        isVirtual: isVirtual ?? true,
+        meetingLink: meetingLink || "",
+      },
+    });
+
+    // Update application status to SHORTLISTED
+    await prisma.application.update({
+      where: { id: applicationId! }, // We already validated it's not undefined above
+      data: { status: "SHORTLISTED" },
+    });
+
+    // TODO: Send email notification to job seeker
+    // This would integrate with the existing email service
+
+    res.status(201).json({
+      success: true,
+      data: { interview },
+      message: "Interview scheduled successfully",
+    });
+  }),
+];
+
+// Get interviews for an application
+export const getApplicationInterviews = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    const { id: applicationId } = req.params;
+
+    if (!applicationId) {
+      throw new AppError("Application ID is required", 400);
+    }
+
+    // Check if user has access to this application
+    const application = await prisma.application.findFirst({
+      where: {
+        id: applicationId,
+        OR: [
+          { jobSeekerId: req.user?.profile?.id || "" },
+          { job: { employer: { userId: req.user?.id || "" } } },
+        ],
+      },
+    });
+
+    if (!application) {
+      throw new AppError("Application not found or unauthorized", 404);
+    }
+
+    const interviews = await prisma.interview.findMany({
+      where: { applicationId: applicationId! }, // We already validated it's not undefined above
+      orderBy: { scheduledDate: "asc" },
+    });
+
+    res.status(200).json({
+      success: true,
+      data: { interviews },
     });
   }
 );

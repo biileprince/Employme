@@ -47,8 +47,12 @@ export const getEmployerProfile = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
 
+    if (!id) {
+      throw new AppError("Employer ID is required", 400);
+    }
+
     const employer = await prisma.employer.findUnique({
-      where: { id },
+      where: { userId: id }, // Use userId instead of id
       include: {
         user: {
           select: {
@@ -76,7 +80,7 @@ export const getEmployerProfile = catchAsync(
     // Count active jobs
     const activeJobsCount = await prisma.job.count({
       where: {
-        employerId: id,
+        employerId: employer.id, // Use the actual employer ID
         isActive: true,
       },
     });
@@ -87,7 +91,7 @@ export const getEmployerProfile = catchAsync(
         employer: {
           id: employer.id,
           companyName: employer.companyName,
-          companyDescription: employer.companyDescription,
+          companyDescription: employer.description, // Use correct field name
           website: employer.website,
           location: employer.location,
           industry: employer.industry,
@@ -95,7 +99,7 @@ export const getEmployerProfile = catchAsync(
           founded: employer.founded,
           logoUrl: employer.logoUrl,
           isVerified: employer.isVerified,
-          totalJobs: employer._count.jobs,
+          totalJobs: employer._count?.jobs || 0,
           activeJobs: activeJobsCount,
         },
       },

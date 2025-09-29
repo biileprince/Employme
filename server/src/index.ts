@@ -18,6 +18,7 @@ import userRoutes from "./routes/userRoutes.js";
 import applicationRoutes from "./routes/applicationRoutes.js";
 import savedJobsRoutes from "./routes/savedJobsRoutes.js";
 import attachmentRoutes from "./routes/attachmentRoutes.js";
+import interviewRoutes from "./routes/interviewRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 
 // Import middleware
@@ -176,6 +177,7 @@ app.use("/api/users", authMiddleware, userRoutes);
 app.use("/api/applications", applicationRoutes);
 app.use("/api/saved-jobs", authMiddleware, savedJobsRoutes);
 app.use("/api/attachments", authMiddleware, attachmentRoutes);
+app.use("/api/interviews", interviewRoutes);
 app.use("/api/admin", authMiddleware, adminRoutes);
 
 // Socket.IO connection handling

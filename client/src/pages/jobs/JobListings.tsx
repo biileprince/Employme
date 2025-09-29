@@ -1362,11 +1362,11 @@ const JobListings = () => {
                   </p>
                   <p>
                     <strong>Experience:</strong>{" "}
-                    {selectedJob.experience
-                      ? selectedJob.experience
+                    {selectedJob.experienceLevel
+                      ? selectedJob.experienceLevel
                           .replace(/_/g, " ")
                           .toLowerCase()
-                          .replace(/\b\w/g, (l) => l.toUpperCase())
+                          .replace(/\b\w/g, (l: string) => l.toUpperCase())
                       : "Not specified"}
                   </p>
                   {selectedJob.salaryMin && selectedJob.salaryMax && (

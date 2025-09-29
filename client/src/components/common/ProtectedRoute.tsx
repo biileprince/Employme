@@ -31,7 +31,9 @@ export function ProtectedRoute({
   // Check role requirement
   if (requireRole && user.role !== requireRole) {
     // Redirect to appropriate dashboard based on their actual role
-    if (user.role === "EMPLOYER") {
+    if (user.role === "ADMIN") {
+      return <Navigate to="/admin/dashboard" replace />;
+    } else if (user.role === "EMPLOYER") {
       return <Navigate to="/employer/dashboard" replace />;
     } else {
       return <Navigate to="/job-seeker/dashboard" replace />;
@@ -49,7 +51,9 @@ export function ProtectedRoute({
 
   // If user has completed onboarding but is trying to access onboarding page, redirect to appropriate dashboard
   if (user.hasProfile && requireOnboarding) {
-    if (user.role === "EMPLOYER") {
+    if (user.role === "ADMIN") {
+      return <Navigate to="/admin/dashboard" replace />;
+    } else if (user.role === "EMPLOYER") {
       return <Navigate to="/employer/dashboard" replace />;
     } else {
       return <Navigate to="/job-seeker/dashboard" replace />;

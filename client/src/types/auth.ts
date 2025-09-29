@@ -1,5 +1,5 @@
 // Authentication-related types
-export type UserRole = 'JOB_SEEKER' | 'EMPLOYER';
+export type UserRole = "JOB_SEEKER" | "EMPLOYER" | "ADMIN";
 
 export interface AuthUser {
   id: string;

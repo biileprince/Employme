@@ -417,7 +417,7 @@ export default function EmployerProfile() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-semibold text-blue-600 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   Company Name *
                 </label>
                 {isEditing ? (
@@ -426,7 +426,7 @@ export default function EmployerProfile() {
                     name="companyName"
                     value={formData.companyName}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-background text-foreground"
+                    className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                     required
                   />
                 ) : (
@@ -437,7 +437,7 @@ export default function EmployerProfile() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-purple-600 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   Your Title
                 </label>
                 {isEditing ? (
@@ -446,7 +446,7 @@ export default function EmployerProfile() {
                     name="title"
                     value={formData.title}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-background text-foreground"
+                    className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                     placeholder="CEO, Founder, HR Manager..."
                   />
                 ) : (
@@ -457,7 +457,7 @@ export default function EmployerProfile() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-green-600 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   Industry
                 </label>
                 {isEditing ? (
@@ -465,7 +465,7 @@ export default function EmployerProfile() {
                     name="industry"
                     value={formData.industry}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-background text-foreground"
+                    className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                   >
                     <option value="">Select Industry</option>
                     {INDUSTRIES.map((industry) => (
@@ -482,7 +482,7 @@ export default function EmployerProfile() {
               </div>
 
               <div>
-                <label className="text-sm font-semibold text-indigo-600 mb-2 flex items-center gap-2">
+                <label className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
                   <MdLocationOn className="w-4 h-4" />
                   Location
                 </label>
@@ -493,7 +493,7 @@ export default function EmployerProfile() {
                     value={formData.location}
                     onChange={handleInputChange}
                     placeholder="e.g., Accra, Ghana"
-                    className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-background text-foreground"
+                    className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                   />
                 ) : (
                   <p className="text-foreground py-3">
@@ -503,7 +503,7 @@ export default function EmployerProfile() {
               </div>
 
               <div>
-                <label className="text-sm font-semibold text-teal-600 mb-2 flex items-center gap-2">
+                <label className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
                   <MdLanguage className="w-4 h-4" />
                   Website
                 </label>
@@ -514,7 +514,7 @@ export default function EmployerProfile() {
                     value={formData.website}
                     onChange={handleInputChange}
                     placeholder="https://www.company.com"
-                    className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-background text-foreground"
+                    className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                   />
                 ) : (
                   <p className="text-foreground py-3">
@@ -535,7 +535,7 @@ export default function EmployerProfile() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-orange-600 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   Founded Year
                 </label>
                 {isEditing ? (
@@ -547,7 +547,7 @@ export default function EmployerProfile() {
                     placeholder="e.g., 2020"
                     min="1800"
                     max={new Date().getFullYear()}
-                    className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-background text-foreground"
+                    className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                   />
                 ) : (
                   <p className="text-foreground py-3">
@@ -557,7 +557,7 @@ export default function EmployerProfile() {
               </div>
 
               <div>
-                <label className="text-sm font-semibold text-pink-600 mb-2 flex items-center gap-2">
+                <label className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
                   <MdWork className="w-4 h-4" />
                   Company Size
                 </label>
@@ -584,7 +584,7 @@ export default function EmployerProfile() {
 
               {/* Phone Number */}
               <div className="col-span-2">
-                <label className="block text-sm font-semibold text-red-600 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   Company Phone Number
                 </label>
                 {isEditing ? (
@@ -612,7 +612,7 @@ export default function EmployerProfile() {
 
             {/* Company Description */}
             <div className="mt-6">
-              <label className="text-sm font-semibold text-slate-600 mb-2 flex items-center gap-2">
+              <label className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
                 <MdDescription className="w-4 h-4" />
                 Company Description
               </label>

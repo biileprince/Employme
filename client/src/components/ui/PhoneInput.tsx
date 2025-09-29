@@ -68,7 +68,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    const validationError = validatePhoneNumber(value);
+    validatePhoneNumber(value);
     onPhoneNumberChange(value);
   };
 

@@ -8,9 +8,26 @@ import {
   MdDateRange,
   MdVisibility,
   MdDescription,
+  MdEdit,
+  MdDelete,
 } from "react-icons/md";
 import Button from "../../components/ui/Button";
 import { applicationsAPI } from "../../services/api";
+import {
+  InterviewScheduleModal,
+  EditInterviewModal,
+} from "../../components/employer";
+
+interface Interview {
+  id: string;
+  scheduledDate: string;
+  scheduledTime: string;
+  description?: string;
+  location?: string;
+  isVirtual: boolean;
+  meetingLink?: string;
+  status: "SCHEDULED" | "CONFIRMED" | "COMPLETED" | "CANCELLED" | "RESCHEDULED";
+}
 
 interface Application {
   id: string;
@@ -25,23 +42,43 @@ interface Application {
     jobType: string;
   };
   jobSeeker: {
-    userId: string;
-    user: {
-      id: string;
-      firstName: string;
-      lastName: string;
-      email: string;
-    };
+    id: string;
+    firstName: string;
+    lastName: string;
+    location?: string;
+    bio?: string;
     skills: string[];
     experience?: string;
+    education?: string;
+    cvUrl?: string;
+    profileImageUrl?: string;
     phone?: string;
     countryCode?: string;
+    user: {
+      email: string;
+      imageUrl?: string;
+    };
   };
   attachments?: Array<{
     id: string;
     filename: string;
     url: string;
     fileType: string;
+  }>;
+  interviews?: Array<{
+    id: string;
+    scheduledDate: string;
+    scheduledTime: string;
+    description?: string;
+    location?: string;
+    isVirtual: boolean;
+    meetingLink?: string;
+    status:
+      | "SCHEDULED"
+      | "CONFIRMED"
+      | "COMPLETED"
+      | "CANCELLED"
+      | "RESCHEDULED";
   }>;
 }
 
@@ -52,6 +89,13 @@ export default function EmployerApplications() {
   const [filter, setFilter] = useState<
     "ALL" | "PENDING" | "REVIEWED" | "SHORTLISTED" | "REJECTED" | "HIRED"
   >("ALL");
+  const [showInterviewModal, setShowInterviewModal] = useState(false);
+  const [showEditInterviewModal, setShowEditInterviewModal] = useState(false);
+  const [selectedApplication, setSelectedApplication] =
+    useState<Application | null>(null);
+  const [selectedInterview, setSelectedInterview] = useState<Interview | null>(
+    null
+  );
 
   useEffect(() => {
     const loadApplications = async () => {
@@ -59,8 +103,9 @@ export default function EmployerApplications() {
         setLoading(true);
         const response = await applicationsAPI.getEmployerApplications();
 
-        if (response.success && (response.data as any)?.applications) {
-          setApplications((response.data as any).applications);
+        if (response.success && response.data) {
+          const data = response.data as { applications?: Application[] };
+          setApplications(data.applications || []);
         } else {
           setApplications([]);
         }
@@ -110,6 +155,96 @@ export default function EmployerApplications() {
     acc[app.status] = (acc[app.status] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
+
+  const updateApplicationStatus = async (
+    applicationId: string,
+    newStatus: string
+  ) => {
+    try {
+      await applicationsAPI.updateStatus(applicationId, newStatus);
+      // Reload applications
+      window.location.reload();
+    } catch (err) {
+      console.error("Failed to update application status:", err);
+      setError("Failed to update application status");
+    }
+  };
+
+  const handleScheduleInterview = (application: Application) => {
+    setSelectedApplication(application);
+    setShowInterviewModal(true);
+  };
+
+  const handleInterviewScheduled = async () => {
+    // Reload applications to show updated status
+    try {
+      const response = await applicationsAPI.getEmployerApplications();
+      if (response.success && response.data) {
+        const data = response.data as { applications?: Application[] };
+        setApplications(data.applications || []);
+      }
+    } catch (err) {
+      console.error("Failed to reload applications:", err);
+    }
+    setSelectedApplication(null);
+    setShowInterviewModal(false);
+  };
+
+  const handleEditInterview = (
+    application: Application,
+    interview: Interview
+  ) => {
+    setSelectedApplication(application);
+    setSelectedInterview(interview);
+    setShowEditInterviewModal(true);
+  };
+
+  const handleInterviewUpdated = async (
+    updatedInterview: Partial<Interview>
+  ) => {
+    try {
+      // Call the interview update API
+      if (selectedInterview) {
+        await applicationsAPI.updateInterview(selectedInterview.id, {
+          scheduledDate: updatedInterview.scheduledDate,
+          scheduledTime: updatedInterview.scheduledTime,
+          description: updatedInterview.description,
+          location: updatedInterview.location,
+          meetingLink: updatedInterview.meetingLink,
+        });
+      }
+      // Reload applications to show updated interview
+      const response = await applicationsAPI.getEmployerApplications();
+      if (response.success && response.data) {
+        const data = response.data as { applications?: Application[] };
+        setApplications(data.applications || []);
+      }
+    } catch (err) {
+      console.error("Failed to update interview:", err);
+    } finally {
+      setShowEditInterviewModal(false);
+      setSelectedInterview(null);
+      setSelectedApplication(null);
+    }
+  };
+
+  const handleDeleteInterview = async (interviewId: string) => {
+    if (!confirm("Are you sure you want to delete this interview?")) {
+      return;
+    }
+
+    try {
+      await applicationsAPI.deleteInterview(interviewId);
+      // Reload applications to show updated list
+      const response = await applicationsAPI.getEmployerApplications();
+      if (response.success && response.data) {
+        const data = response.data as { applications?: Application[] };
+        setApplications(data.applications || []);
+      }
+    } catch (err) {
+      console.error("Failed to delete interview:", err);
+    }
+  };
 
   if (loading) {
     return (
@@ -255,8 +390,8 @@ export default function EmployerApplications() {
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         <h3 className="text-lg font-semibold text-foreground">
-                          {application.jobSeeker.user.firstName}{" "}
-                          {application.jobSeeker.user.lastName}
+                          {application.jobSeeker.firstName}{" "}
+                          {application.jobSeeker.lastName}
                         </h3>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
                           <div className="flex items-center gap-1">
@@ -378,13 +513,102 @@ export default function EmployerApplications() {
 
                   {/* Actions */}
                   <div className="flex lg:flex-col gap-2">
+                    {/* Status Update */}
+                    <select
+                      value={application.status}
+                      onChange={(e) =>
+                        updateApplicationStatus(application.id, e.target.value)
+                      }
+                      className="px-3 py-2 border border-border rounded-lg text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-background dark:text-foreground dark:border-border"
+                    >
+                      <option value="PENDING">Pending</option>
+                      <option value="REVIEWED">Reviewed</option>
+                      <option value="SHORTLISTED">Shortlisted</option>
+                      <option value="HIRED">Hired</option>
+                      <option value="REJECTED">Rejected</option>
+                    </select>
+
+                    {/* Interview Information */}
+                    {application.interviews &&
+                      application.interviews.length > 0 && (
+                        <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                          <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
+                            Scheduled Interviews
+                          </h4>
+                          {application.interviews.map((interview) => (
+                            <div
+                              key={interview.id}
+                              className="flex items-center justify-between text-sm mb-2 last:mb-0"
+                            >
+                              <div className="text-blue-700 dark:text-blue-300 flex-1">
+                                <div>
+                                  {new Date(
+                                    interview.scheduledDate
+                                  ).toLocaleDateString()}{" "}
+                                  at {interview.scheduledTime}
+                                </div>
+                                <div className="text-xs opacity-75">
+                                  {interview.isVirtual
+                                    ? "Virtual Interview"
+                                    : interview.location}
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() =>
+                                    handleEditInterview(application, interview)
+                                  }
+                                  className="px-2 py-1 bg-primary text-primary-foreground rounded text-xs hover:bg-primary/90 transition-colors flex items-center gap-1"
+                                >
+                                  <MdEdit className="w-3 h-3" />
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleDeleteInterview(interview.id)
+                                  }
+                                  className="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600 transition-colors flex items-center gap-1"
+                                >
+                                  <MdDelete className="w-3 h-3" />
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                    {/* Schedule Interview Button */}
+                    {(application.status === "PENDING" ||
+                      application.status === "REVIEWED" ||
+                      application.status === "SHORTLISTED") && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleScheduleInterview(application)}
+                        className="w-full flex items-center justify-center gap-2"
+                      >
+                        <MdDateRange className="w-4 h-4" />
+                        <span>
+                          {application.interviews &&
+                          application.interviews.length > 0
+                            ? "Schedule Another Interview"
+                            : "Schedule Interview"}
+                        </span>
+                      </Button>
+                    )}
+
                     <Link
                       to={`/employer/jobs/${application.job.id}/applications`}
                       className="flex-1 lg:flex-none"
                     >
-                      <Button variant="outline" size="sm" className="w-full">
-                        <MdVisibility className="w-4 h-4 mr-1" />
-                        View Details
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full flex items-center justify-center gap-2"
+                      >
+                        <MdVisibility className="w-4 h-4" />
+                        <span>View Details</span>
                       </Button>
                     </Link>
                   </div>
@@ -394,6 +618,30 @@ export default function EmployerApplications() {
           </div>
         )}
       </div>
+
+      {/* Interview Schedule Modal */}
+      {showInterviewModal && selectedApplication && (
+        <InterviewScheduleModal
+          isOpen={showInterviewModal}
+          onClose={() => setShowInterviewModal(false)}
+          applicationId={selectedApplication.id}
+          applicantName={`${selectedApplication.jobSeeker.firstName} ${selectedApplication.jobSeeker.lastName}`}
+          jobTitle={selectedApplication.job.title}
+          onScheduled={handleInterviewScheduled}
+        />
+      )}
+
+      {/* Edit Interview Modal */}
+      {showEditInterviewModal && selectedApplication && selectedInterview && (
+        <EditInterviewModal
+          isOpen={showEditInterviewModal}
+          onClose={() => setShowEditInterviewModal(false)}
+          interview={selectedInterview}
+          candidateName={`${selectedApplication.jobSeeker.firstName} ${selectedApplication.jobSeeker.lastName}`}
+          jobTitle={selectedApplication.job.title}
+          onSave={handleInterviewUpdated}
+        />
+      )}
     </div>
   );
 }

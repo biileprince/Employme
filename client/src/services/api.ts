@@ -30,7 +30,7 @@ interface ApiResponse<T = unknown> {
 }
 
 // HTTP methods
-type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
+type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 // Request data type
 type RequestData =
@@ -118,7 +118,7 @@ class ApiClient {
       credentials: "include", // Include cookies in requests
     };
 
-    if (data && (method === "POST" || method === "PUT")) {
+    if (data && (method === "POST" || method === "PUT" || method === "PATCH")) {
       config.body = JSON.stringify(data);
     }
 
@@ -149,10 +149,19 @@ class ApiClient {
             const contentType = response.headers.get("content-type");
             if (contentType && contentType.includes("application/json")) {
               const result = await response.json();
-              throw new Error(
+              console.log("API Error Response:", result); // Add detailed logging
+              console.log("Validation errors:", result.errors); // Log specific validation errors
+
+              // Create error with validation details if available
+              const error = new Error(
                 result.message ||
                   `API request failed with status ${response.status}`
               );
+              // Attach validation errors if present
+              if (result.errors) {
+                Object.assign(error, { errors: result.errors });
+              }
+              throw error;
             } else {
               // Non-JSON response (like plain text error messages)
               const text = await response.text();
@@ -207,6 +216,14 @@ class ApiClient {
   // PUT request
   async put<T>(endpoint: string, data?: RequestData): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, "PUT", data);
+  }
+
+  // PATCH request
+  async patch<T>(
+    endpoint: string,
+    data?: RequestData
+  ): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, "PATCH", data);
   }
 
   // DELETE request
@@ -352,10 +369,44 @@ export const applicationsAPI = {
   getEmployerApplications: () => apiClient.get("/applications/employer"),
 
   updateStatus: (id: string, status: string) =>
-    apiClient.put(`/applications/${id}/status`, { status }),
+    apiClient.patch(`/applications/${id}/status`, { status }),
 
   applyToJob: (jobId: string, applicationData: Record<string, unknown>) =>
     apiClient.post(`/applications/apply/${jobId}`, applicationData),
+
+  scheduleInterview: (
+    applicationId: string,
+    interviewData: {
+      scheduledDate: string;
+      scheduledTime: string;
+      description?: string;
+      location?: string;
+      isVirtual?: boolean;
+      meetingLink?: string;
+    }
+  ) =>
+    apiClient.post(
+      `/applications/${applicationId}/schedule-interview`,
+      interviewData
+    ),
+
+  getInterviews: (applicationId: string) =>
+    apiClient.get(`/applications/${applicationId}/interviews`),
+
+  updateInterview: (
+    interviewId: string,
+    interviewData: {
+      scheduledDate?: string;
+      scheduledTime?: string;
+      description?: string;
+      location?: string;
+      meetingLink?: string;
+      status?: string;
+    }
+  ) => apiClient.put(`/interviews/${interviewId}`, interviewData),
+
+  deleteInterview: (interviewId: string) =>
+    apiClient.delete(`/interviews/${interviewId}`),
 };
 
 export const userAPI = {
@@ -424,6 +475,43 @@ export const attachmentAPI = {
 
   getById: (attachmentId: string) =>
     apiClient.get(`/attachments/${attachmentId}`),
+};
+
+// Admin API endpoints
+export const adminAPI = {
+  getStats: () => apiClient.get("/admin/stats"),
+
+  // User management
+  getAllUsers: (params?: URLSearchParams) =>
+    apiClient.get(`/admin/users${params ? `?${params}` : ""}`),
+  toggleUserStatus: (userId: string) =>
+    apiClient.patch(`/admin/users/${userId}/toggle-status`),
+  toggleUserVerification: (userId: string) =>
+    apiClient.patch(`/admin/users/${userId}/toggle-verification`),
+  deleteUser: (userId: string) => apiClient.delete(`/admin/users/${userId}`),
+
+  // Job management
+  getAllJobs: (params?: URLSearchParams) =>
+    apiClient.get(`/admin/jobs${params ? `?${params}` : ""}`),
+  manageJob: (jobId: string, action: string) =>
+    apiClient.patch(`/admin/jobs/${jobId}`, { action }),
+  deleteJob: (jobId: string) => apiClient.delete(`/admin/jobs/${jobId}`),
+
+  // Application management
+  getAllApplications: (params?: URLSearchParams) =>
+    apiClient.get(`/admin/applications${params ? `?${params}` : ""}`),
+
+  // Admin creation
+  createAdmin: (adminData: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    secretKey: string;
+  }) => apiClient.post("/admin/create-admin", adminData),
+
+  // Admin profile
+  getProfile: () => apiClient.get("/admin/profile"),
 };
 
 // Export default instance

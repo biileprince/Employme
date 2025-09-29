@@ -368,527 +368,528 @@ export default function JobSeekerProfile() {
         </div>
       )}
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-card rounded-lg border border-border overflow-hidden"
-      >
-        <div className="p-6">
-          {/* Basic Information */}
-          <div className="mb-8">
-            <div className="flex items-center mb-6">
-              <h2 className="text-2xl font-bold text-foreground border-b-2 border-primary pb-2">
-                Basic Information
-              </h2>
-            </div>
+      <div className="space-y-8">
+        {/* Basic Information */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-card text-card-foreground p-6 rounded-xl border border-border"
+        >
+          <h2 className="text-xl font-semibold mb-6">Basic Information</h2>
 
-            {/* Profile Image Upload */}
-            <div className="mb-6">
+          {/* Profile Image Upload */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Profile Image
+            </label>
+            {isEditing ? (
+              <ImageUpload
+                onFilesUpload={handleProfileImageUpload}
+                accept="image/*"
+                maxFiles={1}
+                label="Upload Profile Image"
+                existingImages={
+                  formData.profileImageUrl ? [formData.profileImageUrl] : []
+                }
+              />
+            ) : (
+              <div className="flex items-center gap-4">
+                {userData?.profile?.profileImageUrl || userData?.imageUrl ? (
+                  <img
+                    src={formatImageUrl(
+                      userData.profile?.profileImageUrl || userData.imageUrl!
+                    )}
+                    alt="Profile"
+                    className="w-20 h-20 object-cover rounded-full border border-border"
+                    onError={(e) => {
+                      console.warn(
+                        "Failed to load profile image:",
+                        userData?.profile?.profileImageUrl || userData?.imageUrl
+                      );
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
+                  />
+                ) : (
+                  <p className="text-muted-foreground">No profile image</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                Profile Image
+                First Name *
               </label>
               {isEditing ? (
-                <ImageUpload
-                  onFilesUpload={handleProfileImageUpload}
-                  accept="image/*"
-                  maxFiles={1}
-                  label="Upload Profile Image"
-                  existingImages={
-                    formData.profileImageUrl ? [formData.profileImageUrl] : []
+                <input
+                  type="text"
+                  value={formData.firstName}
+                  onChange={(e) =>
+                    setFormData({ ...formData, firstName: e.target.value })
                   }
+                  className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                 />
               ) : (
-                <div className="flex items-center gap-4">
-                  {userData?.profile?.profileImageUrl || userData?.imageUrl ? (
-                    <img
-                      src={formatImageUrl(
-                        userData.profile?.profileImageUrl || userData.imageUrl!
-                      )}
-                      alt="Profile"
-                      className="w-20 h-20 object-cover rounded-full border border-border"
-                      onError={(e) => {
-                        console.warn(
-                          "Failed to load profile image:",
-                          userData?.profile?.profileImageUrl ||
-                            userData?.imageUrl
-                        );
-                        (e.target as HTMLImageElement).style.display = "none";
+                <p className="text-foreground py-3">
+                  {userData?.profile?.firstName ||
+                    userData?.firstName ||
+                    "Not provided"}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Last Name *
+              </label>
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={formData.lastName}
+                  onChange={(e) =>
+                    setFormData({ ...formData, lastName: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                />
+              ) : (
+                <p className="text-foreground py-3">
+                  {userData?.profile?.lastName ||
+                    userData?.lastName ||
+                    "Not provided"}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Date of Birth
+              </label>
+              {isEditing ? (
+                <input
+                  type="date"
+                  value={formData.dateOfBirth}
+                  onChange={(e) =>
+                    setFormData({ ...formData, dateOfBirth: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                />
+              ) : (
+                <p className="text-foreground py-3">
+                  {userData?.profile?.dateOfBirth
+                    ? new Date(
+                        userData.profile.dateOfBirth
+                      ).toLocaleDateString()
+                    : "Not provided"}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Phone
+              </label>
+              {isEditing ? (
+                <PhoneInput
+                  countryCode={formData.countryCode}
+                  phoneNumber={formData.phone}
+                  onCountryCodeChange={(code) =>
+                    setFormData({ ...formData, countryCode: code })
+                  }
+                  onPhoneNumberChange={(phone) =>
+                    setFormData({ ...formData, phone })
+                  }
+                  label=""
+                />
+              ) : (
+                <p className="text-foreground py-3">
+                  {userData?.profile?.phone
+                    ? `${userData?.profile?.countryCode || "+233"} ${
+                        userData?.profile?.phone
+                      }`
+                    : "Not provided"}
+                </p>
+              )}
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Location
+              </label>
+              {isEditing ? (
+                <div className="relative">
+                  <div className="relative">
+                    <MdLocationOn className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+                    <input
+                      type="text"
+                      value={locationSearch}
+                      onChange={handleLocationSearchChange}
+                      onFocus={() => {
+                        if (!locationSearch) {
+                          setLocationSearch(formData.location);
+                        }
                       }}
+                      onBlur={() => {
+                        // Allow manual clearing - don't revert if user cleared the field
+                        if (!locationSearch) {
+                          setFormData({ ...formData, location: "" });
+                        }
+                      }}
+                      placeholder="Type to search for city or location..."
+                      className="w-full pl-10 pr-12 py-3 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
                     />
-                  ) : (
-                    <p className="text-muted-foreground">No profile image</p>
+                    {locationSearch && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLocationSearch("");
+                          setFormData({ ...formData, location: "" });
+                          setShowLocationDropdown(false);
+                        }}
+                        className="absolute right-8 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        ✕
+                      </button>
+                    )}
+                    {isSearchingLocation && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Location Dropdown */}
+                  {showLocationDropdown && locationResults.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                      {locationResults.map((location) => (
+                        <button
+                          key={location.place_id}
+                          onClick={() => selectLocation(location)}
+                          className="w-full text-left px-4 py-3 hover:bg-muted focus:bg-muted focus:outline-none border-b border-border last:border-b-0"
+                        >
+                          <div className="flex items-center">
+                            <MdLocationOn className="w-4 h-4 text-primary mr-2 flex-shrink-0" />
+                            <span className="text-foreground text-sm truncate">
+                              {location.display_name.split(",")[0].trim()}
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   )}
+                </div>
+              ) : (
+                <p className="text-foreground py-3">
+                  {userData?.profile?.location || "Not provided"}
+                </p>
+              )}
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Professional Information */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-card text-card-foreground p-6 rounded-xl border border-border"
+        >
+          <h2 className="text-xl font-semibold mb-6">
+            Professional Information
+          </h2>
+
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Experience Level
+              </label>
+              {isEditing ? (
+                <select
+                  value={formData.experience}
+                  onChange={(e) =>
+                    setFormData({ ...formData, experience: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                >
+                  <option value="">Select experience level</option>
+                  <option value="ENTRY_LEVEL">Entry Level (0-2 years)</option>
+                  <option value="MID_LEVEL">Mid Level (2-5 years)</option>
+                  <option value="SENIOR_LEVEL">Senior Level (5+ years)</option>
+                  <option value="EXECUTIVE">Executive (Leadership)</option>
+                </select>
+              ) : (
+                <p className="text-foreground py-3">
+                  {userData?.profile?.experience || "Not provided"}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Education
+              </label>
+              {isEditing ? (
+                <select
+                  value={formData.education}
+                  onChange={(e) =>
+                    setFormData({ ...formData, education: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                >
+                  <option value="">Select Education Level</option>
+                  <option value="HIGH_SCHOOL">High School</option>
+                  <option value="DIPLOMA">Diploma</option>
+                  <option value="BACHELOR">Bachelor's Degree</option>
+                  <option value="MASTER">Master's Degree</option>
+                  <option value="PHD">PhD/Doctorate</option>
+                  <option value="PROFESSIONAL">Professional Certificate</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              ) : (
+                <p className="text-foreground py-3">
+                  {formData.education
+                    ? formData.education
+                        .replace("_", " ")
+                        .replace(/\b\w/g, (l) => l.toUpperCase())
+                    : userData?.profile?.education || "Not provided"}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Bio
+              </label>
+              {isEditing ? (
+                <textarea
+                  value={formData.bio}
+                  onChange={(e) =>
+                    setFormData({ ...formData, bio: e.target.value })
+                  }
+                  rows={4}
+                  placeholder="Tell us about yourself, your background, and what you're looking for..."
+                  className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground resize-none"
+                />
+              ) : (
+                <div className="bg-muted p-4 rounded-lg">
+                  <p className="text-foreground leading-relaxed">
+                    {userData?.profile?.bio || "No bio provided."}
+                  </p>
                 </div>
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-primary mb-2">
-                  First Name *
-                </label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={formData.firstName}
-                    onChange={(e) =>
-                      setFormData({ ...formData, firstName: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
-                  />
-                ) : (
-                  <div className="text-lg font-medium text-foreground bg-muted/30 p-3 rounded-md">
-                    {userData?.profile?.firstName ||
-                      userData?.firstName ||
-                      "Not specified"}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-primary mb-2">
-                  Last Name *
-                </label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={formData.lastName}
-                    onChange={(e) =>
-                      setFormData({ ...formData, lastName: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
-                  />
-                ) : (
-                  <div className="text-lg font-medium text-foreground bg-muted/30 p-3 rounded-md">
-                    {userData?.profile?.lastName ||
-                      userData?.lastName ||
-                      "Not specified"}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-purple-600 dark:text-purple-400 mb-2">
-                  Date of Birth
-                </label>
-                {isEditing ? (
-                  <input
-                    type="date"
-                    value={formData.dateOfBirth}
-                    onChange={(e) =>
-                      setFormData({ ...formData, dateOfBirth: e.target.value })
-                    }
-                    className="w-full px-3 py-3 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
-                  />
-                ) : (
-                  <div className="text-lg font-medium text-foreground bg-purple-50 dark:bg-purple-900/20 p-3 rounded-md">
-                    {userData?.profile?.dateOfBirth
-                      ? new Date(
-                          userData.profile.dateOfBirth
-                        ).toLocaleDateString()
-                      : "Not specified"}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-green-600 dark:text-green-400 mb-2">
-                  Phone
-                </label>
-                {isEditing ? (
-                  <PhoneInput
-                    countryCode={formData.countryCode}
-                    phoneNumber={formData.phone}
-                    onCountryCodeChange={(code) =>
-                      setFormData({ ...formData, countryCode: code })
-                    }
-                    onPhoneNumberChange={(phone) =>
-                      setFormData({ ...formData, phone })
-                    }
-                    label=""
-                  />
-                ) : (
-                  <div className="text-lg font-medium text-foreground bg-green-50 dark:bg-green-900/20 p-3 rounded-md">
-                    {userData?.profile?.phone
-                      ? `${userData?.profile?.countryCode || "+233"} ${
-                          userData?.profile?.phone
-                        }`
-                      : "Not specified"}
-                  </div>
-                )}
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-blue-600 dark:text-blue-400 mb-2">
-                  Location
-                </label>
-                {isEditing ? (
-                  <div className="relative">
-                    <div className="relative">
-                      <MdLocationOn className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
-                      <input
-                        type="text"
-                        value={locationSearch}
-                        onChange={handleLocationSearchChange}
-                        onFocus={() => {
-                          if (!locationSearch) {
-                            setLocationSearch(formData.location);
-                          }
-                        }}
-                        onBlur={() => {
-                          // Allow manual clearing - don't revert if user cleared the field
-                          if (!locationSearch) {
-                            setFormData({ ...formData, location: "" });
-                          }
-                        }}
-                        placeholder="Type to search for city or location..."
-                        className="w-full pl-10 pr-12 py-3 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
-                      />
-                      {locationSearch && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setLocationSearch("");
-                            setFormData({ ...formData, location: "" });
-                            setShowLocationDropdown(false);
-                          }}
-                          className="absolute right-8 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        >
-                          ✕
-                        </button>
-                      )}
-                      {isSearchingLocation && (
-                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Location Dropdown */}
-                    {showLocationDropdown && locationResults.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
-                        {locationResults.map((location) => (
-                          <button
-                            key={location.place_id}
-                            onClick={() => selectLocation(location)}
-                            className="w-full text-left px-4 py-3 hover:bg-muted focus:bg-muted focus:outline-none border-b border-border last:border-b-0"
-                          >
-                            <div className="flex items-center">
-                              <MdLocationOn className="w-4 h-4 text-primary mr-2 flex-shrink-0" />
-                              <span className="text-foreground text-sm truncate">
-                                {location.display_name.split(",")[0].trim()}
-                              </span>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-lg font-medium text-foreground bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md">
-                    {userData?.profile?.location || "Not specified"}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Professional Information */}
-          <div className="mb-8">
-            <div className="flex items-center mb-6">
-              <h2 className="text-2xl font-bold text-foreground border-b-2 border-primary pb-2">
-                Professional Information
-              </h2>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-orange-600 mb-1">
-                  Experience Level
-                </label>
-                {isEditing ? (
-                  <select
-                    value={formData.experience}
-                    onChange={(e) =>
-                      setFormData({ ...formData, experience: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-background text-foreground"
-                  >
-                    <option value="">Select experience level</option>
-                    <option value="ENTRY_LEVEL">Entry Level (0-2 years)</option>
-                    <option value="MID_LEVEL">Mid Level (2-5 years)</option>
-                    <option value="SENIOR_LEVEL">
-                      Senior Level (5+ years)
-                    </option>
-                    <option value="EXECUTIVE">Executive (Leadership)</option>
-                  </select>
-                ) : (
-                  <div className="text-foreground">
-                    {userData?.profile?.experience || "Not specified"}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-indigo-600 mb-2">
-                  Education
-                </label>
-                {isEditing ? (
-                  <select
-                    value={formData.education}
-                    onChange={(e) =>
-                      setFormData({ ...formData, education: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
-                  >
-                    <option value="">Select Education Level</option>
-                    <option value="HIGH_SCHOOL">High School</option>
-                    <option value="DIPLOMA">Diploma</option>
-                    <option value="BACHELOR">Bachelor's Degree</option>
-                    <option value="MASTER">Master's Degree</option>
-                    <option value="PHD">PhD/Doctorate</option>
-                    <option value="PROFESSIONAL">
-                      Professional Certificate
-                    </option>
-                    <option value="OTHER">Other</option>
-                  </select>
-                ) : (
-                  <div className="text-lg font-medium text-foreground bg-muted/30 p-3 rounded-md">
-                    {formData.education
-                      ? formData.education
-                          .replace("_", " ")
-                          .replace(/\b\w/g, (l) => l.toUpperCase())
-                      : userData?.profile?.education || "Not specified"}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-pink-600 mb-1">
-                  Bio
-                </label>
-                {isEditing ? (
-                  <textarea
-                    value={formData.bio}
-                    onChange={(e) =>
-                      setFormData({ ...formData, bio: e.target.value })
-                    }
-                    rows={4}
-                    placeholder="Tell us about yourself, your background, and what you're looking for..."
-                    className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 bg-background text-foreground"
-                  />
-                ) : (
-                  <div className="text-foreground">
-                    {userData?.profile?.bio || "Not specified"}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-yellow-600 mb-1">
-                  CV/Resume
-                </label>
-                {isEditing ? (
-                  <FileUpload
-                    onFilesUpload={handleResumeUpload}
-                    maxFiles={1}
-                    acceptedTypes={[
-                      "application/pdf",
-                      "application/msword",
-                      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    ]}
-                    maxFileSize={10 * 1024 * 1024} // 10MB
-                    label="Upload CV/Resume"
-                    description="Upload your CV or Resume (.pdf, .doc, .docx)"
-                  />
-                ) : (
-                  <div className="text-foreground">
-                    {userData?.profile?.resumeAttachments &&
-                    userData.profile.resumeAttachments.length > 0 ? (
-                      <AttachmentViewer
-                        attachments={userData.profile.resumeAttachments}
-                      />
-                    ) : userData?.profile?.cvUrl ? (
-                      <div className="border border-border rounded-lg p-4 bg-background hover:bg-muted transition-colors">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            {userData.profile.cvUrl
-                              .toLowerCase()
-                              .includes(".pdf") ? (
-                              <MdPictureAsPdf className="w-8 h-8 text-red-600" />
-                            ) : (
-                              <MdDescription className="w-8 h-8 text-blue-600" />
-                            )}
-                            <div>
-                              <p className="font-medium text-foreground">
-                                {userData.profile.cvUrl
-                                  .split("/")
-                                  .pop()
-                                  ?.split(".")[0] || "CV/Resume"}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {userData.profile.cvUrl
-                                  .toLowerCase()
-                                  .includes(".pdf")
-                                  ? "PDF Document"
-                                  : "Document"}
-                              </p>
-                            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                CV/Resume
+              </label>
+              {isEditing ? (
+                <FileUpload
+                  onFilesUpload={handleResumeUpload}
+                  maxFiles={1}
+                  acceptedTypes={[
+                    "application/pdf",
+                    "application/msword",
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                  ]}
+                  maxFileSize={10 * 1024 * 1024} // 10MB
+                  label="Upload CV/Resume"
+                  description="Upload your CV or Resume (.pdf, .doc, .docx)"
+                />
+              ) : (
+                <div className="text-foreground">
+                  {userData?.profile?.resumeAttachments &&
+                  userData.profile.resumeAttachments.length > 0 ? (
+                    <AttachmentViewer
+                      attachments={userData.profile.resumeAttachments}
+                    />
+                  ) : userData?.profile?.cvUrl ? (
+                    <div className="border border-border rounded-lg p-4 bg-background hover:bg-muted transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          {userData.profile.cvUrl
+                            .toLowerCase()
+                            .includes(".pdf") ? (
+                            <MdPictureAsPdf className="w-8 h-8 text-red-600" />
+                          ) : (
+                            <MdDescription className="w-8 h-8 text-blue-600" />
+                          )}
+                          <div>
+                            <p className="font-medium text-foreground">
+                              {userData.profile.cvUrl
+                                .split("/")
+                                .pop()
+                                ?.split(".")[0] || "CV/Resume"}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {userData.profile.cvUrl
+                                .toLowerCase()
+                                .includes(".pdf")
+                                ? "PDF Document"
+                                : "Document"}
+                            </p>
                           </div>
-                          <a
-                            href={formatImageUrl(userData.profile.cvUrl)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center space-x-1 text-primary hover:text-primary/80 font-medium"
-                          >
-                            <span>View</span>
-                            <MdOpenInNew className="w-4 h-4" />
-                          </a>
                         </div>
+                        <a
+                          href={formatImageUrl(userData.profile.cvUrl)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center space-x-1 text-primary hover:text-primary/80 font-medium"
+                        >
+                          <span>View</span>
+                          <MdOpenInNew className="w-4 h-4" />
+                        </a>
                       </div>
-                    ) : (
-                      <p className="text-muted-foreground italic">
-                        No resume uploaded
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground italic">
+                      No resume uploaded
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
+        </motion.div>
 
-          {/* Skills */}
-          <div className="mb-8">
-            <div className="flex items-center mb-6">
-              <h2 className="text-2xl font-bold text-foreground border-b-2 border-primary pb-2">
-                Skills
-              </h2>
-            </div>
-            {isEditing ? (
-              <div>
-                <div className="flex space-x-2 mb-4">
-                  <input
-                    type="text"
-                    value={newSkill}
-                    onChange={(e) => setNewSkill(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && addSkill()}
-                    placeholder="Add a skill"
-                    className="flex-1 px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
-                  />
-                  <Button onClick={addSkill} variant="outline">
-                    Add
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {formData.skills.map((skill: string, index: number) => (
-                    <span
-                      key={index}
-                      className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm flex items-center space-x-2"
-                    >
-                      <span>{skill}</span>
-                      <button
-                        onClick={() => removeSkill(skill)}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
+        {/* Skills */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="bg-card text-card-foreground p-6 rounded-xl border border-border"
+        >
+          <h2 className="text-xl font-semibold mb-6">Skills</h2>
+          {isEditing ? (
+            <div>
+              <div className="flex space-x-2 mb-4">
+                <input
+                  type="text"
+                  value={newSkill}
+                  onChange={(e) => setNewSkill(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && addSkill()}
+                  placeholder="Add a skill"
+                  className="flex-1 px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                />
+                <Button onClick={addSkill} variant="outline">
+                  Add
+                </Button>
               </div>
-            ) : (
               <div className="flex flex-wrap gap-2">
-                {userData?.profile?.skills?.map(
-                  (skill: string, index: number) => (
-                    <span
-                      key={index}
-                      className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm"
-                    >
-                      {skill}
-                    </span>
-                  )
-                ) || (
-                  <span className="text-muted-foreground">No skills added</span>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Privacy Settings */}
-          <div className="mb-8">
-            <div className="flex items-center mb-6">
-              <h2 className="text-2xl font-bold text-foreground border-b-2 border-primary pb-2">
-                Privacy Settings
-              </h2>
-            </div>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <label className="text-sm font-semibold text-slate-600">
-                    Public Profile
-                  </label>
-                  <p className="text-sm text-muted-foreground">
-                    Allow employers to find and view your profile
-                  </p>
-                </div>
-                {isEditing ? (
-                  <input
-                    type="checkbox"
-                    checked={formData.isProfilePublic}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        isProfilePublic: e.target.checked,
-                      })
-                    }
-                    className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
-                  />
-                ) : (
+                {formData.skills.map((skill: string, index: number) => (
                   <span
-                    className={`px-2 py-1 rounded text-xs ${
-                      userData?.profile?.isProfilePublic
-                        ? "bg-secondary/10 text-secondary"
-                        : "bg-muted text-muted-foreground"
-                    }`}
+                    key={index}
+                    className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm flex items-center space-x-2"
                   >
-                    {userData?.profile?.isProfilePublic ? "Public" : "Private"}
+                    <span>{skill}</span>
+                    <button
+                      onClick={() => removeSkill(skill)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      ×
+                    </button>
                   </span>
-                )}
+                ))}
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {userData?.profile?.skills?.map(
+                (skill: string, index: number) => (
+                  <span
+                    key={index}
+                    className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm"
+                  >
+                    {skill}
+                  </span>
+                )
+              ) || (
+                <span className="text-muted-foreground">No skills added</span>
+              )}
+            </div>
+          )}
+        </motion.div>
 
-          {/* Action Buttons */}
-          <div className="mt-8 flex justify-center">
-            {!isEditing ? (
-              <Button
-                onClick={() => setIsEditing(true)}
-                variant="primary"
-                size="lg"
-              >
-                Edit Profile
-              </Button>
-            ) : (
-              <div className="flex space-x-4">
-                <Button
-                  onClick={() => setIsEditing(false)}
-                  variant="outline"
-                  size="lg"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSave}
-                  isLoading={isSaving}
-                  variant="primary"
-                  size="lg"
-                >
-                  Save Changes
-                </Button>
+        {/* Privacy Settings */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-card text-card-foreground p-6 rounded-xl border border-border"
+        >
+          <h2 className="text-xl font-semibold mb-6">Privacy Settings</h2>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="text-sm font-medium text-foreground">
+                  Public Profile
+                </label>
+                <p className="text-sm text-muted-foreground">
+                  Allow employers to find and view your profile
+                </p>
               </div>
-            )}
+              {isEditing ? (
+                <input
+                  type="checkbox"
+                  checked={formData.isProfilePublic}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      isProfilePublic: e.target.checked,
+                    })
+                  }
+                  className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
+                />
+              ) : (
+                <span
+                  className={`px-2 py-1 rounded text-xs ${
+                    userData?.profile?.isProfilePublic
+                      ? "bg-secondary/10 text-secondary"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {userData?.profile?.isProfilePublic ? "Public" : "Private"}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
+        </motion.div>
+      </div>
+
+      {/* Action Buttons */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+        className="mt-8 flex justify-center"
+      >
+        {!isEditing ? (
+          <Button
+            onClick={() => setIsEditing(true)}
+            variant="primary"
+            size="lg"
+          >
+            Edit Profile
+          </Button>
+        ) : (
+          <div className="flex space-x-4">
+            <Button
+              onClick={() => setIsEditing(false)}
+              variant="outline"
+              size="lg"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSave}
+              isLoading={isSaving}
+              variant="primary"
+              size="lg"
+            >
+              Save Changes
+            </Button>
+          </div>
+        )}
       </motion.div>
     </div>
   );

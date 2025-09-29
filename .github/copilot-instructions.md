@@ -1,6 +1,23 @@
 # Employ.me Copilot Instructions
 
-This is a full-stack job platform with React/TypeScript frontend and Express/Prisma backend.
+This is a full-stack job platform targeting Ghana's job market with React/TypeScript frontend and Express/Prisma backend.
+
+## Quick Start Commands
+
+```bash
+# Backend setup (Terminal 1)
+cd server && npm run dev          # Starts on :5001 with tsx watch
+npm run db:studio                 # Prisma Studio on :5555
+
+# Frontend setup (Terminal 2)
+cd client && npm run dev          # Starts on :5173 with Vite HMR
+
+# Database operations
+cd server
+npm run db:push                   # Push schema changes (dev)
+npm run db:migrate                # Create migrations (prod)
+npm run db:seed                   # Populate with sample data
+```
 
 ## Architecture Overview
 
@@ -1476,77 +1493,138 @@ cp .env.example .env
 npm run dev
 
 # Full stack running
-# Backend: http://localhost:5000
+# Backend: http://localhost:5001
 # Frontend: http://localhost:5173
 # Prisma Studio: http://localhost:5555 (npm run db:studio)
 ```
 
-## Critical Development Patterns
+## Critical Patterns for Immediate Productivity
 
-### Authentication Flow
-
-- JWT tokens stored in localStorage via `apiClient.setToken()`
-- `AuthContext` manages user state and provides login/logout
-- Backend uses `authMiddleware` for protected routes
-- Role-based middleware: `employerOnly`, `jobSeekerOnly`, `adminOnly`
-
-### API Client Pattern
+### 1. API Client Pattern (Essential)
 
 ```typescript
-// Use the centralized API client in services/api.ts
-import { authAPI, jobsAPI, applicationsAPI, userAPI } from "../services/api";
+// services/api.ts - All API calls use centralized client with auto token management
+import { authAPI, jobsAPI, applicationsAPI } from "../services/api";
 
-// All API methods return ApiResponse<T> with success/data structure
 const response = await jobsAPI.getAll();
 if (response.success) {
-  setJobs(response.data.jobs);
+  setJobs(response.data.jobs); // Always check success before using data
 }
 ```
 
-## Development Commands
+### 2. Authentication Flow
 
-### Backend (server/)
+- JWT stored in localStorage via `apiClient.setToken()` in AuthContext
+- All components use `useAuth()` hook for user state
+- Protected routes check role: `<ProtectedRoute requiredRole="EMPLOYER">`
+- Backend middleware: `authMiddleware` → `req.user` populated
 
-```bash
-npm run dev          # Start with tsx watch
-npm run db:studio    # Open Prisma Studio
-npm run db:migrate   # Apply database migrations
-npm run db:seed      # Seed database with sample data
+### 3. Component Organization
+
+```typescript
+// Feature-based imports using barrel exports
+import { Dashboard, MyApplications } from "../pages/job-seeker";
+import { Button, PhoneInput } from "../components/ui";
+import { Header } from "../components/common";
 ```
 
-### Frontend (client/)
+### 4. Database Patterns
 
-```bash
-npm run dev          # Start Vite dev server (port 5173)
-npm run build        # Production build
+```typescript
+// Always include related profile data when fetching users
+const user = await prisma.user.findUnique({
+  where: { id },
+  include: { jobSeeker: true, employer: true, admin: true },
+});
+
+// Prevent duplicate applications with unique constraint
+await prisma.application.create({
+  data: { jobId, jobSeekerId, coverLetter },
+}); // Throws P2002 error if duplicate
 ```
 
-### Full Stack
+### 5. File Upload Pattern
 
-- Backend runs on `localhost:5000`
-- Frontend dev server on `localhost:5173`
-- Health check: `GET /health`
+- Multer → local `/server/uploads/` → Cloudinary (production)
+- Frontend: FormData with `attachmentAPI.upload(files)`
+- Always validate file types: PDF, DOC, DOCX, images
 
-## Role-Based Features
+## Role-Based Access & Routes
 
-### Job Seekers
+### Job Seekers (`JOB_SEEKER`)
 
-- View jobs (`/jobs`), apply to jobs, manage applications
-- Profile creation via onboarding flow
-- Saved jobs functionality
+- Dashboard: `/job-seeker/dashboard` - applications, saved jobs
+- Pages: `/jobs` (browse), `/jobs/:id/apply` (application modal)
 
-### Employers
+### Employers (`EMPLOYER`)
 
-- Post/edit jobs, view applications, manage candidates
-- Company profile with verification status
-- Dashboard with job metrics
+- Dashboard: `/employer/dashboard` - posted jobs, applications
+- Job management: Create/edit via modals, view applicant CVs
 
-### Admins
+### Common Patterns
 
-- System statistics, user management
-- Access via `/api/admin` routes
+- Role-specific redirects after login in `AuthContext`
+- Each role has dedicated layout: `JobSeekerDashboardLayout`, `EmployerDashboardLayout`
+- API routes are role-protected via middleware
+
+## Troubleshooting Common Issues
+
+### "API calls failing after login"
+
+- Check if `apiClient.setToken()` called in AuthContext login method
+- Verify backend `authMiddleware` sets `req.user`
+
+### "Database connection issues"
+
+- Ensure `DATABASE_URL` in server/.env matches running PostgreSQL
+- Run `cd server && npm run db:push` to sync schema
+
+### "File uploads not working"
+
+- Check server/uploads/ directory exists (created automatically)
+- Verify Cloudinary env vars for production uploads
+
+### "Hot reload issues"
+
+- Clear Vite cache: `cd client && rm -rf node_modules/.vite`
+- Restart with `npm run dev`
 
 ## Key Integration Points
+
+### Socket.IO
+
+Real-time messaging configured in `server/src/index.ts` with CORS for localhost:5173
+
+### File Uploads
+
+Cloudinary integration via `attachmentRoutes` for resumes/logos
+
+### Social Auth
+
+Passport.js with Google/LinkedIn/Facebook OAuth configured
+
+## Common Gotchas
+
+1. **Route Organization**: Application routes include auth middleware internally - don't double-apply
+2. **Token Management**: Login must call `apiClient.setToken()` or subsequent API calls fail
+3. **Role Validation**: Always check user role before rendering role-specific UI
+4. **Error Boundaries**: Empty states should render gracefully, not throw errors
+5. **Migration Safety**: Use `db:push` for development, `db:migrate` for production
+6. **Component Imports**: Use barrel exports from index.ts files for cleaner imports
+
+## Testing Endpoints
+
+```bash
+# Health check
+curl http://localhost:5000/health
+
+# Login test
+curl -X POST http://localhost:5000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"password"}'
+```
+
+When working on this codebase, prioritize understanding the user role context and ensure API calls include proper authentication headers.
 
 ### Socket.IO
 

@@ -10,6 +10,7 @@ import "./App.css";
 import RootLayout from "./layouts/RootLayout";
 import EmployerDashboardLayout from "./layouts/EmployerDashboardLayout";
 import JobSeekerDashboardLayout from "./layouts/JobSeekerDashboardLayout";
+import AdminLayout from "./layouts/AdminLayout";
 
 // Import pages using the new organized structure
 import {
@@ -34,6 +35,17 @@ import {
   AllApplications,
   CandidateSearch,
 } from "./pages";
+
+// Import admin pages
+import {
+  AdminDashboard,
+  AdminUsers,
+  AdminJobs,
+  AdminApplications,
+  AdminAnalytics,
+  AdminSettings,
+  CreateAdmin,
+} from "./pages/admin";
 
 // Import loaders
 import { jobDetailLoader } from "./loaders/jobsLoaders";
@@ -199,6 +211,70 @@ const router = createBrowserRouter(
           element: (
             <ProtectedRoute requireRole="JOB_SEEKER">
               <JobSeekerProfile />
+            </ProtectedRoute>
+          ),
+        },
+      ],
+    },
+    // Admin Dashboard Routes (separate layout)
+    {
+      path: "/admin",
+      element: <AdminLayout />,
+      errorElement: <ErrorPage />,
+      children: [
+        {
+          path: "dashboard",
+          element: (
+            <ProtectedRoute requireRole="ADMIN">
+              <AdminDashboard />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "users",
+          element: (
+            <ProtectedRoute requireRole="ADMIN">
+              <AdminUsers />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "jobs",
+          element: (
+            <ProtectedRoute requireRole="ADMIN">
+              <AdminJobs />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "applications",
+          element: (
+            <ProtectedRoute requireRole="ADMIN">
+              <AdminApplications />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "analytics",
+          element: (
+            <ProtectedRoute requireRole="ADMIN">
+              <AdminAnalytics />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "settings",
+          element: (
+            <ProtectedRoute requireRole="ADMIN">
+              <AdminSettings />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "create-admin",
+          element: (
+            <ProtectedRoute requireRole="ADMIN">
+              <CreateAdmin />
             </ProtectedRoute>
           ),
         },

@@ -151,6 +151,7 @@ model Application {
   job         Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
   jobSeeker   JobSeeker         @relation(fields: [jobSeekerId], references: [id], onDelete: Cascade)
   attachments Attachment[]
+  interviews  Interview[]
 
   @@unique([jobId, jobSeekerId])
   @@map("applications")
@@ -254,4 +255,30 @@ enum AttachmentType {
   PORTFOLIO
   CERTIFICATE
   OTHER
+}
+
+model Interview {
+  id            String      @id @default(cuid())
+  applicationId String
+  scheduledDate DateTime
+  scheduledTime String      // e.g., "14:30"
+  description   String?
+  location      String?     // Can be "Virtual" or physical address
+  isVirtual     Boolean     @default(true)
+  meetingLink   String?     // For virtual interviews
+  status        InterviewStatus @default(SCHEDULED)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  @@map("interviews")
+}
+
+enum InterviewStatus {
+  SCHEDULED
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  RESCHEDULED
 }

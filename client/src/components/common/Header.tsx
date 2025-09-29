@@ -7,11 +7,6 @@ import {
   HiUser,
   HiLogout,
   HiViewGrid,
-  HiBriefcase,
-  HiOfficeBuilding,
-  HiAcademicCap,
-  HiLocationMarker,
-  HiGlobeAlt,
 } from "react-icons/hi";
 import ThemeToggle from "../ui/ThemeToggle";
 import Button from "../ui/Button";
