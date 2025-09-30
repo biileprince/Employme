@@ -144,19 +144,73 @@ export const getAllUsers = catchAsync(
           email: true,
           firstName: true,
           lastName: true,
+          imageUrl: true,
           role: true,
           isActive: true,
+          isVerified: true,
           createdAt: true,
+          updatedAt: true,
           jobSeeker: {
             select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              dateOfBirth: true,
               location: true,
+              bio: true,
               skills: true,
+              experience: true,
+              education: true,
+              cvUrl: true,
+              profileImageUrl: true,
+              isProfilePublic: true,
+              countryCode: true,
+              phone: true,
+              createdAt: true,
+              updatedAt: true,
             },
           },
           employer: {
             select: {
+              id: true,
               companyName: true,
+              title: true,
+              industry: true,
               location: true,
+              website: true,
+              description: true,
+              logoUrl: true,
+              founded: true,
+              companySize: true,
+              isVerified: true,
+              countryCode: true,
+              phone: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+          admin: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+          socialAccounts: {
+            select: {
+              id: true,
+              provider: true,
+              email: true,
+              displayName: true,
+              createdAt: true,
+            },
+          },
+          _count: {
+            select: {
+              attachments: true,
+              socialAccounts: true,
             },
           },
         },
@@ -531,6 +585,105 @@ export const getAllApplications = catchAsync(
           pages: totalPages,
         },
       },
+    });
+  }
+);
+
+// Delete application
+export const deleteApplication = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.user || req.user.role !== "ADMIN") {
+      throw new AppError("Access denied. Admin privileges required.", 403);
+    }
+
+    const { id } = req.params;
+
+    // Check if application exists
+    const application = await prisma.application.findUnique({
+      where: { id },
+      include: {
+        job: {
+          include: {
+            employer: {
+              include: { user: true },
+            },
+          },
+        },
+        jobSeeker: {
+          include: { user: true },
+        },
+      },
+    });
+
+    if (!application) {
+      throw new AppError("Application not found", 404);
+    }
+
+    // Delete the application (this will also cascade delete related attachments)
+    await prisma.application.delete({
+      where: { id },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Application deleted successfully",
+    });
+  }
+);
+
+// Update application status (admin can change any application status)
+export const updateApplicationStatus = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.user || req.user.role !== "ADMIN") {
+      throw new AppError("Access denied. Admin privileges required.", 403);
+    }
+
+    const { id } = req.params;
+    const { status } = req.body;
+
+    // Validate status
+    const validStatuses = [
+      "PENDING",
+      "REVIEWED",
+      "SHORTLISTED",
+      "REJECTED",
+      "HIRED",
+    ];
+    if (!validStatuses.includes(status)) {
+      throw new AppError("Invalid status", 400);
+    }
+
+    // Check if application exists
+    const application = await prisma.application.findUnique({
+      where: { id },
+    });
+
+    if (!application) {
+      throw new AppError("Application not found", 404);
+    }
+
+    // Update application status
+    const updatedApplication = await prisma.application.update({
+      where: { id },
+      data: { status, updatedAt: new Date() },
+      include: {
+        job: {
+          include: {
+            employer: {
+              include: { user: true },
+            },
+          },
+        },
+        jobSeeker: {
+          include: { user: true },
+        },
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Application status updated successfully",
+      data: { application: updatedApplication },
     });
   }
 );

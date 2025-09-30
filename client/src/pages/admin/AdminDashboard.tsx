@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   MdDashboard,
@@ -58,6 +59,7 @@ interface DashboardData {
 }
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -233,7 +235,11 @@ export default function AdminDashboard() {
               <h3 className="text-xl font-semibold text-foreground">
                 Recent Users
               </h3>
-              <Button variant="outline" size="sm">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate("/admin/users")}
+              >
                 View All
               </Button>
             </div>
@@ -302,7 +308,11 @@ export default function AdminDashboard() {
               <h3 className="text-xl font-semibold text-foreground">
                 Recent Jobs
               </h3>
-              <Button variant="outline" size="sm">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate("/admin/jobs")}
+              >
                 View All
               </Button>
             </div>

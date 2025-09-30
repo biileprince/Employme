@@ -500,6 +500,8 @@ export const adminAPI = {
   // Application management
   getAllApplications: (params?: URLSearchParams) =>
     apiClient.get(`/admin/applications${params ? `?${params}` : ""}`),
+  deleteApplication: (applicationId: string) =>
+    apiClient.delete(`/admin/applications/${applicationId}`),
 
   // Admin creation
   createAdmin: (adminData: {

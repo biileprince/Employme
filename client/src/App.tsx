@@ -43,7 +43,6 @@ import {
   AdminJobs,
   AdminApplications,
   AdminAnalytics,
-  AdminSettings,
   CreateAdmin,
 } from "./pages/admin";
 
@@ -259,14 +258,6 @@ const router = createBrowserRouter(
           element: (
             <ProtectedRoute requireRole="ADMIN">
               <AdminAnalytics />
-            </ProtectedRoute>
-          ),
-        },
-        {
-          path: "settings",
-          element: (
-            <ProtectedRoute requireRole="ADMIN">
-              <AdminSettings />
             </ProtectedRoute>
           ),
         },

@@ -104,24 +104,24 @@ export default function CreateAdmin() {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="max-w-2xl mx-auto"
+        className="max-w-3xl mx-auto"
       >
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6 sm:mb-8">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-              <MdAdd className="w-6 h-6 text-primary-foreground" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+              <MdAdd className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground">
                 Create Admin User
               </h1>
-              <p className="text-muted-foreground">
+              <p className="text-sm sm:text-base text-muted-foreground">
                 Add a new administrator to the system
               </p>
             </div>
@@ -151,43 +151,46 @@ export default function CreateAdmin() {
         )}
 
         {/* Form */}
-        <div className="bg-card border border-border rounded-xl p-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* First Name */}
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
-                First Name *
-              </label>
-              <div className="relative">
-                <MdPerson className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
-                <input
-                  type="text"
-                  name="firstName"
-                  value={formData.firstName}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full pl-10 pr-4 py-3 border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="Enter first name"
-                />
+        <div className="bg-card border border-border rounded-xl p-4 sm:p-6">
+          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+            {/* Name Fields - Side by side on larger screens */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+              {/* First Name */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  First Name *
+                </label>
+                <div className="relative">
+                  <MdPerson className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+                  <input
+                    type="text"
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full pl-10 pr-4 py-3 border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
+                    placeholder="Enter first name"
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Last Name */}
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
-                Last Name *
-              </label>
-              <div className="relative">
-                <MdPerson className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
-                <input
-                  type="text"
-                  name="lastName"
-                  value={formData.lastName}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full pl-10 pr-4 py-3 border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="Enter last name"
-                />
+              {/* Last Name */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Last Name *
+                </label>
+                <div className="relative">
+                  <MdPerson className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+                  <input
+                    type="text"
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full pl-10 pr-4 py-3 border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
+                    placeholder="Enter last name"
+                  />
+                </div>
               </div>
             </div>
 
@@ -256,40 +259,62 @@ export default function CreateAdmin() {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-4 pt-4">
+            <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-3 pt-6">
               <Button
                 type="submit"
                 variant="primary"
-                size="lg"
+                size="md"
                 isLoading={isLoading}
-                className="flex-1"
+                className="w-full sm:w-auto flex items-center justify-center min-h-[44px]"
               >
-                <MdSave className="w-5 h-5 mr-2" />
-                Create Admin User
+                <div className="flex items-center justify-center gap-2">
+                  <MdSave className="w-4 h-4 flex-shrink-0" />
+                  <span className="font-medium">Create Admin</span>
+                </div>
               </Button>
 
               <Button
                 type="button"
                 variant="outline"
-                size="lg"
+                size="md"
                 onClick={handleReset}
                 disabled={isLoading}
+                className="w-full sm:w-auto flex items-center justify-center min-h-[44px]"
               >
-                <MdCancel className="w-5 h-5 mr-2" />
-                Reset
+                <div className="flex items-center justify-center gap-2">
+                  <MdCancel className="w-4 h-4 flex-shrink-0" />
+                  <span className="font-medium">Reset</span>
+                </div>
               </Button>
             </div>
           </form>
         </div>
 
         {/* Info Section */}
-        <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <h3 className="font-medium text-blue-900 mb-2">Important Notes:</h3>
-          <ul className="text-sm text-blue-700 space-y-1">
-            <li>• Admin users have full access to the system</li>
-            <li>• Use strong passwords for security</li>
-            <li>• Admin credentials should be kept secure</li>
-            <li>• New admin users can access all admin features immediately</li>
+        <div className="mt-6 sm:mt-8 p-4 sm:p-6 bg-blue-50 border border-blue-200 rounded-lg">
+          <h3 className="font-medium text-blue-900 mb-3 flex items-center gap-2">
+            <MdPerson className="w-4 h-4" />
+            Important Notes:
+          </h3>
+          <ul className="text-sm text-blue-700 space-y-2">
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 mt-0.5">•</span>
+              <span>Admin users have full access to the system</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 mt-0.5">•</span>
+              <span>Use strong passwords for security</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 mt-0.5">•</span>
+              <span>Admin credentials should be kept secure</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-500 mt-0.5">•</span>
+              <span>
+                New admin users can access all admin features immediately
+              </span>
+            </li>
           </ul>
         </div>
       </motion.div>

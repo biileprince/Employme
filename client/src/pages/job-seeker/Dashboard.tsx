@@ -217,17 +217,17 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6 sm:mb-8">
           <motion.h1
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-4xl font-bold text-foreground mb-2"
+            className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-2"
           >
             Welcome back, {userProfile?.firstName || user?.firstName || "User"}!
           </motion.h1>
-          <p className="text-muted-foreground text-lg">
+          <p className="text-muted-foreground text-sm sm:text-base lg:text-lg">
             Here's what's happening with your job search today.
           </p>
         </div>
@@ -237,66 +237,74 @@ const Dashboard = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8"
         >
-          <div className="bg-card border border-border rounded-xl p-6 hover:shadow-lg transition-shadow">
+          <div className="bg-card border border-border rounded-xl p-4 sm:p-6 hover:shadow-lg transition-shadow">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-muted-foreground text-sm">Available Jobs</p>
-                <p className="text-3xl font-bold text-foreground">
+              <div className="flex-1 min-w-0">
+                <p className="text-muted-foreground text-xs sm:text-sm">
+                  Available Jobs
+                </p>
+                <p className="text-2xl sm:text-3xl font-bold text-foreground">
                   {stats.totalJobs}
                 </p>
               </div>
-              <div className="h-12 w-12 bg-secondary/20 rounded-lg flex items-center justify-center">
+              <div className="h-10 w-10 sm:h-12 sm:w-12 bg-secondary/20 rounded-lg flex items-center justify-center flex-shrink-0">
                 <FiBriefcase className="h-6 w-6 text-secondary" />
               </div>
             </div>
           </div>
 
-          <div className="bg-card border border-border rounded-xl p-6 hover:shadow-lg transition-shadow">
+          <div className="bg-card border border-border rounded-xl p-4 sm:p-6 hover:shadow-lg transition-shadow">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-muted-foreground text-sm">Saved Jobs</p>
-                <p className="text-3xl font-bold text-foreground">
+              <div className="flex-1 min-w-0">
+                <p className="text-muted-foreground text-xs sm:text-sm">
+                  Saved Jobs
+                </p>
+                <p className="text-2xl sm:text-3xl font-bold text-foreground">
                   {stats.savedJobs}
                 </p>
               </div>
-              <div className="h-12 w-12 bg-secondary/20 rounded-lg flex items-center justify-center">
-                <FiBookmark className="h-6 w-6 text-secondary" />
+              <div className="h-10 w-10 sm:h-12 sm:w-12 bg-secondary/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                <FiBookmark className="h-5 w-5 sm:h-6 sm:w-6 text-secondary" />
               </div>
             </div>
           </div>
 
-          <div className="bg-card border border-border rounded-xl p-6 hover:shadow-lg transition-shadow">
+          <div className="bg-card border border-border rounded-xl p-4 sm:p-6 hover:shadow-lg transition-shadow">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-muted-foreground text-sm">Applications</p>
-                <p className="text-3xl font-bold text-foreground">
+              <div className="flex-1 min-w-0">
+                <p className="text-muted-foreground text-xs sm:text-sm">
+                  Applications
+                </p>
+                <p className="text-2xl sm:text-3xl font-bold text-foreground">
                   {stats.applications}
                 </p>
               </div>
-              <div className="h-12 w-12 bg-accent/50 rounded-lg flex items-center justify-center">
-                <FiTrendingUp className="h-6 w-6 text-accent-foreground" />
+              <div className="h-10 w-10 sm:h-12 sm:w-12 bg-accent/50 rounded-lg flex items-center justify-center flex-shrink-0">
+                <FiTrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-accent-foreground" />
               </div>
             </div>
           </div>
 
-          <div className="bg-card border border-border rounded-xl p-6 hover:shadow-lg transition-shadow">
+          <div className="bg-card border border-border rounded-xl p-4 sm:p-6 hover:shadow-lg transition-shadow">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-muted-foreground text-sm">Profile Views</p>
-                <p className="text-3xl font-bold text-foreground">
+              <div className="flex-1 min-w-0">
+                <p className="text-muted-foreground text-xs sm:text-sm">
+                  Profile Views
+                </p>
+                <p className="text-2xl sm:text-3xl font-bold text-foreground">
                   {stats.profileViews}
                 </p>
               </div>
-              <div className="h-12 w-12 bg-muted rounded-lg flex items-center justify-center">
-                <FiEye className="h-6 w-6 text-muted-foreground" />
+              <div className="h-10 w-10 sm:h-12 sm:w-12 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
+                <FiEye className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
               </div>
             </div>
           </div>
         </motion.div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
           {/* Recent Jobs */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
@@ -304,9 +312,9 @@ const Dashboard = () => {
             transition={{ delay: 0.2 }}
             className="lg:col-span-2"
           >
-            <div className="bg-card border border-border rounded-xl p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-semibold text-foreground">
+            <div className="bg-card border border-border rounded-xl p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-0 mb-4 sm:mb-6">
+                <h2 className="text-xl sm:text-2xl font-semibold text-foreground">
                   Recent Job Postings
                 </h2>
                 <Link
@@ -317,33 +325,33 @@ const Dashboard = () => {
                 </Link>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {recentJobs.map((job) => (
                   <div
                     key={job.id}
-                    className="p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
+                    className="p-3 sm:p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
                   >
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-semibold text-foreground hover:text-primary cursor-pointer">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 sm:gap-2 mb-2">
+                      <h3 className="font-semibold text-foreground hover:text-primary cursor-pointer text-sm sm:text-base line-clamp-1">
                         {job.title}
                       </h3>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-muted-foreground flex-shrink-0">
                         {formatDate(job.createdAt)}
                       </span>
                     </div>
 
-                    <p className="text-muted-foreground text-sm mb-2">
+                    <p className="text-muted-foreground text-xs sm:text-sm mb-2 line-clamp-1">
                       {job.employer.companyName}
                     </p>
 
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-muted-foreground">
                       <div className="flex items-center gap-1">
-                        <FiMapPin className="h-3 w-3" />
-                        {job.location}
+                        <FiMapPin className="h-3 w-3 flex-shrink-0" />
+                        <span className="truncate">{job.location}</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <FiBriefcase className="h-3 w-3" />
-                        {job.jobType}
+                        <FiBriefcase className="h-3 w-3 flex-shrink-0" />
+                        <span className="truncate">{job.jobType}</span>
                       </div>
                       {job.salaryMin && job.salaryMax && (
                         <div>

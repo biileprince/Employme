@@ -9,6 +9,8 @@ import {
   manageJob,
   deleteJob,
   getAllApplications,
+  deleteApplication,
+  updateApplicationStatus,
   createAdminUser,
   getAdminProfile,
 } from "../controllers/adminController.js";
@@ -34,8 +36,10 @@ router.get("/jobs", getAllJobs);
 router.patch("/jobs/:id", manageJob);
 router.delete("/jobs/:id", deleteJob);
 
-// Application management routes (to be implemented)
+// Application management routes
 router.get("/applications", getAllApplications);
+router.delete("/applications/:id", deleteApplication);
+router.patch("/applications/:id/status", updateApplicationStatus);
 
 // Admin creation route
 router.post("/create-admin", createAdminUser);
