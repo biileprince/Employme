@@ -22,6 +22,8 @@ interface AdminStats {
   activeEmployers: number;
   activeJobSeekers: number;
   pendingApplications: number;
+  pendingEmployerVerifications: number;
+  pendingJobApprovals: number;
 }
 
 interface RecentUser {
@@ -175,6 +177,13 @@ export default function AdminDashboard() {
       color: "bg-red-500",
       textColor: "text-red-600",
     },
+    {
+      title: "Pending Verifications",
+      value: data.stats?.pendingEmployerVerifications || 0,
+      icon: MdCheckCircle,
+      color: "bg-yellow-500",
+      textColor: "text-yellow-600",
+    },
   ];
 
   return (
@@ -194,7 +203,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
           {statsCards.map((stat, index) => (
             <motion.div
               key={stat.title}
@@ -370,6 +379,40 @@ export default function AdminDashboard() {
             </div>
           </motion.div>
         </div>
+
+        {/* Pending Employer Verifications */}
+        {data.stats && data.stats.pendingEmployerVerifications > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8 }}
+            className="mt-8 bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-300 rounded-xl p-6"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-yellow-500 rounded-full flex items-center justify-center">
+                  <MdBusiness className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-foreground">
+                    Pending Employer Verifications
+                  </h3>
+                  <p className="text-muted-foreground">
+                    {data.stats.pendingEmployerVerifications} employer
+                    {data.stats.pendingEmployerVerifications !== 1 ? "s" : ""}{" "}
+                    waiting for verification
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="primary"
+                onClick={() => navigate("/admin/employers")}
+              >
+                Review Employers
+              </Button>
+            </div>
+          </motion.div>
+        )}
       </div>
     </div>
   );

@@ -1,35 +1,41 @@
-import React, { useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import React, { useState } from "react";
+import { useAuth } from "../../contexts/AuthContext";
+import SocialLogin from "./SocialLogin";
 
 interface LoginFormProps {
   onSwitchToForgotPassword: () => void;
   onVerificationRequired?: (email: string) => void;
 }
 
-export const LoginForm: React.FC<LoginFormProps> = ({ 
+export const LoginForm: React.FC<LoginFormProps> = ({
   onSwitchToForgotPassword,
-  onVerificationRequired 
+  onVerificationRequired,
 }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const { login, isLoading } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
     try {
       await login(email, password);
     } catch (err) {
-      const errorMessage = (err as Error).message || 'Login failed';
-      
+      const errorMessage = (err as Error).message || "Login failed";
+
       // Check if the error is about email verification
-      if (errorMessage.toLowerCase().includes('verify') || errorMessage.toLowerCase().includes('verification')) {
+      if (
+        errorMessage.toLowerCase().includes("verify") ||
+        errorMessage.toLowerCase().includes("verification")
+      ) {
         if (onVerificationRequired) {
           onVerificationRequired(email);
         } else {
-          setError('Please verify your email address before logging in. Check your inbox for the verification link.');
+          setError(
+            "Please verify your email address before logging in. Check your inbox for the verification link."
+          );
         }
       } else {
         setError(errorMessage);
@@ -56,7 +62,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({
         )}
 
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label
+            htmlFor="email"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+          >
             Email address
           </label>
           <input
@@ -71,7 +80,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({
         </div>
 
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label
+            htmlFor="password"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+          >
             Password
           </label>
           <input
@@ -100,9 +112,12 @@ export const LoginForm: React.FC<LoginFormProps> = ({
           disabled={isLoading}
           className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white py-2 px-4 rounded-md transition-colors"
         >
-          {isLoading ? 'Signing in...' : 'Sign in'}
+          {isLoading ? "Signing in..." : "Sign in"}
         </button>
       </form>
+
+      {/* Social Login Options */}
+      <SocialLogin text="Sign in with" />
     </div>
   );
 };

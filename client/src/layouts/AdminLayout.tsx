@@ -11,10 +11,13 @@ import {
   MdClose,
   MdPersonAdd,
   MdAnalytics,
+  MdEmail,
+  MdBusiness,
 } from "react-icons/md";
 import { useAuth } from "../contexts/AuthContext";
 import ThemeToggle from "../components/ui/ThemeToggle";
 import Button from "../components/ui/Button";
+import ScrollToTop from "../components/common/ScrollToTop";
 
 interface NavItem {
   path: string;
@@ -34,6 +37,11 @@ const navItems: NavItem[] = [
     icon: MdPeople,
   },
   {
+    path: "/admin/employers",
+    label: "Employers",
+    icon: MdBusiness,
+  },
+  {
     path: "/admin/jobs",
     label: "Jobs",
     icon: MdWork,
@@ -47,6 +55,11 @@ const navItems: NavItem[] = [
     path: "/admin/analytics",
     label: "Analytics",
     icon: MdAnalytics,
+  },
+  {
+    path: "/admin/newsletter",
+    label: "Newsletter",
+    icon: MdEmail,
   },
   {
     path: "/admin/create-admin",
@@ -64,7 +77,7 @@ export default function AdminLayout() {
   const handleLogout = async () => {
     try {
       await logout();
-      navigate("/auth/login");
+      navigate("/login");
     } catch (error) {
       console.error("Failed to logout:", error);
     }
@@ -76,6 +89,7 @@ export default function AdminLayout() {
 
   return (
     <div className="min-h-screen bg-background flex">
+      <ScrollToTop />
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div

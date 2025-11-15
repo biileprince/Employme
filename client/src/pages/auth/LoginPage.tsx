@@ -1,59 +1,116 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { LoginForm } from '../../components/auth/LoginForm';
-import { EmailVerification } from '../../components/auth/EmailVerification';
-import { useAuth } from '../../contexts/AuthContext';
-import ladyWithLaptop from '../../assets/images/Ladywithlaptop.jpg';
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation, Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import { LoginForm } from "../../components/auth/LoginForm";
+import { EmailVerification } from "../../components/auth/EmailVerification";
+import { ForgotPassword } from "../../components/auth/ForgotPassword";
+import { ResetPassword } from "../../components/auth/ResetPassword";
+import { useAuth } from "../../contexts/AuthContext";
+import ladyWithLaptop from "../../assets/images/Ladywithlaptop.jpg";
 
-type LoginStep = 'login' | 'verify-email';
+type LoginStep =
+  | "login"
+  | "verify-email"
+  | "forgot-password"
+  | "reset-password";
 
 export default function LoginPage() {
-  const [currentStep, setCurrentStep] = useState<LoginStep>('login');
-  const [pendingEmail, setPendingEmail] = useState<string>('');
+  const [currentStep, setCurrentStep] = useState<LoginStep>("login");
+  const [pendingEmail, setPendingEmail] = useState<string>("");
+  const [resetEmail, setResetEmail] = useState<string>("");
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Handle OAuth errors from URL parameters
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const error = urlParams.get("error");
+    const message = urlParams.get("message");
+
+    if (error) {
+      console.error("OAuth error:", error, message);
+
+      let errorMessage = "Authentication failed. Please try again.";
+
+      if (error === "oauth_error" || error === "oauth_failed") {
+        if (message) {
+          errorMessage = decodeURIComponent(message);
+        }
+        // Clear session and retry
+        fetch(`${import.meta.env.VITE_API_URL}/auth/clear-session`, {
+          method: "POST",
+        })
+          .then(() => {
+            console.log("Session cleared after OAuth error");
+          })
+          .catch(console.error);
+      }
+
+      // Show error to user (you might want to add a toast notification here)
+      alert(`Social login failed: ${errorMessage}`);
+
+      // Clean up URL
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, [location.search]);
 
   // Redirect authenticated users based on role and profile status
   useEffect(() => {
     if (user) {
       if (user.hasProfile) {
-        if (user.role === 'EMPLOYER') {
-          navigate('/employer/dashboard');
+        if (user.role === "EMPLOYER") {
+          navigate("/employer/dashboard");
         } else {
-          navigate('/dashboard');
+          navigate("/dashboard");
         }
       } else {
-        navigate('/onboarding');
+        navigate("/onboarding");
       }
     }
   }, [user, navigate]);
 
   const handleVerificationRequired = (email: string) => {
     setPendingEmail(email);
-    setCurrentStep('verify-email');
+    setCurrentStep("verify-email");
   };
 
   const handleSwitchToForgotPassword = () => {
-    // TODO: Implement forgot password flow
-    console.log('Forgot password clicked');
+    setCurrentStep("forgot-password");
+  };
+
+  const handleSwitchToReset = (email: string) => {
+    setResetEmail(email);
+    setCurrentStep("reset-password");
+  };
+
+  const handleBackToLogin = () => {
+    setCurrentStep("login");
+    setPendingEmail("");
+    setResetEmail("");
   };
 
   const handleVerificationSuccess = () => {
-    setCurrentStep('login');
+    setCurrentStep("login");
+  };
+
+  const handleResetSuccess = () => {
+    setCurrentStep("login");
+    setResetEmail("");
   };
 
   const renderStep = () => {
     switch (currentStep) {
-      case 'login':
+      case "login":
         return (
           <div className="min-h-screen flex">
             {/* Left side - Image */}
             <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-primary-600/90 to-primary-800/90 z-10" />
-              <img 
-                src={ladyWithLaptop} 
-                alt="Professional woman with laptop" 
+              <img
+                src={ladyWithLaptop}
+                alt="Professional woman with laptop"
                 className="absolute inset-0 w-full h-full object-cover"
               />
               <div className="relative z-20 flex flex-col justify-center px-12 text-white">
@@ -62,9 +119,12 @@ export default function LoginPage() {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.8 }}
                 >
-                  <h1 className="text-4xl font-bold mb-6">Welcome back to Employ.me</h1>
+                  <h1 className="text-4xl font-bold mb-6">
+                    Welcome back to Employ.me
+                  </h1>
                   <p className="text-xl text-primary-100 mb-8">
-                    Continue your journey to find the perfect job or hire the best talent in Ghana.
+                    Continue your journey to find the perfect job or hire the
+                    best talent in Ghana.
                   </p>
                   <div className="space-y-4 text-primary-100">
                     <div className="flex items-center">
@@ -106,16 +166,16 @@ export default function LoginPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6, delay: 0.1 }}
                   className="bg-card rounded-2xl shadow-xl border border-border p-8"
-                  style={{ boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)' }}
+                  style={{ boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.15)" }}
                 >
-                  <LoginForm 
+                  <LoginForm
                     onSwitchToForgotPassword={handleSwitchToForgotPassword}
                     onVerificationRequired={handleVerificationRequired}
                   />
-                  
+
                   <div className="mt-6 text-center">
                     <p className="text-sm text-muted-foreground">
-                      Don't have an account?{' '}
+                      Don't have an account?{" "}
                       <Link
                         to="/signup"
                         className="font-medium text-primary hover:text-primary/80 transition-colors"
@@ -130,7 +190,7 @@ export default function LoginPage() {
           </div>
         );
 
-      case 'verify-email':
+      case "verify-email":
         return (
           <div className="min-h-screen flex items-center justify-center bg-background px-4">
             <div className="max-w-md w-full">
@@ -143,7 +203,46 @@ export default function LoginPage() {
                 <EmailVerification
                   email={pendingEmail}
                   onVerificationSuccess={handleVerificationSuccess}
-                  onSwitchToLogin={() => setCurrentStep('login')}
+                  onSwitchToLogin={() => setCurrentStep("login")}
+                />
+              </motion.div>
+            </div>
+          </div>
+        );
+
+      case "forgot-password":
+        return (
+          <div className="min-h-screen flex items-center justify-center bg-background px-4">
+            <div className="max-w-md w-full">
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6 }}
+                className="bg-card rounded-2xl shadow-xl border border-border p-8"
+              >
+                <ForgotPassword
+                  onBackToLogin={handleBackToLogin}
+                  onSwitchToReset={handleSwitchToReset}
+                />
+              </motion.div>
+            </div>
+          </div>
+        );
+
+      case "reset-password":
+        return (
+          <div className="min-h-screen flex items-center justify-center bg-background px-4">
+            <div className="max-w-md w-full">
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6 }}
+                className="bg-card rounded-2xl shadow-xl border border-border p-8"
+              >
+                <ResetPassword
+                  email={resetEmail}
+                  onBackToLogin={handleBackToLogin}
+                  onResetSuccess={handleResetSuccess}
                 />
               </motion.div>
             </div>

@@ -20,11 +20,15 @@ import savedJobsRoutes from "./routes/savedJobsRoutes.js";
 import attachmentRoutes from "./routes/attachmentRoutes.js";
 import interviewRoutes from "./routes/interviewRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
+import newsletterRoutes from "./routes/newsletterRoutes.js";
 
 // Import middleware
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
 import { authMiddleware } from "./middleware/auth.js";
 import passport from "./middleware/passport.js";
+
+// Import email service
+import { testEmailConnection } from "./services/emailService.js";
 
 // Load environment variables
 dotenv.config();
@@ -96,23 +100,7 @@ app.use(
   })
 );
 
-// Session middleware for Passport
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "your-secret-key",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === "production",
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    },
-  })
-);
-
-// Initialize Passport middleware
-app.use(passport.initialize());
-app.use(passport.session());
+app.use(cookieParser());
 
 // Session middleware (required for Passport)
 app.use(
@@ -123,6 +111,7 @@ app.use(
     saveUninitialized: false,
     cookie: {
       secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
     },
   })
@@ -131,7 +120,6 @@ app.use(
 // Initialize Passport
 app.use(passport.initialize());
 app.use(passport.session());
-app.use(cookieParser());
 
 // Health check endpoint
 app.get("/health", (req, res) => {
@@ -168,6 +156,9 @@ app.get("/uploads/:filename", (req, res) => {
 
 // Authentication routes (public)
 app.use("/api/auth", authRoutes);
+
+// Newsletter routes (public subscription, protected admin)
+app.use("/api/newsletter", newsletterRoutes);
 
 // Some job routes should be public for browsing
 app.use("/api/jobs", jobRoutes);
@@ -206,10 +197,21 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5001;
 
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, async () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🌐 Environment: ${process.env.NODE_ENV || "development"}`);
+
+  // Test email connection on startup
+  console.log(`📧 Testing email connection...`);
+  const emailWorking = await testEmailConnection();
+  if (emailWorking) {
+    console.log(`✅ Email service is ready`);
+  } else {
+    console.log(
+      `⚠️  Email service connection failed - check your configuration`
+    );
+  }
 });
 
 export default app;

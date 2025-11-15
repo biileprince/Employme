@@ -1,6 +1,5 @@
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
-import { Strategy as LinkedInStrategy } from "passport-linkedin-oauth2";
 import { Strategy as FacebookStrategy } from "passport-facebook";
 import { PrismaClient } from "@prisma/client";
 
@@ -45,10 +44,18 @@ passport.use(
       clientID: process.env.GOOGLE_CLIENT_ID || "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
       callbackURL:
-        process.env.GOOGLE_CALLBACK_URL || "/api/auth/google/callback",
+        process.env.GOOGLE_CALLBACK_URL ||
+        `http://localhost:${process.env.PORT || 5001}/api/auth/google/callback`,
+      passReqToCallback: true,
     },
-    async (accessToken, refreshToken, profile, done) => {
+    async (req, accessToken, refreshToken, profile, done) => {
       try {
+        console.log("Google OAuth callback received:", {
+          profileId: profile.id,
+          email: profile.emails?.[0]?.value,
+          displayName: profile.displayName,
+        });
+
         // Check if user already exists with this Google ID
         let user = await prisma.user.findFirst({
           where: {
@@ -114,6 +121,11 @@ passport.use(
 
         // Create new user with social account
         if (email) {
+          // Get role from session or default to JOB_SEEKER
+          const userRole =
+            (req.session as any)?.pendingOAuthRole || "JOB_SEEKER";
+          console.log("Creating Google user with role:", userRole);
+
           user = await prisma.user.create({
             data: {
               email,
@@ -122,7 +134,7 @@ passport.use(
               imageUrl: profile.photos?.[0]?.value || null,
               password: "", // No password for social login
               isVerified: true, // Social accounts are pre-verified
-              role: "JOB_SEEKER", // Default role
+              role: userRole,
               socialAccounts: {
                 create: {
                   provider: "google",
@@ -146,124 +158,14 @@ passport.use(
 
         return done(new Error("No email provided by Google"), false);
       } catch (error) {
-        console.error("Google OAuth error:", error);
-        return done(error, false);
-      }
-    }
-  )
-);
-
-// LinkedIn OAuth Strategy
-passport.use(
-  new LinkedInStrategy(
-    {
-      clientID: process.env.LINKEDIN_CLIENT_ID || "",
-      clientSecret: process.env.LINKEDIN_CLIENT_SECRET || "",
-      callbackURL:
-        process.env.LINKEDIN_CALLBACK_URL || "/api/auth/linkedin/callback",
-      scope: ["r_emailaddress", "r_liteprofile"],
-    },
-    async (accessToken, refreshToken, profile, done) => {
-      try {
-        // Check if user already exists with this LinkedIn ID
-        let user = await prisma.user.findFirst({
-          where: {
-            socialAccounts: {
-              some: {
-                provider: "linkedin",
-                providerId: profile.id,
-              },
-            },
-          },
-          include: {
-            socialAccounts: true,
-            jobSeeker: true,
-            employer: true,
-            admin: true,
-          },
+        console.error("Google OAuth error:", {
+          error: error,
+          message: (error as Error).message,
+          stack: (error as Error).stack,
+          profileId: profile?.id,
+          profileEmail: profile?.emails?.[0]?.value,
         });
-
-        if (user) {
-          return done(null, user);
-        }
-
-        // Check if user exists with the same email
-        const email = profile.emails?.[0]?.value;
-        if (email) {
-          user = await prisma.user.findUnique({
-            where: { email },
-            include: {
-              socialAccounts: true,
-              jobSeeker: true,
-              employer: true,
-              admin: true,
-            },
-          });
-
-          if (user) {
-            // Link the social account to existing user
-            await prisma.socialAccount.create({
-              data: {
-                userId: user.id,
-                provider: "linkedin",
-                providerId: profile.id,
-                email: email,
-                displayName: profile.displayName,
-                photos: profile.photos?.[0]?.value || null,
-              },
-            });
-
-            // Refresh user data
-            user = await prisma.user.findUnique({
-              where: { id: user.id },
-              include: {
-                socialAccounts: true,
-                jobSeeker: true,
-                employer: true,
-                admin: true,
-              },
-            });
-
-            return done(null, user);
-          }
-        }
-
-        // Create new user with social account
-        if (email) {
-          user = await prisma.user.create({
-            data: {
-              email,
-              firstName: profile.name?.givenName || "",
-              lastName: profile.name?.familyName || "",
-              imageUrl: profile.photos?.[0]?.value || null,
-              password: "", // No password for social login
-              isVerified: true, // Social accounts are pre-verified
-              role: "JOB_SEEKER", // Default role
-              socialAccounts: {
-                create: {
-                  provider: "linkedin",
-                  providerId: profile.id,
-                  email: email,
-                  displayName: profile.displayName,
-                  photos: profile.photos?.[0]?.value || null,
-                },
-              },
-            },
-            include: {
-              socialAccounts: true,
-              jobSeeker: true,
-              employer: true,
-              admin: true,
-            },
-          });
-
-          return done(null, user);
-        }
-
-        return done(new Error("No email provided by LinkedIn"), null);
-      } catch (error) {
-        console.error("LinkedIn OAuth error:", error);
-        return done(error, null);
+        return done(error, false);
       }
     }
   )
@@ -276,11 +178,21 @@ passport.use(
       clientID: process.env.FACEBOOK_APP_ID || "",
       clientSecret: process.env.FACEBOOK_APP_SECRET || "",
       callbackURL:
-        process.env.FACEBOOK_CALLBACK_URL || "/api/auth/facebook/callback",
+        process.env.FACEBOOK_CALLBACK_URL ||
+        `http://localhost:${
+          process.env.PORT || 5001
+        }/api/auth/facebook/callback`,
       profileFields: ["id", "emails", "name", "picture.type(large)"],
+      passReqToCallback: true,
     },
-    async (accessToken, refreshToken, profile, done) => {
+    async (req, accessToken, refreshToken, profile, done) => {
       try {
+        console.log("Facebook OAuth callback received:", {
+          profileId: profile.id,
+          email: profile.emails?.[0]?.value,
+          displayName: profile.displayName,
+        });
+
         // Check if user already exists with this Facebook ID
         let user = await prisma.user.findFirst({
           where: {
@@ -346,6 +258,11 @@ passport.use(
 
         // Create new user with social account
         if (email) {
+          // Get role from session or default to JOB_SEEKER
+          const userRole =
+            (req.session as any)?.pendingOAuthRole || "JOB_SEEKER";
+          console.log("Creating Facebook user with role:", userRole);
+
           user = await prisma.user.create({
             data: {
               email,
@@ -354,7 +271,7 @@ passport.use(
               imageUrl: profile.photos?.[0]?.value || null,
               password: "", // No password for social login
               isVerified: true, // Social accounts are pre-verified
-              role: "JOB_SEEKER", // Default role
+              role: userRole,
               socialAccounts: {
                 create: {
                   provider: "facebook",
@@ -378,7 +295,13 @@ passport.use(
 
         return done(new Error("No email provided by Facebook"), null);
       } catch (error) {
-        console.error("Facebook OAuth error:", error);
+        console.error("Facebook OAuth error:", {
+          error: error,
+          message: (error as Error).message,
+          stack: (error as Error).stack,
+          profileId: profile?.id,
+          profileEmail: profile?.emails?.[0]?.value,
+        });
         return done(error, null);
       }
     }

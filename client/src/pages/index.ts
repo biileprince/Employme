@@ -1,15 +1,16 @@
 // Authentication pages
-export * from './auth';
+export * from "./auth";
 
-// Employer pages  
-export * from './employer';
+// Employer pages
+export * from "./employer";
 
 // Job seeker pages
-export * from './job-seeker';
+export * from "./job-seeker";
 
 // Job pages
-export * from './jobs';
+export * from "./jobs";
 
 // Common pages
-export { default as HomePage } from './HomePage';
-export { default as ErrorPage } from './ErrorPage';
+export { default as HomePage } from "./HomePage";
+export { default as ErrorPage } from "./ErrorPage";
+export { default as AboutPage } from "./AboutPage";

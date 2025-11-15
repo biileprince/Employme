@@ -140,6 +140,90 @@ export const getCandidates = catchAsync(
   }
 );
 
+// Get candidates who have applied to employer's jobs
+export const getEmployerCandidates = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw new AppError("User not authenticated", 401);
+    }
+
+    // Get employer profile
+    const employer = await prisma.employer.findUnique({
+      where: { userId: req.user.id },
+    });
+
+    if (!employer) {
+      throw new AppError("Employer profile not found", 404);
+    }
+
+    // Get unique candidates who have applied to employer's jobs
+    const candidates = await prisma.user.findMany({
+      where: {
+        role: "JOB_SEEKER",
+        isActive: true,
+        jobSeeker: {
+          applications: {
+            some: {
+              job: {
+                employerId: employer.id,
+              },
+            },
+          },
+        },
+      },
+      include: {
+        jobSeeker: {
+          include: {
+            applications: {
+              where: {
+                job: {
+                  employerId: employer.id,
+                },
+              },
+              include: {
+                job: {
+                  select: {
+                    title: true,
+                  },
+                },
+                attachments: {
+                  select: {
+                    filename: true,
+                    url: true,
+                    id: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Transform the data to include application history and CV info
+    const transformedCandidates = candidates.map((user) => ({
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      imageUrl: user.imageUrl,
+      profile: {
+        ...user.jobSeeker,
+        applications: user.jobSeeker?.applications || [],
+        cvs:
+          user.jobSeeker?.applications?.flatMap(
+            (app: any) => app.attachments
+          ) || [],
+      },
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: transformedCandidates,
+    });
+  }
+);
+
 // Update user profile
 export const updateProfile = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
@@ -395,6 +479,7 @@ export const updateJobSeekerProfile = catchAsync(
       profileImageUrl,
       phone,
       countryCode,
+      isProfilePublic,
     } = req.body;
 
     // Update User table if firstName or lastName changed
@@ -437,6 +522,10 @@ export const updateJobSeekerProfile = catchAsync(
         phone: phone !== undefined ? phone : profile.phone,
         countryCode:
           countryCode !== undefined ? countryCode : profile.countryCode,
+        isProfilePublic:
+          isProfilePublic !== undefined
+            ? isProfilePublic
+            : profile.isProfilePublic,
       },
     });
 

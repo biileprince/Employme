@@ -5,3 +5,5 @@ export { default as AdminJobs } from "./AdminJobs";
 export { default as AdminApplications } from "./AdminApplications";
 export { default as AdminAnalytics } from "./AdminAnalytics";
 export { default as CreateAdmin } from "./CreateAdmin";
+export { default as AdminNewsletter } from "./AdminNewsletter";
+export { default as AdminEmployers } from "./AdminEmployers";

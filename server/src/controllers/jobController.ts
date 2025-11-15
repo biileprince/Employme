@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { body } from "express-validator";
 import { catchAsync, AppError } from "../middleware/errorHandler.js";
 import { handleValidationErrors } from "../middleware/validation.js";
+import { sendNewJobNotificationToAdmin } from "../services/emailService.js";
 
 const prisma = new PrismaClient();
 
@@ -47,6 +48,7 @@ export const getJobs = catchAsync(
     // Build filter conditions
     const where: any = {
       isActive: true,
+      isApproved: true, // Only show approved jobs
     };
 
     if (category) {
@@ -437,6 +439,35 @@ export const createJob = [
           jobId: job.id,
         },
       });
+    }
+
+    // Send admin notification about new job posting
+    try {
+      const employerUser = await prisma.user.findUnique({
+        where: { id: req.user.id },
+        select: {
+          firstName: true,
+          lastName: true,
+          email: true,
+        },
+      });
+
+      if (employerUser) {
+        const employerName =
+          `${employerUser.firstName || ""} ${
+            employerUser.lastName || ""
+          }`.trim() || employerUser.email;
+
+        await sendNewJobNotificationToAdmin(
+          job.title,
+          employer.companyName,
+          employerName,
+          employerUser.email
+        );
+      }
+    } catch (error) {
+      console.error("Failed to send job posting notification to admin:", error);
+      // Don't fail the job creation if admin notification fails
     }
 
     res.status(201).json({

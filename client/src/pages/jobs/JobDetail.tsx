@@ -234,6 +234,38 @@ const JobDetail = () => {
     setShowApplicationModal(true);
   };
 
+  // Handle job share
+  const handleShareJob = async () => {
+    const jobUrl = `${window.location.origin}/jobs/${job.id}`;
+    const companyName = getCompanyName(job);
+    const shareText = `Check out this job opportunity: ${job.title} at ${companyName}`;
+
+    try {
+      // Use Web Share API if available (mobile devices)
+      if (navigator.share) {
+        await navigator.share({
+          title: `${job.title} - ${companyName}`,
+          text: shareText,
+          url: jobUrl,
+        });
+      } else {
+        // Fallback: Copy to clipboard
+        await navigator.clipboard.writeText(`${shareText}\n${jobUrl}`);
+        alert("Job link copied to clipboard!");
+      }
+    } catch (error) {
+      console.error("Failed to share:", error);
+      // Final fallback: Copy to clipboard manually
+      try {
+        await navigator.clipboard.writeText(`${shareText}\n${jobUrl}`);
+        alert("Job link copied to clipboard!");
+      } catch (clipboardError) {
+        console.error("Failed to copy to clipboard:", clipboardError);
+        alert(`Share this job: ${jobUrl}`);
+      }
+    }
+  };
+
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files) return;
@@ -519,7 +551,11 @@ const JobDetail = () => {
                     </button>
                   )}
 
-                  <button className="flex items-center justify-center gap-1.5 px-3 md:px-4 py-2 rounded-lg border border-border dark:border-gray-700 bg-background dark:bg-gray-800 text-muted-foreground dark:text-gray-400 hover:text-foreground dark:hover:text-white transition-colors text-sm font-medium whitespace-nowrap">
+                  <button
+                    onClick={handleShareJob}
+                    className="flex items-center justify-center gap-1.5 px-3 md:px-4 py-2 rounded-lg border border-border dark:border-gray-700 bg-background dark:bg-gray-800 text-muted-foreground dark:text-gray-400 hover:text-foreground dark:hover:text-white transition-colors text-sm font-medium whitespace-nowrap"
+                    title="Share this job"
+                  >
                     <HiShare className="w-4 h-4" />
                     <span className="hidden sm:inline">Share</span>
                   </button>

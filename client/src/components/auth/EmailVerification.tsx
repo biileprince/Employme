@@ -109,8 +109,11 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
         <button
           type="submit"
           disabled={isLoading || code.length !== 6}
-          className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white py-2 px-4 rounded-md transition-colors"
+          className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white py-2 px-4 rounded-md transition-colors flex items-center justify-center gap-2"
         >
+          {isLoading && (
+            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          )}
           {isLoading ? "Verifying..." : "Verify Email"}
         </button>
       </form>
@@ -122,8 +125,11 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
         <button
           onClick={handleResendCode}
           disabled={isResending}
-          className="text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 disabled:text-blue-400"
+          className="text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 disabled:text-blue-400 disabled:cursor-not-allowed flex items-center justify-center gap-1"
         >
+          {isResending && (
+            <div className="w-3 h-3 border border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          )}
           {isResending ? "Sending..." : "Resend code"}
         </button>
       </div>

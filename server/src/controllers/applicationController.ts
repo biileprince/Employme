@@ -3,6 +3,11 @@ import { PrismaClient } from "@prisma/client";
 import { body } from "express-validator";
 import { catchAsync, AppError } from "../middleware/errorHandler.js";
 import { handleValidationErrors } from "../middleware/validation.js";
+import {
+  sendJobApplicationNotification,
+  sendInterviewScheduleNotification,
+  sendApplicationStatusUpdateNotification,
+} from "../services/emailService.js";
 
 const prisma = new PrismaClient();
 
@@ -119,6 +124,28 @@ export const applyForJob = [
         },
       });
     });
+
+    // Send email notification to employer
+    try {
+      if (job.employer?.user?.email && application?.jobSeeker) {
+        const employerName = job.employer.user.firstName || "Employer";
+        const applicantName =
+          `${application.jobSeeker.firstName || ""} ${
+            application.jobSeeker.lastName || ""
+          }`.trim() || "Job Seeker";
+
+        await sendJobApplicationNotification(
+          job.employer.user.email,
+          employerName,
+          job.title,
+          applicantName,
+          job.employer.companyName
+        );
+      }
+    } catch (error) {
+      console.error("Failed to send job application notification:", error);
+      // Don't fail the application if email sending fails
+    }
 
     res.status(201).json({
       success: true,
@@ -496,6 +523,16 @@ export const updateApplicationStatus = [
           select: {
             employerId: true,
             title: true,
+            employer: {
+              select: {
+                companyName: true,
+                user: {
+                  select: {
+                    email: true,
+                  },
+                },
+              },
+            },
           },
         },
         jobSeeker: {
@@ -515,6 +552,9 @@ export const updateApplicationStatus = [
     if (!application) {
       throw new AppError("Application not found", 404);
     }
+
+    // Store the previous status for email notification
+    const previousStatus = application.status;
 
     // Update application status
     const updatedApplication = await prisma.application.update({
@@ -539,6 +579,36 @@ export const updateApplicationStatus = [
         },
       },
     });
+
+    // Send email notification to job seeker about status change
+    try {
+      if (
+        application.jobSeeker?.user?.email &&
+        application.job.employer?.user?.email &&
+        status !== previousStatus
+      ) {
+        const jobSeekerName =
+          `${application.jobSeeker.firstName || ""} ${
+            application.jobSeeker.lastName || ""
+          }`.trim() || "Job Seeker";
+
+        await sendApplicationStatusUpdateNotification(
+          application.jobSeeker.user.email,
+          jobSeekerName,
+          application.job.title,
+          application.job.employer.companyName,
+          application.job.employer.user.email,
+          status,
+          previousStatus
+        );
+      }
+    } catch (error) {
+      console.error(
+        "Failed to send application status update notification:",
+        error
+      );
+      // Don't fail the status update if email sending fails
+    }
 
     res.status(200).json({
       success: true,
@@ -650,14 +720,15 @@ export const scheduleInterview = [
       },
       include: {
         job: {
-          select: {
-            id: true,
-            title: true,
-          },
           include: {
             employer: {
               select: {
                 companyName: true,
+                user: {
+                  select: {
+                    email: true,
+                  },
+                },
               },
             },
           },
@@ -699,13 +770,38 @@ export const scheduleInterview = [
       data: { status: "SHORTLISTED" },
     });
 
-    // TODO: Send email notification to job seeker
-    // This would integrate with the existing email service
+    // Send email notification to job seeker
+    try {
+      if (application.jobSeeker.user) {
+        const jobSeekerName =
+          `${application.jobSeeker.user.firstName || ""} ${
+            application.jobSeeker.user.lastName || ""
+          }`.trim() || "Job Seeker";
+
+        await sendInterviewScheduleNotification(
+          application.jobSeeker.user.email,
+          jobSeekerName,
+          application.job.title,
+          application.job.employer.companyName,
+          application.job.employer.user.email,
+          scheduledDate,
+          scheduledTime,
+          description || `Interview for ${application.job.title}`,
+          location || (isVirtual ? "Virtual Meeting" : ""),
+          isVirtual ?? true,
+          meetingLink
+        );
+      }
+    } catch (error) {
+      console.error("Failed to send interview schedule notification:", error);
+      // Don't fail the interview scheduling if email sending fails
+    }
 
     res.status(201).json({
       success: true,
       data: { interview },
-      message: "Interview scheduled successfully",
+      message:
+        "Interview scheduled successfully. The candidate has been notified via email.",
     });
   }),
 ];

@@ -39,6 +39,7 @@ interface Job {
   category?: string;
   isActive: boolean;
   isFeatured: boolean;
+  isApproved: boolean;
   createdAt: string;
   updatedAt: string;
   employer: {
@@ -46,6 +47,7 @@ interface Job {
     companyName?: string;
     countryCode?: string;
     phone?: string;
+    isVerified?: boolean;
     user: {
       firstName: string;
       lastName: string;
@@ -76,6 +78,9 @@ export default function AdminJobs() {
   const [statusFilter, setStatusFilter] = useState<
     "all" | "active" | "inactive"
   >("all");
+  const [approvalFilter, setApprovalFilter] = useState<
+    "all" | "approved" | "pending"
+  >("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalJobs, setTotalJobs] = useState(0);
@@ -96,6 +101,13 @@ export default function AdminJobs() {
 
       if (searchTerm) {
         params.append("search", searchTerm);
+      }
+
+      if (approvalFilter !== "all") {
+        params.append(
+          "isApproved",
+          approvalFilter === "approved" ? "true" : "false"
+        );
       }
 
       if (statusFilter !== "all") {
@@ -130,9 +142,9 @@ export default function AdminJobs() {
     // Confirmation prompts for job actions
     const actionMessages = {
       activate:
-        "Are you sure you want to activate this job? It will become visible to job seekers.",
+        "Are you sure you want to activate this job? It will become visible to job seekers and the employer will receive an email notification.",
       deactivate:
-        "Are you sure you want to deactivate this job? It will be hidden from job seekers.",
+        "Are you sure you want to deactivate this job? It will be hidden from job seekers and the employer will receive an email notification.",
       feature:
         "Are you sure you want to feature this job? It will be highlighted on the platform.",
       unfeature:
@@ -493,6 +505,20 @@ export default function AdminJobs() {
                 <option value="inactive">Inactive</option>
               </select>
 
+              <select
+                value={approvalFilter}
+                onChange={(e) =>
+                  setApprovalFilter(
+                    e.target.value as "all" | "approved" | "pending"
+                  )
+                }
+                className="px-4 py-3 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all min-w-0 sm:min-w-[140px]"
+              >
+                <option value="all">All Approvals</option>
+                <option value="approved">Approved</option>
+                <option value="pending">Pending Approval</option>
+              </select>
+
               <div className="flex gap-2">
                 <Button
                   onClick={handleSearch}
@@ -662,20 +688,61 @@ export default function AdminJobs() {
                             <span className="text-xs text-muted-foreground">
                               {job.isActive ? "Active" : "Inactive"}
                             </span>
+                            {job.isApproved ? (
+                              <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">
+                                Approved
+                              </span>
+                            ) : (
+                              <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">
+                                Pending
+                              </span>
+                            )}
                           </div>
                         </div>
 
                         {/* Actions */}
                         <div className="col-span-3">
-                          <div className="flex items-center justify-end gap-1">
+                          <div className="flex items-center justify-end gap-1 flex-wrap">
                             <Button
                               onClick={() => handleViewJob(job)}
                               variant="outline"
                               size="sm"
                               disabled={actionLoading !== null}
+                              title="View Details"
                             >
                               <MdVisibility className="w-4 h-4" />
                             </Button>
+
+                            {!job.isApproved && (
+                              <>
+                                <Button
+                                  onClick={() =>
+                                    handleJobAction(job.id, "approve")
+                                  }
+                                  variant="outline"
+                                  size="sm"
+                                  isLoading={actionLoading === job.id}
+                                  disabled={actionLoading !== null}
+                                  className="text-green-600 hover:bg-green-50 border-green-300"
+                                  title="Approve Job"
+                                >
+                                  <MdCheckCircle className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  onClick={() =>
+                                    handleJobAction(job.id, "reject")
+                                  }
+                                  variant="outline"
+                                  size="sm"
+                                  isLoading={actionLoading === job.id}
+                                  disabled={actionLoading !== null}
+                                  className="text-red-600 hover:bg-red-50 border-red-300"
+                                  title="Reject Job"
+                                >
+                                  <MdCancel className="w-4 h-4" />
+                                </Button>
+                              </>
+                            )}
 
                             <Button
                               onClick={() =>
@@ -688,6 +755,9 @@ export default function AdminJobs() {
                               size="sm"
                               isLoading={actionLoading === job.id}
                               disabled={actionLoading !== null}
+                              title={
+                                job.isActive ? "Deactivate Job" : "Activate Job"
+                              }
                             >
                               {job.isActive ? "Deactivate" : "Activate"}
                             </Button>
@@ -826,7 +896,7 @@ export default function AdminJobs() {
 
                     {/* Job Meta - Mobile */}
                     <div className="flex items-center justify-between mb-3 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="px-2 py-1 rounded-full bg-primary/10 text-primary">
                           {formatJobType(job.type)}
                         </span>
@@ -835,6 +905,15 @@ export default function AdminJobs() {
                             ? job.category.replace("_", " ")
                             : "Uncategorized"}
                         </span>
+                        {job.isApproved ? (
+                          <span className="px-2 py-1 rounded-full bg-green-100 text-green-800">
+                            Approved
+                          </span>
+                        ) : (
+                          <span className="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">
+                            Pending
+                          </span>
+                        )}
                       </div>
                       <span>Posted: {formatDate(job.createdAt)}</span>
                     </div>
@@ -851,6 +930,31 @@ export default function AdminJobs() {
                         <MdVisibility className="w-4 h-4" />
                         <span className="truncate">View</span>
                       </Button>
+
+                      {!job.isApproved && (
+                        <>
+                          <Button
+                            onClick={() => handleJobAction(job.id, "approve")}
+                            variant="outline"
+                            size="sm"
+                            isLoading={actionLoading === job.id}
+                            disabled={actionLoading !== null}
+                            className="flex-1 min-w-0 px-3 py-2 text-xs text-green-600 border-green-300"
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            onClick={() => handleJobAction(job.id, "reject")}
+                            variant="outline"
+                            size="sm"
+                            isLoading={actionLoading === job.id}
+                            disabled={actionLoading !== null}
+                            className="flex-1 min-w-0 px-3 py-2 text-xs text-red-600 border-red-300"
+                          >
+                            Reject
+                          </Button>
+                        </>
+                      )}
 
                       <Button
                         onClick={() =>
@@ -1032,6 +1136,26 @@ export default function AdminJobs() {
                           ? selectedJob.category.replace("_", " ")
                           : "Uncategorized"}
                       </p>
+                    </div>
+
+                    <div>
+                      <label className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <MdCheckCircle className="w-4 h-4 flex-shrink-0" />
+                        Approval Status
+                      </label>
+                      <div className="mt-1">
+                        {selectedJob.isApproved ? (
+                          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-100 text-green-800 text-sm font-semibold">
+                            <MdCheckCircle className="w-4 h-4" />
+                            Approved
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-100 text-yellow-800 text-sm font-semibold">
+                            <MdCancel className="w-4 h-4" />
+                            Pending Approval
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div>

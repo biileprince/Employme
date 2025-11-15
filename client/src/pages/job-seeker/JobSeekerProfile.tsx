@@ -818,39 +818,66 @@ export default function JobSeekerProfile() {
           className="bg-card text-card-foreground p-6 rounded-xl border border-border"
         >
           <h2 className="text-xl font-semibold mb-6">Privacy Settings</h2>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
+          <div className="space-y-6">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
                 <label className="text-sm font-medium text-foreground">
                   Public Profile
                 </label>
-                <p className="text-sm text-muted-foreground">
-                  Allow employers to find and view your profile
+                <p className="text-sm text-muted-foreground mt-1">
+                  When enabled, employers can find and view your profile through
+                  candidate searches. This increases your visibility and job
+                  opportunities.
                 </p>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1 mb-1">
+                    <span className="w-1 h-1 bg-muted-foreground rounded-full"></span>
+                    <span>
+                      Visible information: Name, skills, experience, bio
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 mb-1">
+                    <span className="w-1 h-1 bg-muted-foreground rounded-full"></span>
+                    <span>
+                      Contact details are only shared after you apply to jobs
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="w-1 h-1 bg-muted-foreground rounded-full"></span>
+                    <span>You can change this setting anytime</span>
+                  </div>
+                </div>
               </div>
-              {isEditing ? (
-                <input
-                  type="checkbox"
-                  checked={formData.isProfilePublic}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      isProfilePublic: e.target.checked,
-                    })
-                  }
-                  className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
-                />
-              ) : (
-                <span
-                  className={`px-2 py-1 rounded text-xs ${
-                    userData?.profile?.isProfilePublic
-                      ? "bg-secondary/10 text-secondary"
-                      : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {userData?.profile?.isProfilePublic ? "Public" : "Private"}
-                </span>
-              )}
+              <div className="ml-4 flex-shrink-0">
+                {isEditing ? (
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.isProfilePublic}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          isProfilePublic: e.target.checked,
+                        })
+                      }
+                      className="sr-only peer"
+                    />
+                    <div className="relative w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                  </label>
+                ) : (
+                  <span
+                    className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                      userData?.profile?.isProfilePublic
+                        ? "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400 border border-green-200 dark:border-green-800"
+                        : "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-400 border border-gray-200 dark:border-gray-600"
+                    }`}
+                  >
+                    {userData?.profile?.isProfilePublic
+                      ? "✓ Public"
+                      : "🔒 Private"}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </motion.div>

@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 import type { ReactNode } from "react";
 import { apiClient } from "../services/api";
 
@@ -56,34 +62,54 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
   // API call helper
-  const apiCall = async (endpoint: string, options: RequestInit = {}) => {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      credentials: "include", // Include cookies for JWT
-      headers: {
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
-      ...options,
-    });
+  const apiCall = useCallback(
+    async (endpoint: string, options: RequestInit = {}) => {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        credentials: "include", // Include cookies for JWT
+        headers: {
+          "Content-Type": "application/json",
+          ...options.headers,
+        },
+        ...options,
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (!response.ok) {
-      throw new Error(data.message || "An error occurred");
-    }
+      if (!response.ok) {
+        throw new Error(data.message || "An error occurred");
+      }
 
-    return data;
-  };
+      return data;
+    },
+    [API_BASE_URL]
+  );
 
   // Check if user is authenticated on app load
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        // Check for social auth success in URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get("token");
+        const socialAuth = urlParams.get("social");
+
+        if (token && socialAuth) {
+          // Set token and fetch user data
+          apiClient.setToken(token);
+
+          // Clear the URL parameters
+          window.history.replaceState(
+            {},
+            document.title,
+            window.location.pathname
+          );
+        }
+
         const data = await apiCall("/auth/me");
         if (data.success) {
           setUser(data.data.user);
         }
-      } catch (error) {
+      } catch {
         console.log("User not authenticated");
       } finally {
         setIsLoading(false);
@@ -91,7 +117,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     checkAuth();
-  }, []);
+  }, [apiCall]);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
@@ -111,8 +137,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } else {
         throw new Error(data.message || "Login failed");
       }
-    } catch (error) {
-      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -150,7 +174,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(null);
       // Remove the token from the API client
       apiClient.removeToken();
-    } catch (error) {
+    } catch {
       // Still clear user on client side even if server call fails
       setUser(null);
       apiClient.removeToken();
@@ -160,20 +184,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const verifyEmail = async (code: string) => {
-    const data = await apiCall("/auth/verify-email", {
-      method: "POST",
-      body: JSON.stringify({ code }),
-    });
+    setIsLoading(true);
+    try {
+      const data = await apiCall("/auth/verify-email", {
+        method: "POST",
+        body: JSON.stringify({ code }),
+      });
 
-    if (data.success) {
-      // Auto-login user after successful verification
-      setUser(data.data.user);
-      // Set the token in the API client
-      if (data.data.token) {
-        apiClient.setToken(data.data.token);
+      if (data.success) {
+        // Auto-login user after successful verification
+        setUser(data.data.user);
+        // Set the token in the API client
+        if (data.data.token) {
+          apiClient.setToken(data.data.token);
+        }
       }
+      return data;
+    } finally {
+      setIsLoading(false);
     }
-    return data;
   };
 
   const resendVerificationCode = async (email: string) => {

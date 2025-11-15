@@ -11,6 +11,7 @@ import {
   MdAttachMoney,
   MdCheckCircle,
   MdFilterList,
+  MdAttachFile,
 } from "react-icons/md";
 import { userAPI, formatImageUrl } from "../../services/api";
 import { INDUSTRIES } from "../../utils/constants";
@@ -32,6 +33,24 @@ interface Candidate {
     preferredSalary?: string;
     industry?: string;
     phoneCountryCode?: string;
+    applications?: Array<{
+      id: string;
+      status: string;
+      createdAt: string;
+      job: {
+        title: string;
+      };
+      attachments?: Array<{
+        id: string;
+        filename: string;
+        url: string;
+      }>;
+    }>;
+    cvs?: Array<{
+      id: string;
+      filename: string;
+      url: string;
+    }>;
   };
 }
 
@@ -55,11 +74,11 @@ export default function CandidateSearch() {
 
   const fetchCandidates = async () => {
     try {
-      const response = await userAPI.getCandidates();
+      const response = await userAPI.getEmployerCandidates();
       setCandidates(response.data as Candidate[]);
     } catch (err) {
       console.error("Failed to fetch candidates:", err);
-      setError("Failed to fetch candidates");
+      setError("Failed to fetch candidates who applied to your jobs");
     } finally {
       setIsLoading(false);
     }
@@ -140,11 +159,11 @@ export default function CandidateSearch() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2">
-            Find Candidates
+            My Candidates
           </h1>
           <p className="text-muted-foreground">
-            Discover and connect with talented job seekers who match your
-            requirements
+            View and connect with candidates who have applied to your job
+            postings
           </p>
         </div>
 
@@ -410,15 +429,25 @@ export default function CandidateSearch() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-muted-foreground text-sm mb-4">
                       <div className="flex items-center gap-2">
                         <MdEmail className="w-4 h-4" />
-                        <span className="truncate">{candidate.email}</span>
+                        <a
+                          href={`mailto:${candidate.email}`}
+                          className="truncate text-primary hover:text-primary/80 hover:underline transition-colors"
+                        >
+                          {candidate.email}
+                        </a>
                       </div>
                       {candidate.profile?.phone && (
                         <div className="flex items-center gap-2">
                           <MdPhone className="w-4 h-4" />
-                          <span>
+                          <a
+                            href={`tel:${
+                              candidate.profile.phoneCountryCode || ""
+                            }${candidate.profile.phone}`}
+                            className="text-primary hover:text-primary/80 hover:underline transition-colors"
+                          >
                             {candidate.profile.phoneCountryCode || ""}{" "}
                             {candidate.profile.phone}
-                          </span>
+                          </a>
                         </div>
                       )}
                       {candidate.profile?.location && (
@@ -483,6 +512,89 @@ export default function CandidateSearch() {
                             {skill}
                           </span>
                         ))}
+                      </div>
+                    </div>
+                  )}
+
+                {/* CV Files */}
+                {candidate.profile?.cvs && candidate.profile.cvs.length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+                      <MdAttachFile className="w-4 h-4" />
+                      CV Documents
+                    </h4>
+                    <div className="space-y-2">
+                      {candidate.profile.cvs.map((cv, cvIndex) => (
+                        <a
+                          key={cvIndex}
+                          href={formatImageUrl(cv.url)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors text-sm"
+                        >
+                          <MdAttachFile className="w-4 h-4" />
+                          {cv.filename}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Application History */}
+                {candidate.profile?.applications &&
+                  candidate.profile.applications.length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+                        <MdWork className="w-4 h-4" />
+                        Application History (
+                        {candidate.profile.applications.length} applications)
+                      </h4>
+                      <div className="space-y-2">
+                        {candidate.profile.applications
+                          .slice(0, 3)
+                          .map((application, appIndex) => (
+                            <div
+                              key={appIndex}
+                              className="flex items-center justify-between p-3 bg-muted/50 border border-border rounded-lg text-sm"
+                            >
+                              <div className="flex-1">
+                                <p className="font-medium text-foreground">
+                                  {application.job.title}
+                                </p>
+                                <p className="text-muted-foreground text-xs">
+                                  Applied:{" "}
+                                  {application.createdAt
+                                    ? new Date(
+                                        application.createdAt
+                                      ).toLocaleDateString()
+                                    : "Date unavailable"}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                    application.status === "HIRED"
+                                      ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
+                                      : application.status === "SHORTLISTED"
+                                      ? "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
+                                      : application.status === "REVIEWED"
+                                      ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400"
+                                      : application.status === "REJECTED"
+                                      ? "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400"
+                                      : "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400"
+                                  }`}
+                                >
+                                  {application.status}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        {candidate.profile.applications.length > 3 && (
+                          <p className="text-xs text-muted-foreground">
+                            +{candidate.profile.applications.length - 3} more
+                            applications
+                          </p>
+                        )}
                       </div>
                     </div>
                   )}

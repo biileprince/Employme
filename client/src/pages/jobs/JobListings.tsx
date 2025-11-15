@@ -11,6 +11,7 @@ import {
   HiUpload,
   HiDocumentText,
   HiTrash,
+  HiShare,
 } from "react-icons/hi";
 import Button from "../../components/ui/Button";
 import { AuthModal } from "../../components/auth";
@@ -90,6 +91,15 @@ const JobListings = () => {
     experience: "",
     categories: [] as string[],
   });
+
+  // Sort functionality state
+  const [sortBy, setSortBy] = useState("Most Recent");
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalJobs, setTotalJobs] = useState(0);
+  const jobsPerPage = 15;
 
   // Ref to track previous API params to prevent duplicate requests
   const prevParamsRef = useRef<string>("");
@@ -192,7 +202,8 @@ const JobListings = () => {
   // Memoize API parameters to prevent unnecessary recreations
   const apiParams = useMemo(() => {
     const params: Record<string, string | number> = {
-      limit: 50, // Get more jobs to show
+      limit: jobsPerPage,
+      page: currentPage,
     };
 
     // Add search and filter parameters only if they have meaningful values
@@ -224,6 +235,7 @@ const JobListings = () => {
     filter.location,
     filter.jobType,
     filter.experience,
+    currentPage,
   ]);
 
   // Handle apply to job
@@ -353,6 +365,37 @@ const JobListings = () => {
     }
   };
 
+  // Handle job share
+  const handleShareJob = async (job: Job) => {
+    const jobUrl = `${window.location.origin}/jobs/${job.id}`;
+    const shareText = `Check out this job opportunity: ${job.title} at ${job.employer.companyName}`;
+
+    try {
+      // Use Web Share API if available (mobile devices)
+      if (navigator.share) {
+        await navigator.share({
+          title: `${job.title} - ${job.employer.companyName}`,
+          text: shareText,
+          url: jobUrl,
+        });
+      } else {
+        // Fallback: Copy to clipboard
+        await navigator.clipboard.writeText(`${shareText}\n${jobUrl}`);
+        alert("Job link copied to clipboard!");
+      }
+    } catch (error) {
+      console.error("Failed to share:", error);
+      // Final fallback: Copy to clipboard manually
+      try {
+        await navigator.clipboard.writeText(`${shareText}\n${jobUrl}`);
+        alert("Job link copied to clipboard!");
+      } catch (clipboardError) {
+        console.error("Failed to copy to clipboard:", clipboardError);
+        alert(`Share this job: ${jobUrl}`);
+      }
+    }
+  };
+
   // Fetch jobs function without useCallback to avoid circular dependencies
   const fetchJobsInternal = async (params: Record<string, string | number>) => {
     try {
@@ -370,9 +413,22 @@ const JobListings = () => {
           "jobs"
         );
         setJobs(data.jobs || []);
+
+        // Update pagination data if available
+        if (data.pagination) {
+          setTotalPages(data.pagination.totalPages);
+          setTotalJobs(data.pagination.total);
+        } else {
+          // Fallback: estimate based on jobs per page
+          const jobCount = data.jobs?.length || 0;
+          setTotalJobs(jobCount);
+          setTotalPages(Math.max(1, Math.ceil(jobCount / jobsPerPage)));
+        }
       } else {
         console.log("❌ API response not successful:", response);
         setJobs([]);
+        setTotalPages(1);
+        setTotalJobs(0);
       }
     } catch (error) {
       console.error("💥 Error fetching jobs:", error);
@@ -386,8 +442,19 @@ const JobListings = () => {
   // Initial fetch on component mount
   useEffect(() => {
     console.log("⚡ Initial fetch useEffect triggered");
-    fetchJobsInternal({ limit: 50 });
+    fetchJobsInternal({ limit: jobsPerPage, page: 1 });
   }, []); // Only run once on mount
+
+  // Reset pagination when search or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    searchTerm,
+    filter.categories,
+    filter.location,
+    filter.jobType,
+    filter.experience,
+  ]);
 
   // Debounced fetch when filters change
   useEffect(() => {
@@ -397,12 +464,9 @@ const JobListings = () => {
     console.log("🔄 Previous params:", prevParamsRef.current);
     console.log("📝 Current params string:", paramsString);
 
-    // Skip if this is just the default params (no filters applied) or if params haven't changed
-    if (
-      (Object.keys(apiParams).length === 1 && apiParams.limit === 50) ||
-      paramsString === prevParamsRef.current
-    ) {
-      console.log("⏭️ Skipping debounced fetch (default params or no change)");
+    // Skip only if params haven't changed (allow default params to fetch)
+    if (paramsString === prevParamsRef.current) {
+      console.log("⏭️ Skipping debounced fetch (no change in params)");
       return;
     }
 
@@ -410,11 +474,11 @@ const JobListings = () => {
     // Update previous params
     prevParamsRef.current = paramsString;
 
-    // Use debouncing for filter changes
+    // Use debouncing for filter changes (shorter timeout for better UX)
     const timeoutId = setTimeout(() => {
       console.log("⏰ Debounced fetch executing");
       fetchJobsInternal(apiParams);
-    }, 500);
+    }, 200);
 
     return () => {
       console.log("🚫 Clearing debounced fetch timeout");
@@ -461,63 +525,63 @@ const JobListings = () => {
   const jobCounts = getJobCounts();
   const jobCategories = INDUSTRIES;
 
-  // Filter jobs based on search term and filters (client-side for additional filtering)
+  // Use jobs from server (already filtered and sorted by backend)
+  // The server handles filtering and sorting based on the API parameters we send
   const filteredJobs = useMemo(() => {
-    const filtered = jobs.filter((job) => {
-      const matchesSearch =
-        !searchTerm ||
-        job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        job.employer.companyName
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        job.description.toLowerCase().includes(searchTerm.toLowerCase());
+    // If server is handling everything, just return the jobs
+    // But keep client-side sorting as fallback if server doesn't handle it
+    if (jobs.length === 0) return [];
 
-      const matchesJobType =
-        !filter.jobType ||
-        (job.jobType &&
-          job.jobType.toLowerCase().replace("_", "-") ===
-            filter.jobType.toLowerCase());
-      const matchesLocation =
-        !filter.location ||
-        job.location.toLowerCase().includes(filter.location.toLowerCase());
+    // Apply client-side sorting only if needed (fallback)
+    const sorted = [...jobs].sort((a, b) => {
+      switch (sortBy) {
+        case "Most Recent":
+          return (
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
 
-      const matchesCategories =
-        filter.categories.length === 0 ||
-        filter.categories.some(
-          (category) => job.category.toLowerCase() === category.toLowerCase()
-        );
-
-      // Handle salary range filtering
-      let matchesSalary = true;
-      if (filter.salaryRange && job.salaryMin && job.salaryMax) {
-        const avgSalary = (job.salaryMin + job.salaryMax) / 2;
-        switch (filter.salaryRange) {
-          case "Under GHS 2,000":
-            matchesSalary = avgSalary < 2000;
-            break;
-          case "GHS 2,000 - 5,000":
-            matchesSalary = avgSalary >= 2000 && avgSalary <= 5000;
-            break;
-          case "GHS 5,000 - 10,000":
-            matchesSalary = avgSalary >= 5000 && avgSalary <= 10000;
-            break;
-          case "Above GHS 10,000":
-            matchesSalary = avgSalary > 10000;
-            break;
+        case "Salary (High to Low)": {
+          const avgSalaryA =
+            a.salaryMin && a.salaryMax ? (a.salaryMin + a.salaryMax) / 2 : 0;
+          const avgSalaryB =
+            b.salaryMin && b.salaryMax ? (b.salaryMin + b.salaryMax) / 2 : 0;
+          return avgSalaryB - avgSalaryA;
         }
-      }
 
-      return (
-        matchesSearch &&
-        matchesJobType &&
-        matchesLocation &&
-        matchesCategories &&
-        matchesSalary
-      );
+        case "Salary (Low to High)": {
+          const avgSalaryA2 =
+            a.salaryMin && a.salaryMax ? (a.salaryMin + a.salaryMax) / 2 : 0;
+          const avgSalaryB2 =
+            b.salaryMin && b.salaryMax ? (b.salaryMin + b.salaryMax) / 2 : 0;
+          return avgSalaryA2 - avgSalaryB2;
+        }
+
+        case "Relevance": {
+          // Sort by how well the job matches the search term
+          if (!searchTerm) return 0;
+          const searchLower = searchTerm.toLowerCase();
+          const aTitle = a.title.toLowerCase().includes(searchLower) ? 2 : 0;
+          const bTitle = b.title.toLowerCase().includes(searchLower) ? 2 : 0;
+          const aCompany = a.employer.companyName
+            .toLowerCase()
+            .includes(searchLower)
+            ? 1
+            : 0;
+          const bCompany = b.employer.companyName
+            .toLowerCase()
+            .includes(searchLower)
+            ? 1
+            : 0;
+          return bTitle + bCompany - (aTitle + aCompany);
+        }
+
+        default:
+          return 0;
+      }
     });
 
-    return filtered;
-  }, [jobs, searchTerm, filter]);
+    return sorted;
+  }, [jobs, sortBy, searchTerm]);
 
   // Handle category toggle
   const toggleCategory = (category: string) => {
@@ -543,17 +607,76 @@ const JobListings = () => {
     return jobType.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
-  // Format date
+  // Format date with minutes, hours, days, etc.
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
-    const diffTime = Math.abs(now.getTime() - date.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffTime = now.getTime() - date.getTime();
 
-    if (diffDays === 1) return "1 day ago";
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.ceil(diffDays / 7)} weeks ago`;
+    const minutes = Math.floor(diffTime / (1000 * 60));
+    const hours = Math.floor(diffTime / (1000 * 60 * 60));
+    const days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    const weeks = Math.floor(days / 7);
+    const months = Math.floor(days / 30);
+
+    if (minutes < 1) return "Just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days === 1) return "1d ago";
+    if (days < 7) return `${days}d ago`;
+    if (weeks === 1) return "1w ago";
+    if (weeks < 4) return `${weeks}w ago`;
+    if (months === 1) return "1mo ago";
+    if (months < 12) return `${months}mo ago`;
     return date.toLocaleDateString();
+  };
+
+  // Pagination handlers
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+      setCurrentPage(page);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      handlePageChange(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      handlePageChange(currentPage + 1);
+    }
+  };
+
+  // Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const pages: number[] = [];
+    const maxVisiblePages = 5;
+
+    if (totalPages <= maxVisiblePages) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (currentPage <= 3) {
+        for (let i = 1; i <= 5; i++) {
+          pages.push(i);
+        }
+      } else if (currentPage >= totalPages - 2) {
+        for (let i = totalPages - 4; i <= totalPages; i++) {
+          pages.push(i);
+        }
+      } else {
+        for (let i = currentPage - 2; i <= currentPage + 2; i++) {
+          pages.push(i);
+        }
+      }
+    }
+
+    return pages;
   };
 
   return (
@@ -581,7 +704,7 @@ const JobListings = () => {
             <p className="text-xl text-white/95 max-w-2xl mx-auto drop-shadow-md">
               {loading
                 ? `Loading jobs... (${jobs.length} found)`
-                : `${filteredJobs.length} jobs available across Ghana`}
+                : `${filteredJobs.length} jobs available`}
             </p>
           </div>
 
@@ -659,10 +782,10 @@ const JobListings = () => {
               <div className="flex justify-between items-center mt-4">
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className="flex items-center gap-2 text-primary hover:text-primary/80 font-medium dark:text-primary-400"
+                  className="flex items-center justify-center gap-2 text-primary hover:text-primary/80 font-medium dark:text-primary-400 transition-colors"
                 >
-                  <HiFilter className="w-5 h-5" />
-                  {showFilters ? "Hide Filters" : "More Filters"}
+                  <HiFilter className="w-5 h-5 flex-shrink-0" />
+                  <span>{showFilters ? "Hide Filters" : "More Filters"}</span>
                 </button>
                 <Button
                   size="lg"
@@ -685,10 +808,10 @@ const JobListings = () => {
               variant="outline"
               fullWidth
               onClick={() => setShowFilters(!showFilters)}
-              className="mb-4"
+              className="mb-4 flex items-center justify-center gap-2"
             >
-              <HiFilter className="w-5 h-5 mr-2" />
-              {showFilters ? "Hide Filters" : "Show Filters"}
+              <HiFilter className="w-5 h-5 flex-shrink-0" />
+              <span>{showFilters ? "Hide Filters" : "Show Filters"}</span>
             </Button>
           </div>
 
@@ -912,11 +1035,19 @@ const JobListings = () => {
                 <span className="text-sm text-muted-foreground dark:text-gray-400">
                   Sort by:
                 </span>
-                <select className="px-3 py-2 border border-border dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-foreground dark:text-white">
-                  <option>Most Recent</option>
-                  <option>Salary (High to Low)</option>
-                  <option>Salary (Low to High)</option>
-                  <option>Relevance</option>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="px-3 py-2 border border-border dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-foreground dark:text-white"
+                >
+                  <option value="Most Recent">Most Recent</option>
+                  <option value="Salary (High to Low)">
+                    Salary (High to Low)
+                  </option>
+                  <option value="Salary (Low to High)">
+                    Salary (Low to High)
+                  </option>
+                  <option value="Relevance">Relevance</option>
                 </select>
               </div>
             </div>
@@ -1132,6 +1263,16 @@ const JobListings = () => {
                                   View Details
                                 </Button>
                               </Link>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleShareJob(job)}
+                                className="font-medium flex items-center gap-1"
+                                title="Share this job"
+                              >
+                                <HiShare className="w-4 h-4" />
+                                Share
+                              </Button>
                             </div>
                           </div>
                         </div>
@@ -1143,56 +1284,32 @@ const JobListings = () => {
             )}
 
             {/* Responsive Pagination */}
-            {!loading && filteredJobs.length > 0 && (
+            {!loading && filteredJobs.length > 0 && totalPages > 1 && (
               <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-12">
                 {/* Previous Button */}
                 <Button
                   variant="outline"
                   size="sm"
                   className="w-full sm:w-auto"
+                  onClick={handlePreviousPage}
+                  disabled={currentPage === 1}
                 >
                   Previous
                 </Button>
 
-                {/* Page Numbers - Hide some on mobile */}
+                {/* Page Numbers */}
                 <div className="flex gap-1 overflow-x-auto scrollbar-hide">
-                  {/* Mobile: Show fewer pages */}
-                  <div className="flex gap-1 sm:hidden">
-                    {[1, 2, 3].map((page) => (
-                      <Button
-                        key={page}
-                        variant={page === 1 ? "primary" : "outline"}
-                        size="sm"
-                        className="min-w-[40px]"
-                      >
-                        {page}
-                      </Button>
-                    ))}
-                    <span className="flex items-center px-2 text-muted-foreground">
-                      ...
-                    </span>
+                  {getPageNumbers().map((page) => (
                     <Button
-                      variant="outline"
+                      key={page}
+                      variant={page === currentPage ? "primary" : "outline"}
                       size="sm"
                       className="min-w-[40px]"
+                      onClick={() => handlePageChange(page)}
                     >
-                      10
+                      {page}
                     </Button>
-                  </div>
-
-                  {/* Desktop: Show all pages */}
-                  <div className="hidden sm:flex gap-1">
-                    {[1, 2, 3, 4, 5].map((page) => (
-                      <Button
-                        key={page}
-                        variant={page === 1 ? "primary" : "outline"}
-                        size="sm"
-                        className="min-w-[40px]"
-                      >
-                        {page}
-                      </Button>
-                    ))}
-                  </div>
+                  ))}
                 </div>
 
                 {/* Next Button */}
@@ -1200,9 +1317,21 @@ const JobListings = () => {
                   variant="outline"
                   size="sm"
                   className="w-full sm:w-auto"
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages}
                 >
                   Next
                 </Button>
+              </div>
+            )}
+
+            {/* Pagination Info */}
+            {!loading && totalJobs > 0 && (
+              <div className="text-center mt-4 text-sm text-muted-foreground">
+                Showing{" "}
+                {Math.min((currentPage - 1) * jobsPerPage + 1, totalJobs)} to{" "}
+                {Math.min(currentPage * jobsPerPage, totalJobs)} of {totalJobs}{" "}
+                jobs
               </div>
             )}
           </div>

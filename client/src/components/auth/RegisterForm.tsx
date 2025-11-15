@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import type { UserRole } from '../../types/auth';
+import React, { useState } from "react";
+import { useAuth } from "../../contexts/AuthContext";
+import type { UserRole } from "../../types/auth";
+import SocialLogin from "./SocialLogin";
 
 interface RegisterFormProps {
   role: UserRole;
@@ -8,54 +9,56 @@ interface RegisterFormProps {
   onRegistrationSuccess: (email: string) => void;
 }
 
-export const RegisterForm: React.FC<RegisterFormProps> = ({ 
+export const RegisterForm: React.FC<RegisterFormProps> = ({
   role,
   onSwitchToLogin,
-  onRegistrationSuccess 
+  onRegistrationSuccess,
 }) => {
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-    firstName: '',
-    lastName: '',
-    role: role
+    email: "",
+    password: "",
+    confirmPassword: "",
+    firstName: "",
+    lastName: "",
+    role: role,
   });
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const { register, isLoading } = useAuth();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      setError("Passwords do not match");
       return;
     }
 
     if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long');
+      setError("Password must be at least 6 characters long");
       return;
     }
 
     try {
       await register(
-        formData.email, 
-        formData.password, 
-        formData.firstName, 
-        formData.lastName, 
+        formData.email,
+        formData.password,
+        formData.firstName,
+        formData.lastName,
         formData.role
       );
       onRegistrationSuccess(formData.email);
     } catch (err) {
-      setError((err as Error).message || 'Registration failed');
+      setError((err as Error).message || "Registration failed");
     }
   };
 
@@ -66,7 +69,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
           Create Your Account
         </h2>
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          {role === 'EMPLOYER' ? 'Join as an Employer' : 'Join as a Job Seeker'}
+          {role === "EMPLOYER" ? "Join as an Employer" : "Join as a Job Seeker"}
         </p>
       </div>
 
@@ -79,7 +82,10 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label
+              htmlFor="firstName"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            >
               First Name
             </label>
             <input
@@ -93,7 +99,10 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
             />
           </div>
           <div>
-            <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label
+              htmlFor="lastName"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            >
               Last Name
             </label>
             <input
@@ -109,7 +118,10 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
         </div>
 
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label
+            htmlFor="email"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+          >
             Email
           </label>
           <input
@@ -124,7 +136,10 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
         </div>
 
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label
+            htmlFor="password"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+          >
             Password
           </label>
           <input
@@ -140,7 +155,10 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
         </div>
 
         <div>
-          <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label
+            htmlFor="confirmPassword"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+          >
             Confirm Password
           </label>
           <input
@@ -160,22 +178,25 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
           disabled={isLoading}
           className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-2 px-4 rounded-md transition duration-200"
         >
-          {isLoading ? 'Creating Account...' : 'Create Account'}
+          {isLoading ? "Creating Account..." : "Create Account"}
         </button>
-
-        <div className="text-center">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Already have an account?{' '}
-            <button
-              type="button"
-              onClick={onSwitchToLogin}
-              className="text-blue-600 hover:text-blue-500 font-medium"
-            >
-              Sign in
-            </button>
-          </p>
-        </div>
       </form>
+
+      {/* Social Login Options */}
+      <SocialLogin text="Sign up with" selectedRole={role} />
+
+      <div className="text-center">
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Already have an account?{" "}
+          <button
+            type="button"
+            onClick={onSwitchToLogin}
+            className="text-blue-600 hover:text-blue-500 font-medium"
+          >
+            Sign in
+          </button>
+        </p>
+      </div>
     </div>
   );
 };

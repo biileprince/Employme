@@ -1,6 +1,10 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { catchAsync, AppError } from "../middleware/errorHandler.js";
+import {
+  sendAccountStatusChangeNotification,
+  sendJobDeactivationNotification,
+} from "../services/emailService.js";
 
 const prisma = new PrismaClient();
 
@@ -85,6 +89,16 @@ export const getSystemStats = catchAsync(
       where: { status: "PENDING" },
     });
 
+    // Count pending employer verifications
+    const pendingEmployerVerifications = await prisma.employer.count({
+      where: { isVerified: false },
+    });
+
+    // Count pending job approvals
+    const pendingJobApprovals = await prisma.job.count({
+      where: { isApproved: false, isActive: true },
+    });
+
     const response = {
       stats: {
         totalUsers,
@@ -93,6 +107,8 @@ export const getSystemStats = catchAsync(
         activeEmployers: totalEmployers,
         activeJobSeekers: totalJobSeekers,
         pendingApplications,
+        pendingEmployerVerifications,
+        pendingJobApprovals,
       },
       recentUsers,
       recentJobs,
@@ -148,6 +164,7 @@ export const getAllUsers = catchAsync(
           role: true,
           isActive: true,
           isVerified: true,
+          lastLogin: true,
           createdAt: true,
           updatedAt: true,
           jobSeeker: {
@@ -253,7 +270,30 @@ export const toggleUserStatus = catchAsync(
 
     const user = await prisma.user.findUnique({
       where: { id },
-      select: { id: true, isActive: true, email: true },
+      select: {
+        id: true,
+        isActive: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        jobSeeker: {
+          select: {
+            firstName: true,
+            lastName: true,
+          },
+        },
+        employer: {
+          select: {
+            companyName: true,
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!user) {
@@ -267,8 +307,44 @@ export const toggleUserStatus = catchAsync(
         id: true,
         email: true,
         isActive: true,
+        firstName: true,
+        lastName: true,
       },
     });
+
+    // Send email notification to the user
+    try {
+      let userName = "User";
+      if (user.firstName && user.lastName) {
+        userName = `${user.firstName} ${user.lastName}`;
+      } else if (user.jobSeeker?.firstName && user.jobSeeker?.lastName) {
+        userName = `${user.jobSeeker.firstName} ${user.jobSeeker.lastName}`;
+      } else if (user.employer?.companyName) {
+        userName = user.employer.companyName;
+      } else if (user.email) {
+        userName = (user.email as string).split("@")[0];
+      }
+
+      const adminName =
+        req.user?.firstName && req.user?.lastName
+          ? `${req.user.firstName} ${req.user.lastName}`
+          : "Administrator";
+
+      if (user.email) {
+        await sendAccountStatusChangeNotification(
+          user.email,
+          userName,
+          updatedUser.isActive,
+          adminName
+        );
+      }
+    } catch (emailError) {
+      console.error(
+        "Failed to send account status change notification:",
+        emailError
+      );
+      // Don't fail the request if email fails
+    }
 
     res.status(200).json({
       success: true,
@@ -280,7 +356,7 @@ export const toggleUserStatus = catchAsync(
   }
 );
 
-// Toggle user verification status (Admin only)
+// Toggle employer verification status (Admin only)
 export const toggleUserVerification = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     if (!req.user || req.user.role !== "ADMIN") {
@@ -295,29 +371,45 @@ export const toggleUserVerification = catchAsync(
 
     const user = await prisma.user.findUnique({
       where: { id },
-      select: { id: true, isVerified: true, email: true },
+      include: { employer: true },
     });
 
     if (!user) {
       throw new AppError("User not found", 404);
     }
 
-    const updatedUser = await prisma.user.update({
-      where: { id },
-      data: { isVerified: !user.isVerified },
-      select: {
-        id: true,
-        email: true,
-        isVerified: true,
-      },
+    // Only toggle employer verification if user is an employer
+    if (user.role !== "EMPLOYER" || !user.employer) {
+      throw new AppError("User is not an employer", 400);
+    }
+
+    const updatedEmployer = await prisma.employer.update({
+      where: { id: user.employer.id },
+      data: { isVerified: !user.employer.isVerified },
     });
+
+    // Send notification email
+    try {
+      const emailService = await import("../services/emailService.js");
+      await emailService.sendEmployerVerificationNotification(user.email, {
+        companyName: updatedEmployer.companyName,
+        firstName: user.firstName || "User",
+        isVerified: updatedEmployer.isVerified,
+      });
+    } catch (emailError) {
+      console.error("Failed to send verification email:", emailError);
+    }
 
     res.status(200).json({
       success: true,
-      message: `User ${
-        updatedUser.isVerified ? "verified" : "unverified"
+      message: `Employer ${
+        updatedEmployer.isVerified ? "verified" : "unverified"
       } successfully`,
-      data: updatedUser,
+      data: {
+        id: user.id,
+        email: user.email,
+        employer: updatedEmployer,
+      },
     });
   }
 );
@@ -420,6 +512,48 @@ export const getAllJobs = catchAsync(
   }
 );
 
+// Get pending job approvals (Admin only)
+export const getPendingJobs = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.user || req.user.role !== "ADMIN") {
+      throw new AppError("Access denied. Admin privileges required.", 403);
+    }
+
+    const pendingJobs = await prisma.job.findMany({
+      where: {
+        isApproved: false,
+        isActive: true, // Only show active jobs waiting for approval
+      },
+      include: {
+        employer: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: { applications: true },
+        },
+      },
+      orderBy: { createdAt: "asc" }, // Oldest first
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        jobs: pendingJobs,
+        count: pendingJobs.length,
+      },
+    });
+  }
+);
+
 // Manage job (activate/deactivate/feature)
 export const manageJob = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
@@ -430,13 +564,34 @@ export const manageJob = catchAsync(
     const { id } = req.params;
     const { action } = req.body;
 
-    if (!["activate", "deactivate", "feature", "unfeature"].includes(action)) {
+    if (
+      ![
+        "activate",
+        "deactivate",
+        "feature",
+        "unfeature",
+        "approve",
+        "reject",
+      ].includes(action)
+    ) {
       throw new AppError("Invalid action", 400);
     }
 
     const job = await prisma.job.findUnique({
       where: { id },
-      select: { id: true, title: true, isActive: true, isFeatured: true },
+      include: {
+        employer: {
+          include: {
+            user: {
+              select: {
+                email: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!job) {
@@ -444,13 +599,25 @@ export const manageJob = catchAsync(
     }
 
     let updateData: any = {};
+    let shouldSendEmail = false;
 
     switch (action) {
       case "activate":
         updateData.isActive = true;
+        shouldSendEmail = !job.isActive; // Only send email if status is changing
         break;
       case "deactivate":
         updateData.isActive = false;
+        shouldSendEmail = job.isActive; // Only send email if status is changing
+        break;
+      case "approve":
+        updateData.isApproved = true;
+        shouldSendEmail = !job.isApproved; // Send email when approving
+        break;
+      case "reject":
+        updateData.isApproved = false;
+        updateData.isActive = false; // Also deactivate rejected jobs
+        shouldSendEmail = job.isApproved; // Send email when rejecting
         break;
       case "feature":
         updateData.isFeatured = true;
@@ -465,13 +632,59 @@ export const manageJob = catchAsync(
       data: updateData,
       include: {
         employer: {
-          include: { user: true },
+          include: {
+            user: {
+              select: {
+                email: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
         },
         _count: {
           select: { applications: true },
         },
       },
     });
+
+    // Send email notification for job activation/deactivation
+    if (shouldSendEmail && (action === "activate" || action === "deactivate")) {
+      try {
+        const employerUser = updatedJob.employer.user;
+        let employerName = "Employer";
+
+        if (employerUser.firstName && employerUser.lastName) {
+          employerName = `${employerUser.firstName} ${employerUser.lastName}`;
+        } else if (updatedJob.employer.companyName) {
+          employerName = updatedJob.employer.companyName;
+        } else if (employerUser.email) {
+          employerName = (employerUser.email as string).split("@")[0];
+        }
+
+        const adminName =
+          req.user?.firstName && req.user?.lastName
+            ? `${req.user.firstName} ${req.user.lastName}`
+            : "Administrator";
+
+        if (employerUser.email) {
+          await sendJobDeactivationNotification(
+            employerUser.email,
+            employerName,
+            updatedJob.title,
+            updatedJob.id,
+            updatedJob.isActive,
+            adminName
+          );
+        }
+      } catch (emailError) {
+        console.error(
+          "Failed to send job status change notification:",
+          emailError
+        );
+        // Don't fail the request if email fails
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -791,6 +1004,185 @@ export const getAdminProfile = catchAsync(
           profile: admin.admin,
         },
       },
+    });
+  }
+);
+
+// Get all employers (Admin only) - includes pending verification
+export const getAllEmployers = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.user || req.user.role !== "ADMIN") {
+      throw new AppError("Access denied. Admin privileges required.", 403);
+    }
+
+    const { page = "1", limit = "10", verificationStatus = "all" } = req.query;
+
+    const pageNum = parseInt(page as string, 10);
+    const limitNum = parseInt(limit as string, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build filter based on verification status
+    const whereClause: any = {};
+    if (verificationStatus === "verified") {
+      whereClause.isVerified = true;
+    } else if (verificationStatus === "pending") {
+      whereClause.isVerified = false;
+    }
+    // 'all' means no filter on isVerified
+
+    const [employers, total] = await Promise.all([
+      prisma.employer.findMany({
+        where: whereClause,
+        skip,
+        take: limitNum,
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              isActive: true,
+              isVerified: true,
+              createdAt: true,
+              lastLogin: true,
+            },
+          },
+          _count: {
+            select: {
+              jobs: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.employer.count({ where: whereClause }),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        employers,
+        pagination: {
+          total,
+          page: pageNum,
+          pages: Math.ceil(total / limitNum),
+          limit: limitNum,
+        },
+      },
+    });
+  }
+);
+
+// Get pending employer verifications (Admin only)
+export const getPendingEmployers = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.user || req.user.role !== "ADMIN") {
+      throw new AppError("Access denied. Admin privileges required.", 403);
+    }
+
+    const pendingEmployers = await prisma.employer.findMany({
+      where: { isVerified: false },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            createdAt: true,
+            imageUrl: true,
+          },
+        },
+        _count: {
+          select: {
+            jobs: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "asc" }, // Oldest first
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        employers: pendingEmployers,
+        count: pendingEmployers.length,
+      },
+    });
+  }
+);
+
+// Verify or reject employer (Admin only)
+export const updateEmployerVerification = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.user || req.user.role !== "ADMIN") {
+      throw new AppError("Access denied. Admin privileges required.", 403);
+    }
+
+    const { employerId } = req.params;
+    const { isVerified, rejectionReason } = req.body;
+
+    if (typeof isVerified !== "boolean") {
+      throw new AppError("Verification status is required", 400);
+    }
+
+    // Find the employer
+    const employer = await prisma.employer.findUnique({
+      where: { id: employerId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+
+    if (!employer) {
+      throw new AppError("Employer not found", 404);
+    }
+
+    // Update employer verification status
+    const updatedEmployer = await prisma.employer.update({
+      where: { id: employerId },
+      data: { isVerified },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+
+    // Send email notification
+    try {
+      const emailService = await import("../services/emailService.js");
+      await emailService.sendEmployerVerificationNotification(
+        employer.user.email,
+        {
+          companyName: employer.companyName,
+          firstName: employer.user.firstName || "User",
+          isVerified,
+          rejectionReason: rejectionReason || undefined,
+        }
+      );
+    } catch (emailError) {
+      console.error("Failed to send verification email:", emailError);
+      // Don't fail the request if email fails
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Employer ${isVerified ? "verified" : "rejected"} successfully`,
+      data: { employer: updatedEmployer },
     });
   }
 );

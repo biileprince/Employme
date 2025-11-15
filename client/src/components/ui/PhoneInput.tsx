@@ -79,24 +79,29 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
           {label} {required && "*"}
         </label>
       )}
-      <div className="flex space-x-2">
+      <div className="flex gap-2">
         <select
           value={countryCode}
           onChange={(e) => onCountryCodeChange(e.target.value)}
           disabled={isLoading}
-          className="px-3 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground min-w-[120px]"
+          className="px-2 sm:px-3 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground w-20 sm:w-24 md:min-w-[120px] text-xs sm:text-sm"
         >
           {countryCodes.map((country, index) => (
             <option
               key={`${country.code}-${country.country}-${index}`}
               value={country.code}
             >
-              {country.flag} {country.code} {country.country}
+              <span className="hidden sm:inline">
+                {country.flag} {country.code} {country.country}
+              </span>
+              <span className="sm:hidden">
+                {country.flag} {country.code}
+              </span>
             </option>
           ))}
         </select>
-        <div className="relative flex-1">
-          <MdPhone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+        <div className="relative flex-1 min-w-0">
+          <MdPhone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4 sm:w-5 sm:h-5" />
           <input
             type="number"
             value={phoneNumber}
@@ -105,7 +110,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
             pattern="[0-9]{7,15}"
             required={required}
             min="0"
-            className="w-full pl-10 pr-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            className="w-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground text-sm sm:text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           />
         </div>
       </div>

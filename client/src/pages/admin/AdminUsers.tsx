@@ -16,6 +16,7 @@ import {
   MdVisibility,
   MdClose,
   MdEmail,
+  MdAccessTime,
   MdLocationOn,
   MdWork,
   MdCalendarToday,
@@ -44,6 +45,7 @@ interface User {
   role: string;
   isActive: boolean;
   isVerified: boolean;
+  lastLogin?: string;
   createdAt: string;
   updatedAt: string;
   jobSeeker?: {
@@ -162,9 +164,9 @@ export default function AdminUsers() {
     // Confirmation prompts
     const actionMessages = {
       activate:
-        "Are you sure you want to activate this user? They will be able to access the platform.",
+        "Are you sure you want to activate this user? They will be able to access the platform and will receive an email notification.",
       deactivate:
-        "Are you sure you want to deactivate this user? They will lose access to the platform.",
+        "Are you sure you want to deactivate this user? They will lose access to the platform and will receive an email notification.",
       verify:
         "Are you sure you want to verify this user? This will mark their email as verified.",
       unverify:
@@ -326,6 +328,7 @@ export default function AdminUsers() {
           { header: "Date of Birth", key: "dateOfBirth", width: 12 },
           { header: "Bio/Description", key: "bio", width: 50 },
           { header: "Website", key: "website", width: 30 },
+          { header: "Last Login", key: "lastLogin", width: 15 },
           { header: "Registration Date", key: "createdAt", width: 15 },
           { header: "Last Updated", key: "updatedAt", width: 15 },
           {
@@ -412,6 +415,7 @@ export default function AdminUsers() {
             dateOfBirth: user.jobSeeker?.dateOfBirth || "N/A",
             bio: user.jobSeeker?.bio || user.employer?.description || "N/A",
             website: user.employer?.website || "N/A",
+            lastLogin: user.lastLogin ? formatDate(user.lastLogin) : "Never",
             createdAt: formatDate(user.createdAt),
             updatedAt: formatDate(user.updatedAt),
             daysSinceRegistration,
@@ -661,26 +665,29 @@ export default function AdminUsers() {
           className="bg-card border border-border rounded-xl overflow-hidden"
         >
           {/* Desktop Table View */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full min-w-[800px]">
+          <div className="hidden md:block">
+            <table className="w-full table-auto">
               <thead className="bg-muted/50 border-b border-border">
                 <tr>
-                  <th className="text-left p-4 font-medium text-foreground min-w-[200px]">
+                  <th className="text-left p-3 font-medium text-foreground w-[25%]">
                     User
                   </th>
-                  <th className="text-left p-4 font-medium text-foreground min-w-[120px]">
+                  <th className="text-left p-3 font-medium text-foreground w-[10%]">
                     Role
                   </th>
-                  <th className="text-left p-4 font-medium text-foreground min-w-[140px]">
+                  <th className="text-left p-3 font-medium text-foreground w-[12%]">
                     Status
                   </th>
-                  <th className="text-left p-4 font-medium text-foreground min-w-[180px]">
+                  <th className="text-left p-3 font-medium text-foreground w-[15%]">
                     Details
                   </th>
-                  <th className="text-left p-4 font-medium text-foreground min-w-[120px]">
+                  <th className="text-left p-3 font-medium text-foreground w-[12%]">
+                    Last Login
+                  </th>
+                  <th className="text-left p-3 font-medium text-foreground w-[10%]">
                     Joined
                   </th>
-                  <th className="text-right p-4 font-medium text-foreground min-w-[200px]">
+                  <th className="text-right p-3 font-medium text-foreground w-[16%]">
                     Actions
                   </th>
                 </tr>
@@ -694,20 +701,21 @@ export default function AdminUsers() {
                     transition={{ delay: index * 0.05 }}
                     className="border-b border-border hover:bg-muted/30 transition-colors"
                   >
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                    <td className="p-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
                           {getRoleIcon(user.role)}
                         </div>
-                        <div>
-                          <p className="font-medium text-foreground">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-foreground text-sm truncate">
                             {user.firstName && user.lastName
                               ? `${user.firstName} ${user.lastName}`
                               : "No Name"}
                           </p>
                           <a
                             href={`mailto:${user.email}`}
-                            className="text-sm text-muted-foreground hover:text-primary underline-offset-4 hover:underline transition-colors"
+                            className="text-xs text-muted-foreground hover:text-primary underline-offset-4 hover:underline transition-colors truncate block"
+                            title={user.email}
                           >
                             {user.email}
                           </a>
@@ -715,53 +723,73 @@ export default function AdminUsers() {
                       </div>
                     </td>
 
-                    <td className="p-4">
-                      <span className={getRoleBadge(user.role)}>
-                        {user.role.replace("_", " ")}
+                    <td className="p-3">
+                      <span
+                        className={`${getRoleBadge(
+                          user.role
+                        )} text-xs px-2 py-1`}
+                      >
+                        {user.role === "JOB_SEEKER"
+                          ? "Seeker"
+                          : user.role === "EMPLOYER"
+                          ? "Employer"
+                          : "Admin"}
                       </span>
                     </td>
 
-                    <td className="p-4">
-                      <div className="flex items-center gap-2">
+                    <td className="p-3">
+                      <div className="flex items-center gap-1">
                         {user.isActive ? (
-                          <MdCheckCircle className="w-5 h-5 text-green-500" />
+                          <MdCheckCircle className="w-4 h-4 text-green-500" />
                         ) : (
-                          <MdCancel className="w-5 h-5 text-red-500" />
+                          <MdCancel className="w-4 h-4 text-red-500" />
                         )}
                         <span
-                          className={`text-sm ${
+                          className={`text-xs ${
                             user.isActive ? "text-green-600" : "text-red-600"
                           }`}
                         >
                           {user.isActive ? "Active" : "Inactive"}
                         </span>
                         {user.isVerified && (
-                          <MdVerifiedUser className="w-4 h-4 text-blue-500 ml-1" />
+                          <MdVerifiedUser className="w-3 h-3 text-blue-500" />
                         )}
                       </div>
                     </td>
 
-                    <td className="p-4">
-                      <div className="text-sm">
+                    <td className="p-3">
+                      <div className="text-xs">
                         {user.role === "EMPLOYER" && user.employer && (
                           <div>
-                            <p className="text-foreground">
+                            <p
+                              className="text-foreground font-medium truncate"
+                              title={user.employer.companyName}
+                            >
                               {user.employer.companyName || "No Company"}
                             </p>
-                            <p className="text-muted-foreground">
+                            <p
+                              className="text-muted-foreground truncate"
+                              title={user.employer.industry}
+                            >
                               {user.employer.industry || "No Industry"}
                             </p>
                           </div>
                         )}
                         {user.role === "JOB_SEEKER" && user.jobSeeker && (
                           <div>
-                            <p className="text-foreground">
+                            <p
+                              className="text-foreground truncate"
+                              title={user.jobSeeker.location}
+                            >
                               {user.jobSeeker.location || "No Location"}
                             </p>
-                            <p className="text-muted-foreground">
-                              {user.jobSeeker.skills.slice(0, 2).join(", ")}
-                              {user.jobSeeker.skills.length > 2 &&
-                                ` +${user.jobSeeker.skills.length - 2}`}
+                            <p
+                              className="text-muted-foreground truncate"
+                              title={user.jobSeeker.skills.join(", ")}
+                            >
+                              {user.jobSeeker.skills.slice(0, 1).join("")}
+                              {user.jobSeeker.skills.length > 1 &&
+                                ` +${user.jobSeeker.skills.length - 1}`}
                             </p>
                           </div>
                         )}
@@ -773,22 +801,45 @@ export default function AdminUsers() {
                       </div>
                     </td>
 
-                    <td className="p-4">
-                      <p className="text-sm text-muted-foreground">
-                        {formatDate(user.createdAt)}
+                    <td className="p-3">
+                      <p className="text-xs text-muted-foreground">
+                        {user.lastLogin ? (
+                          <span title={formatDate(user.lastLogin)}>
+                            {new Date(user.lastLogin).toLocaleDateString(
+                              "en-US",
+                              { month: "short", day: "numeric" }
+                            )}
+                          </span>
+                        ) : (
+                          <span className="text-amber-600 dark:text-amber-400 font-medium">
+                            Never
+                          </span>
+                        )}
                       </p>
                     </td>
 
-                    <td className="p-4">
+                    <td className="p-3">
+                      <p
+                        className="text-xs text-muted-foreground"
+                        title={formatDate(user.createdAt)}
+                      >
+                        {new Date(user.createdAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </p>
+                    </td>
+
+                    <td className="p-3">
                       <div className="flex items-center justify-end gap-1 flex-wrap">
                         <Button
                           onClick={() => handleViewUser(user)}
                           variant="outline"
                           size="sm"
                           disabled={actionLoading !== null}
+                          className="text-xs px-2 py-1"
                         >
-                          <MdVisibility className="w-4 h-4 mr-1" />
-                          View
+                          <MdVisibility className="w-3 h-3" />
                         </Button>
 
                         {user.role !== "ADMIN" && (
@@ -804,8 +855,9 @@ export default function AdminUsers() {
                               size="sm"
                               isLoading={actionLoading === user.id}
                               disabled={actionLoading !== null}
+                              className="text-xs px-2 py-1"
                             >
-                              {user.isActive ? "Deactivate" : "Activate"}
+                              {user.isActive ? "Deact" : "Act"}
                             </Button>
 
                             <Button
@@ -819,8 +871,9 @@ export default function AdminUsers() {
                               size="sm"
                               isLoading={actionLoading === user.id}
                               disabled={actionLoading !== null}
+                              className="text-xs px-2 py-1"
                             >
-                              {user.isVerified ? "Unverify" : "Verify"}
+                              {user.isVerified ? "Unverf" : "Verify"}
                             </Button>
 
                             <Button
@@ -829,9 +882,9 @@ export default function AdminUsers() {
                               size="sm"
                               isLoading={actionLoading === user.id}
                               disabled={actionLoading !== null}
-                              className="text-red-600 border-red-200 hover:bg-red-50"
+                              className="text-red-600 border-red-200 hover:bg-red-50 text-xs px-2 py-1"
                             >
-                              <MdDelete className="w-4 h-4" />
+                              <MdDelete className="w-3 h-3" />
                             </Button>
                           </>
                         )}
@@ -930,9 +983,21 @@ export default function AdminUsers() {
 
                 {/* Date and Actions Row */}
                 <div className="flex items-center justify-between pt-2 border-t border-border">
-                  <p className="text-xs text-muted-foreground">
-                    Joined {formatDate(user.createdAt)}
-                  </p>
+                  <div className="flex flex-col gap-1">
+                    <p className="text-xs text-muted-foreground">
+                      Last Login:{" "}
+                      {user.lastLogin ? (
+                        formatDate(user.lastLogin)
+                      ) : (
+                        <span className="text-amber-600 dark:text-amber-400 font-medium">
+                          Never
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Joined {formatDate(user.createdAt)}
+                    </p>
+                  </div>
 
                   {/* Mobile Action Buttons - Touch Friendly */}
                   <div className="flex gap-2">
@@ -1210,6 +1275,21 @@ export default function AdminUsers() {
                               : "Email Not Verified"}
                           </span>
                         </div>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                          <MdAccessTime className="w-4 h-4" />
+                          Last Login
+                        </label>
+                        <p className="text-foreground">
+                          {selectedUser.lastLogin ? (
+                            formatDate(selectedUser.lastLogin)
+                          ) : (
+                            <span className="text-amber-600 dark:text-amber-400 font-medium">
+                              Never logged in
+                            </span>
+                          )}
+                        </p>
                       </div>
                       <div>
                         <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">

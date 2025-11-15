@@ -9,6 +9,7 @@ import {
   updateEmployerProfile,
   deleteAccount,
   getCandidates,
+  getEmployerCandidates,
 } from "../controllers/userController.js";
 
 const router = Router();
@@ -17,6 +18,7 @@ const router = Router();
 router.get("/me", getCurrentUser);
 router.get("/employer/:id", getEmployerProfile); // Public route for company profiles
 router.get("/candidates", getCandidates);
+router.get("/my-candidates", getEmployerCandidates); // Get candidates who applied to employer's jobs
 router.put("/profile", updateProfile);
 
 // Profile creation routes

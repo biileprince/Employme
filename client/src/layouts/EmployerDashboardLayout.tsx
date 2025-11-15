@@ -1,48 +1,92 @@
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { 
-  MdDashboard, 
-  MdAdd, 
-  MdWork, 
-  MdDescription, 
-  MdPeople, 
-  MdSettings, 
-  MdLogout 
-} from 'react-icons/md';
-import { useAuth } from '../contexts/AuthContext';
-import ThemeToggle from '../components/ui/ThemeToggle';
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
+import {
+  MdDashboard,
+  MdAdd,
+  MdWork,
+  MdDescription,
+  MdPeople,
+  MdSettings,
+  MdLogout,
+  MdMenu,
+  MdClose,
+} from "react-icons/md";
+import { useAuth } from "../contexts/AuthContext";
+import ThemeToggle from "../components/ui/ThemeToggle";
+import ScrollToTop from "../components/common/ScrollToTop";
 
 const sidebarLinks = [
-  { to: '/employer/dashboard', label: 'Dashboard', icon: MdDashboard },
-  { to: '/employer/post-job', label: 'Post Job', icon: MdAdd },
-  { to: '/employer/my-jobs', label: 'My Jobs', icon: MdWork },
-  { to: '/employer/applications', label: 'Applications', icon: MdDescription },
-  { to: '/employer/candidates', label: 'Find Candidates', icon: MdPeople },
-  { to: '/employer/profile', label: 'Profile', icon: MdSettings },
+  { to: "/employer/dashboard", label: "Dashboard", icon: MdDashboard },
+  { to: "/employer/post-job", label: "Post Job", icon: MdAdd },
+  { to: "/employer/my-jobs", label: "My Jobs", icon: MdWork },
+  { to: "/employer/applications", label: "Applications", icon: MdDescription },
+  { to: "/employer/candidates", label: "Find Candidates", icon: MdPeople },
+  { to: "/employer/profile", label: "Profile", icon: MdSettings },
 ];
 
 export default function EmployerDashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
       await logout();
-      navigate('/auth');
+      navigate("/auth");
     } catch (error) {
-      console.error('Logout failed:', error);
+      console.error("Logout failed:", error);
     }
   };
 
+  // Close sidebar when pressing escape and handle body scroll
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isSidebarOpen) {
+        setIsSidebarOpen(false);
+      }
+    };
+
+    if (isSidebarOpen) {
+      document.addEventListener("keydown", handleEscape);
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+      document.body.style.overflow = "unset";
+    };
+  }, [isSidebarOpen]);
+
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Fixed Sidebar */}
-      <aside className="fixed left-0 top-0 h-screen w-64 bg-card border-r border-border flex flex-col shadow-lg z-40">
+      <ScrollToTop />
+      {/* Mobile Backdrop */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`fixed left-0 top-0 h-screen w-64 bg-card border-r border-border flex flex-col shadow-lg z-50 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         {/* Logo/Brand */}
         <div className="p-6 border-b border-border">
-          <Link to="/" className="text-2xl font-bold text-primary hover:text-primary/80 transition-colors">
-            Employ<span className="text-secondary">.</span><span className="text-secondary">me</span>
+          <Link
+            to="/"
+            onClick={() => setIsSidebarOpen(false)}
+            className="text-2xl font-bold text-primary hover:text-primary/80 transition-colors"
+          >
+            Employ<span className="text-secondary">.</span>
+            <span className="text-secondary">me</span>
           </Link>
           <p className="text-sm text-muted-foreground mt-1">Employer Panel</p>
         </div>
@@ -55,10 +99,11 @@ export default function EmployerDashboardLayout() {
               <Link
                 key={link.to}
                 to={link.to}
+                onClick={() => setIsSidebarOpen(false)}
                 className={`flex items-center gap-3 py-3 px-4 rounded-lg transition-all duration-200 ${
                   location.pathname === link.to
-                    ? 'bg-primary text-primary-foreground shadow-md'
-                    : 'text-foreground hover:bg-muted hover:text-primary'
+                    ? "bg-primary text-primary-foreground shadow-md"
+                    : "text-foreground hover:bg-muted hover:text-primary"
                 }`}
               >
                 <IconComponent className="w-5 h-5" />
@@ -81,26 +126,46 @@ export default function EmployerDashboardLayout() {
       </aside>
 
       {/* Main Content */}
-      <main className="ml-64 flex-1 flex flex-col min-h-screen">
+      <main className="lg:ml-64 flex-1 flex flex-col min-h-screen">
         {/* Top Bar */}
         <div className="bg-card/50 backdrop-blur-sm border-b border-border p-4 sticky top-0 z-30">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-semibold text-foreground">
-                {sidebarLinks.find(link => link.to === location.pathname)?.label || 'Dashboard'}
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Manage your job postings and applications
-              </p>
+            <div className="flex items-center gap-4">
+              {/* Mobile Menu Button */}
+              <button
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className="lg:hidden p-2 rounded-lg hover:bg-muted transition-colors"
+              >
+                {isSidebarOpen ? (
+                  <MdClose className="w-6 h-6" />
+                ) : (
+                  <MdMenu className="w-6 h-6" />
+                )}
+              </button>
+              <div>
+                <h1 className="text-xl font-semibold text-foreground">
+                  {sidebarLinks.find((link) => link.to === location.pathname)
+                    ?.label || "Dashboard"}
+                </h1>
+                <p className="hidden sm:block text-sm text-muted-foreground">
+                  Manage your job postings and applications
+                </p>
+              </div>
             </div>
             <div className="flex items-center gap-4">
+              <Link
+                to="/"
+                className="flex items-center gap-2 text-foreground hover:text-primary transition-colors font-medium px-3 py-2 rounded-lg hover:bg-muted/50"
+              >
+                Home
+              </Link>
               <ThemeToggle />
-              <div className="text-sm text-muted-foreground">
-                {new Date().toLocaleDateString('en-US', { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
+              <div className="hidden md:block text-sm text-muted-foreground">
+                {new Date().toLocaleDateString("en-US", {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
                 })}
               </div>
             </div>

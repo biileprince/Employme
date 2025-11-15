@@ -288,6 +288,12 @@ export const authAPI = {
 
   forgotPassword: (email: string) =>
     apiClient.post("/auth/forgot-password", { email }),
+
+  resetPassword: (code: string, newPassword: string) =>
+    apiClient.post("/auth/reset-password", { code, newPassword }),
+
+  completeSocialAuth: (data: { role: string; email: string }) =>
+    apiClient.post("/auth/complete-social-auth", data),
 };
 
 export const jobsAPI = {
@@ -439,6 +445,7 @@ export const userAPI = {
   },
 
   getCandidates: () => apiClient.get("/users/candidates"),
+  getEmployerCandidates: () => apiClient.get("/users/my-candidates"),
 
   completeOnboarding: (profileData: Record<string, unknown>) => {
     // Alias for createProfile
@@ -490,9 +497,24 @@ export const adminAPI = {
     apiClient.patch(`/admin/users/${userId}/toggle-verification`),
   deleteUser: (userId: string) => apiClient.delete(`/admin/users/${userId}`),
 
+  // Employer verification management
+  getAllEmployers: (params?: URLSearchParams) =>
+    apiClient.get(`/admin/employers${params ? `?${params}` : ""}`),
+  getPendingEmployers: () => apiClient.get("/admin/employers/pending"),
+  verifyEmployer: (
+    employerId: string,
+    isVerified: boolean,
+    rejectionReason?: string
+  ) =>
+    apiClient.patch(`/admin/employers/${employerId}/verification`, {
+      isVerified,
+      rejectionReason,
+    }),
+
   // Job management
   getAllJobs: (params?: URLSearchParams) =>
     apiClient.get(`/admin/jobs${params ? `?${params}` : ""}`),
+  getPendingJobs: () => apiClient.get("/admin/jobs/pending"),
   manageJob: (jobId: string, action: string) =>
     apiClient.patch(`/admin/jobs/${jobId}`, { action }),
   deleteJob: (jobId: string) => apiClient.delete(`/admin/jobs/${jobId}`),

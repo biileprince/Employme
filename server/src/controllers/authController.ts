@@ -9,8 +9,26 @@ import {
   sendVerificationEmail,
   sendPasswordResetEmail,
   sendWelcomeEmail,
+  sendNewUserNotificationToAdmin,
 } from "../services/emailService.js";
 import passport from "../middleware/passport.js";
+
+// Extend session type to include social profile data
+declare module "express-session" {
+  interface SessionData {
+    pendingOAuthRole?: string;
+    socialProfileData?: {
+      provider: string;
+      providerId: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      imageUrl: string | null;
+      displayName: string;
+      photos: string | null;
+    };
+  }
+}
 
 const prisma = new PrismaClient();
 
@@ -69,6 +87,16 @@ export const register = catchAsync(
     } catch (error) {
       console.error("Failed to send verification email:", error);
       // Don't fail registration if email sending fails
+    }
+
+    // Send admin notification about new user registration
+    try {
+      const userName =
+        `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email;
+      await sendNewUserNotificationToAdmin(user.email, userName, user.role);
+    } catch (error) {
+      console.error("Failed to send admin notification:", error);
+      // Don't fail registration if admin notification fails
     }
 
     res.status(201).json({
@@ -134,6 +162,12 @@ export const login = catchAsync(
         403
       );
     }
+
+    // Update last login time
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLogin: new Date() },
+    });
 
     // Generate JWT token
     const token = generateToken(user.id);
@@ -525,6 +559,13 @@ export const socialAuthSuccess = catchAsync(
     }
 
     const user = req.user as any;
+    console.log("Social auth success for user:", user.id, user.email);
+
+    // Update last login time
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLogin: new Date() },
+    });
 
     // Generate JWT token
     const token = generateToken(user.id);
@@ -537,18 +578,39 @@ export const socialAuthSuccess = catchAsync(
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
     });
 
+    // Clear the session after successful authentication
+    delete (req.session as any).pendingOAuthRole;
+    req.logout((err) => {
+      if (err) {
+        console.error("Error logging out session:", err);
+      }
+    });
+
     // Determine if user needs to complete profile
     const hasProfile =
       !!(user.role === "JOB_SEEKER" && user.jobSeeker) ||
       !!(user.role === "EMPLOYER" && user.employer) ||
       !!(user.role === "ADMIN" && user.admin);
 
-    // Redirect to frontend with success
+    // Determine redirect URL based on user role and profile completion
     const frontendUrl = process.env.CLIENT_URL || "http://localhost:5173";
-    const redirectUrl = hasProfile
-      ? `${frontendUrl}/dashboard?auth=success`
-      : `${frontendUrl}/onboarding?auth=success`;
+    let redirectUrl: string;
 
+    if (!hasProfile) {
+      // User needs to complete profile - redirect to onboarding
+      redirectUrl = `${frontendUrl}/onboarding?token=${token}&social=true&auth=success`;
+    } else {
+      // User has complete profile - redirect to appropriate dashboard
+      if (user.role === "EMPLOYER") {
+        redirectUrl = `${frontendUrl}/employer/dashboard?token=${token}&social=true&auth=success`;
+      } else if (user.role === "JOB_SEEKER") {
+        redirectUrl = `${frontendUrl}/job-seeker/dashboard?token=${token}&social=true&auth=success`;
+      } else {
+        redirectUrl = `${frontendUrl}/admin/dashboard?token=${token}&social=true&auth=success`;
+      }
+    }
+
+    console.log("Redirecting to:", redirectUrl);
     res.redirect(redirectUrl);
   }
 );
@@ -556,8 +618,19 @@ export const socialAuthSuccess = catchAsync(
 // Social Authentication Failure Handler
 export const socialAuthFailure = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
+    console.error("Social auth failure:", req.query, req.params);
     const frontendUrl = process.env.CLIENT_URL || "http://localhost:5173";
-    res.redirect(`${frontendUrl}/auth?error=social_auth_failed`);
+
+    // Get error details from query parameters
+    const error = req.query.error || "social_auth_failed";
+    const errorDescription =
+      req.query.error_description || "Authentication failed";
+
+    res.redirect(
+      `${frontendUrl}/auth?error=${error}&description=${encodeURIComponent(
+        errorDescription as string
+      )}`
+    );
   }
 );
 
@@ -678,5 +751,124 @@ export const unlinkSocialAccount = catchAsync(
       success: true,
       message: `${provider} account unlinked successfully`,
     });
+  }
+);
+
+// Complete Social Auth Registration with Role
+export const completeSocialAuthRegistration = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    let { role, email } = req.body;
+
+    // Try to get role from session if not provided
+    if (!role && req.session.pendingOAuthRole) {
+      role = req.session.pendingOAuthRole;
+      console.log("Using role from session:", role);
+    }
+
+    // Validate role
+    const validRoles = ["JOB_SEEKER", "EMPLOYER"];
+    if (!role || !validRoles.includes(role)) {
+      throw new AppError(
+        "Valid role is required (JOB_SEEKER or EMPLOYER)",
+        400
+      );
+    }
+
+    if (!email) {
+      throw new AppError("Email is required", 400);
+    }
+
+    // Get social profile data from session
+    if (!req.session.socialProfileData) {
+      throw new AppError(
+        "No social authentication data found. Please try logging in again.",
+        400
+      );
+    }
+
+    const socialData = req.session.socialProfileData;
+
+    // Verify email matches
+    if (socialData.email !== email) {
+      throw new AppError("Email mismatch. Please try again.", 400);
+    }
+
+    try {
+      // Check if user already exists
+      const existingUser = await prisma.user.findUnique({
+        where: { email: socialData.email },
+      });
+
+      if (existingUser) {
+        throw new AppError("User already exists with this email", 400);
+      }
+
+      // Create user with selected role
+      const user = await prisma.user.create({
+        data: {
+          email: socialData.email,
+          firstName: socialData.firstName,
+          lastName: socialData.lastName,
+          imageUrl: socialData.imageUrl,
+          password: "", // No password for social login
+          isVerified: true, // Social accounts are pre-verified
+          role: role,
+          socialAccounts: {
+            create: {
+              provider: socialData.provider,
+              providerId: socialData.providerId,
+              email: socialData.email,
+              displayName: socialData.displayName,
+              photos: socialData.photos,
+            },
+          },
+        },
+        include: {
+          socialAccounts: true,
+          jobSeeker: true,
+          employer: true,
+          admin: true,
+        },
+      });
+
+      // Clear social profile data and role from session
+      delete req.session.socialProfileData;
+      delete req.session.pendingOAuthRole;
+
+      // Generate JWT token
+      const token = generateToken(user.id);
+
+      // Set cookie
+      res.cookie("token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      });
+
+      // Send response with user data and token
+      res.status(201).json({
+        success: true,
+        message: "Social authentication completed successfully",
+        data: {
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            imageUrl: user.imageUrl,
+            role: user.role,
+            isVerified: user.isVerified,
+            hasProfile: false, // New user, no profile yet
+          },
+          token,
+        },
+      });
+    } catch (error) {
+      // Clear session data on error
+      delete req.session.socialProfileData;
+      delete req.session.pendingOAuthRole;
+      throw error;
+    }
   }
 );

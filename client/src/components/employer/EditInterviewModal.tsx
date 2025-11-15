@@ -145,6 +145,24 @@ export default function EditInterviewModal({
             </div>
           )}
 
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <MdDescription className="w-5 h-5 text-blue-500 mt-0.5" />
+              </div>
+              <div className="ml-3">
+                <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                  📧 Email Notification
+                </h4>
+                <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                  The candidate will automatically receive an email notification
+                  about the interview changes including updated date, time,
+                  location, and meeting link (if virtual).
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Date and Time */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>

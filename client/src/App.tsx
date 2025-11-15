@@ -16,6 +16,7 @@ import AdminLayout from "./layouts/AdminLayout";
 import {
   HomePage,
   ErrorPage,
+  AboutPage,
   LoginPage,
   SignupPage,
   Onboarding,
@@ -44,6 +45,8 @@ import {
   AdminApplications,
   AdminAnalytics,
   CreateAdmin,
+  AdminNewsletter,
+  AdminEmployers,
 } from "./pages/admin";
 
 // Import loaders
@@ -62,6 +65,10 @@ const router = createBrowserRouter(
         {
           index: true,
           element: <HomePage />,
+        },
+        {
+          path: "/about",
+          element: <AboutPage />,
         },
         {
           path: "/jobs",
@@ -222,6 +229,10 @@ const router = createBrowserRouter(
       errorElement: <ErrorPage />,
       children: [
         {
+          index: true,
+          element: <Navigate to="/admin/dashboard" replace />,
+        },
+        {
           path: "dashboard",
           element: (
             <ProtectedRoute requireRole="ADMIN">
@@ -262,10 +273,34 @@ const router = createBrowserRouter(
           ),
         },
         {
+          path: "newsletter",
+          element: (
+            <ProtectedRoute requireRole="ADMIN">
+              <AdminNewsletter />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "employers",
+          element: (
+            <ProtectedRoute requireRole="ADMIN">
+              <AdminEmployers />
+            </ProtectedRoute>
+          ),
+        },
+        {
           path: "create-admin",
           element: (
             <ProtectedRoute requireRole="ADMIN">
               <CreateAdmin />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "reports",
+          element: (
+            <ProtectedRoute requireRole="ADMIN">
+              <AdminAnalytics />
             </ProtectedRoute>
           ),
         },

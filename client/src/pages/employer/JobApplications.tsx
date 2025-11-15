@@ -18,6 +18,7 @@ import {
   MdEventNote,
 } from "react-icons/md";
 import { applicationsAPI, formatImageUrl } from "../../services/api";
+import { formatTimeToAMPM } from "../../utils/timeFormat";
 import { InterviewScheduleModal } from "../../components/employer";
 import Button from "../../components/ui/Button";
 
@@ -93,6 +94,13 @@ export default function JobApplications() {
   const [showInterviewModal, setShowInterviewModal] = useState(false);
   const [selectedApplication, setSelectedApplication] =
     useState<Application | null>(null);
+  const [showStatusConfirm, setShowStatusConfirm] = useState(false);
+  const [pendingStatusChange, setPendingStatusChange] = useState<{
+    applicationId: string;
+    newStatus: string;
+    applicantName: string;
+    currentStatus: string;
+  } | null>(null);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -366,6 +374,21 @@ export default function JobApplications() {
     fetchApplications();
   }, [fetchApplications]);
 
+  const handleStatusChangeRequest = (
+    applicationId: string,
+    newStatus: string,
+    applicantName: string,
+    currentStatus: string
+  ) => {
+    setPendingStatusChange({
+      applicationId,
+      newStatus,
+      applicantName,
+      currentStatus,
+    });
+    setShowStatusConfirm(true);
+  };
+
   const updateApplicationStatus = async (
     applicationId: string,
     newStatus: string
@@ -377,6 +400,17 @@ export default function JobApplications() {
       console.error("Failed to update application status:", err);
       setError("Failed to update application status");
     }
+  };
+
+  const confirmStatusChange = async () => {
+    if (pendingStatusChange) {
+      await updateApplicationStatus(
+        pendingStatusChange.applicationId,
+        pendingStatusChange.newStatus
+      );
+    }
+    setShowStatusConfirm(false);
+    setPendingStatusChange(null);
   };
 
   const handleScheduleInterview = (application: Application) => {
@@ -441,23 +475,23 @@ export default function JobApplications() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 sm:mb-8">
+          <div className="w-full">
             {jobId && (
               <Link
                 to="/employer/my-jobs"
-                className="inline-flex items-center gap-2 text-primary hover:text-primary/80 text-sm font-medium mb-4 transition-colors"
+                className="inline-flex items-center gap-2 text-primary hover:text-primary/80 text-sm font-medium mb-3 sm:mb-4 transition-colors"
               >
                 <MdArrowBack className="w-4 h-4" />
                 Back to My Jobs
               </Link>
             )}
-            <h1 className="text-3xl font-bold text-foreground">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">
               {jobId ? `Applications for ${job?.title}` : "All Applications"}
             </h1>
-            <p className="text-muted-foreground mt-1">
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">
               {applications.length} total applications
               {!jobId && " across all job postings"}
             </p>
@@ -475,7 +509,7 @@ export default function JobApplications() {
         )}
 
         {/* Filter Tabs */}
-        <div className="flex flex-wrap gap-2 mb-8">
+        <div className="flex flex-wrap gap-1 sm:gap-2 mb-6 sm:mb-8">
           {[
             "ALL",
             "PENDING",
@@ -487,7 +521,7 @@ export default function JobApplications() {
             <button
               key={status}
               onClick={() => setFilter(status as typeof filter)}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`inline-flex items-center gap-1 sm:gap-2 px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
                 filter === status
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
@@ -495,7 +529,7 @@ export default function JobApplications() {
             >
               {status.replace("_", " ")}
               {status !== "ALL" && (
-                <span className="bg-background/20 rounded-full px-2 py-0.5 text-xs font-semibold">
+                <span className="bg-background/20 rounded-full px-1.5 sm:px-2 py-0.5 text-xs font-semibold">
                   {applications.filter((app) => app.status === status).length}
                 </span>
               )}
@@ -504,14 +538,14 @@ export default function JobApplications() {
         </div>
 
         {/* Applications List */}
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {filteredApplications.length === 0 ? (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="text-center py-16"
+              className="text-center py-8 sm:py-12 lg:py-16 px-4"
             >
-              <div className="text-muted-foreground text-lg mb-4">
+              <div className="text-muted-foreground text-base sm:text-lg mb-4">
                 {filter === "ALL"
                   ? "No applications yet"
                   : `No ${filter.toLowerCase()} applications`}
@@ -527,18 +561,18 @@ export default function JobApplications() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
-                className="bg-card text-card-foreground border border-border rounded-xl p-6 hover:shadow-lg transition-shadow"
+                className="bg-card text-card-foreground border border-border rounded-lg sm:rounded-xl p-3 sm:p-4 lg:p-6 hover:shadow-lg transition-shadow"
               >
-                <div className="flex justify-between items-start mb-6">
+                <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start mb-4 sm:mb-6">
                   <div className="flex-1">
-                    <div className="flex items-center gap-4 mb-4">
+                    <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
                       {/* Profile Image */}
-                      <div className="relative">
+                      <div className="relative flex-shrink-0">
                         {application.user?.imageUrl ? (
                           <img
                             src={formatImageUrl(application.user.imageUrl)}
                             alt={`${application.applicantName} profile`}
-                            className="w-16 h-16 rounded-full object-cover border-2 border-border"
+                            className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 rounded-full object-cover border-2 border-border"
                             onError={(e) => {
                               e.currentTarget.style.display = "none";
                               e.currentTarget.nextElementSibling?.classList.remove(
@@ -548,24 +582,24 @@ export default function JobApplications() {
                           />
                         ) : null}
                         <div
-                          className={`w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center border-2 border-border ${
+                          className={`w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-primary/10 rounded-full flex items-center justify-center border-2 border-border ${
                             application.user?.imageUrl ? "hidden" : ""
                           }`}
                         >
-                          <MdPerson className="w-8 h-8 text-primary" />
+                          <MdPerson className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-primary" />
                         </div>
                       </div>
 
-                      <div className="flex-1">
-                        <h3 className="text-xl font-semibold text-foreground mb-1">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-1 truncate">
                           {application.user?.firstName &&
                           application.user?.lastName
                             ? `${application.user.firstName} ${application.user.lastName}`
                             : application.applicantName}
                         </h3>
-                        <div className="flex items-center gap-2 mb-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-2">
                           <span
-                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(
+                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border self-start ${getStatusColor(
                               application.status
                             )}`}
                           >
@@ -579,24 +613,28 @@ export default function JobApplications() {
                     </div>
 
                     {!jobId && application.jobTitle && (
-                      <div className="bg-muted/50 rounded-lg p-3 mb-4">
-                        <h4 className="font-medium text-foreground mb-1">
+                      <div className="bg-muted/50 rounded-lg p-2 sm:p-3 mb-3 sm:mb-4">
+                        <h4 className="font-medium text-foreground mb-1 text-sm">
                           Applied for:
                         </h4>
-                        <div className="text-sm text-muted-foreground">
-                          <div className="font-medium">
+                        <div className="text-xs sm:text-sm text-muted-foreground">
+                          <div className="font-medium truncate">
                             {application.jobTitle}
                           </div>
                           {application.jobLocation && (
                             <div className="flex items-center gap-1 mt-1">
-                              <MdLocationOn className="w-3 h-3" />
-                              {application.jobLocation}
+                              <MdLocationOn className="w-3 h-3 flex-shrink-0" />
+                              <span className="truncate">
+                                {application.jobLocation}
+                              </span>
                             </div>
                           )}
                           {application.jobType && (
                             <div className="flex items-center gap-1 mt-1">
-                              <MdWork className="w-3 h-3" />
-                              {application.jobType}
+                              <MdWork className="w-3 h-3 flex-shrink-0" />
+                              <span className="truncate">
+                                {application.jobType}
+                              </span>
                             </div>
                           )}
                         </div>
@@ -604,34 +642,50 @@ export default function JobApplications() {
                     )}
 
                     {/* Contact Information */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-muted-foreground text-sm mb-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4 text-muted-foreground text-xs sm:text-sm mb-3 sm:mb-4">
                       <div className="flex items-center gap-2">
-                        <MdEmail className="w-4 h-4" />
-                        <span>
+                        <MdEmail className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                        <a
+                          href={`mailto:${
+                            application.user?.email ||
+                            application.applicantEmail
+                          }`}
+                          className="truncate text-primary hover:text-primary/80 hover:underline transition-colors"
+                        >
                           {application.user?.email ||
                             application.applicantEmail}
-                        </span>
+                        </a>
                       </div>
                       <div className="flex items-center gap-2">
-                        <MdPhone className="w-4 h-4" />
-                        <span>
-                          {application.user?.profile?.countryCode &&
-                          application.user?.profile?.phone
-                            ? `${application.user.profile.countryCode} ${application.user.profile.phone}`
-                            : application.user?.profile?.phone ||
-                              "Not provided"}
-                        </span>
+                        <MdPhone className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                        {application.user?.profile?.phone ? (
+                          <a
+                            href={`tel:${
+                              application.user?.profile?.countryCode || ""
+                            }${application.user.profile.phone}`}
+                            className="truncate text-primary hover:text-primary/80 hover:underline transition-colors"
+                          >
+                            {application.user?.profile?.countryCode &&
+                            application.user?.profile?.phone
+                              ? `${application.user.profile.countryCode} ${application.user.profile.phone}`
+                              : application.user?.profile?.phone}
+                          </a>
+                        ) : (
+                          <span className="truncate text-muted-foreground">
+                            Not provided
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
-                        <MdLocationOn className="w-4 h-4" />
-                        <span>
+                        <MdLocationOn className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                        <span className="truncate">
                           {application.user?.profile?.location ||
                             application.location}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <MdWork className="w-4 h-4" />
-                        <span>
+                        <MdWork className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                        <span className="truncate">
                           {application.user?.profile?.experience ||
                             application.experience}
                         </span>
@@ -653,14 +707,19 @@ export default function JobApplications() {
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-3 ml-6">
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 lg:ml-6 mt-3 lg:mt-0 w-full lg:w-auto">
                     {/* Status Update */}
                     <select
                       value={application.status}
                       onChange={(e) =>
-                        updateApplicationStatus(application.id, e.target.value)
+                        handleStatusChangeRequest(
+                          application.id,
+                          e.target.value,
+                          application.applicantName,
+                          application.status
+                        )
                       }
-                      className="px-3 py-2 border border-border rounded-lg text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+                      className="px-2 sm:px-3 py-2 border border-border rounded-lg text-xs sm:text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors w-full sm:w-auto"
                     >
                       <option value="PENDING">Pending</option>
                       <option value="REVIEWED">Reviewed</option>
@@ -677,41 +736,44 @@ export default function JobApplications() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleScheduleInterview(application)}
-                        className="flex items-center gap-2"
+                        className="flex items-center justify-center gap-1 sm:gap-2 px-3 py-2 text-xs sm:text-sm w-full sm:w-auto"
                       >
-                        <MdSchedule className="w-4 h-4" />
-                        Schedule Interview
+                        <MdSchedule className="w-3 h-3 sm:w-4 sm:h-4" />
+                        <span className="hidden sm:inline">
+                          Schedule Interview
+                        </span>
+                        <span className="sm:hidden">Interview</span>
                       </Button>
                     )}
                   </div>
                 </div>
 
                 {/* Documents Section */}
-                <div className="mb-6">
-                  <h4 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
-                    <MdAttachFile className="w-4 h-4" />
+                <div className="mb-4 sm:mb-6">
+                  <h4 className="text-sm font-medium text-foreground mb-2 sm:mb-3 flex items-center gap-2">
+                    <MdAttachFile className="w-3 h-3 sm:w-4 sm:h-4" />
                     Documents & Resume
                   </h4>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                     {/* Profile CV */}
                     {application.resumeUrl && (
                       <a
                         href={formatImageUrl(application.resumeUrl)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-3 bg-green-50 hover:bg-green-100 text-green-700 px-4 py-3 rounded-lg border border-green-200 transition-colors"
+                        className="flex items-center gap-2 sm:gap-3 bg-green-50 hover:bg-green-100 text-green-700 px-3 sm:px-4 py-2 sm:py-3 rounded-lg border border-green-200 transition-colors"
                       >
-                        <MdAttachFile className="w-5 h-5" />
+                        <MdAttachFile className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm">
+                          <p className="font-medium text-xs sm:text-sm truncate">
                             Profile Resume/CV
                           </p>
                           <p className="text-xs opacity-80">
                             From candidate's profile
                           </p>
                         </div>
-                        <MdVisibility className="w-4 h-4 flex-shrink-0" />
+                        <MdVisibility className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                       </a>
                     )}
 
@@ -725,11 +787,11 @@ export default function JobApplications() {
                               href={formatImageUrl(attachment.url)}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center gap-3 bg-blue-50 hover:bg-blue-100 text-blue-700 px-4 py-3 rounded-lg border border-blue-200 transition-colors"
+                              className="flex items-center gap-2 sm:gap-3 bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 sm:px-4 py-2 sm:py-3 rounded-lg border border-blue-200 transition-colors"
                             >
-                              <MdAttachFile className="w-5 h-5" />
+                              <MdAttachFile className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
                               <div className="flex-1 min-w-0">
-                                <p className="font-medium text-sm truncate">
+                                <p className="font-medium text-xs sm:text-sm truncate">
                                   {attachment.filename}
                                 </p>
                                 <p className="text-xs opacity-80">
@@ -740,7 +802,7 @@ export default function JobApplications() {
                                   MB
                                 </p>
                               </div>
-                              <MdVisibility className="w-4 h-4 flex-shrink-0" />
+                              <MdVisibility className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                             </a>
                           ))}
                         </>
@@ -761,18 +823,18 @@ export default function JobApplications() {
                 {/* Skills */}
                 {(application.user?.profile?.skills || application.skills)
                   ?.length > 0 && (
-                  <div className="mb-6">
-                    <h4 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
-                      <MdWork className="w-4 h-4" />
+                  <div className="mb-4 sm:mb-6">
+                    <h4 className="text-sm font-medium text-foreground mb-2 sm:mb-3 flex items-center gap-2">
+                      <MdWork className="w-3 h-3 sm:w-4 sm:h-4" />
                       Skills
                     </h4>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-1 sm:gap-2">
                       {(
                         application.user?.profile?.skills || application.skills
                       ).map((skill, skillIndex) => (
                         <span
                           key={skillIndex}
-                          className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-muted text-foreground border border-border"
+                          className="inline-flex items-center px-2 sm:px-3 py-1 rounded-full text-xs font-medium bg-muted text-foreground border border-border"
                         >
                           {skill}
                         </span>
@@ -783,12 +845,12 @@ export default function JobApplications() {
 
                 {/* Bio/About */}
                 {application.user?.profile?.bio && (
-                  <div className="mb-6">
-                    <h4 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
-                      <MdDescription className="w-4 h-4" />
+                  <div className="mb-4 sm:mb-6">
+                    <h4 className="text-sm font-medium text-foreground mb-2 sm:mb-3 flex items-center gap-2">
+                      <MdDescription className="w-3 h-3 sm:w-4 sm:h-4" />
                       About
                     </h4>
-                    <div className="bg-muted p-4 rounded-lg">
+                    <div className="bg-muted p-3 sm:p-4 rounded-lg">
                       <p className="text-foreground text-sm leading-relaxed">
                         {application.user.profile.bio}
                       </p>
@@ -798,12 +860,12 @@ export default function JobApplications() {
 
                 {/* Cover Letter */}
                 {application.coverLetter && (
-                  <div className="mb-6">
-                    <h4 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
-                      <MdDescription className="w-4 h-4" />
+                  <div className="mb-4 sm:mb-6">
+                    <h4 className="text-sm font-medium text-foreground mb-2 sm:mb-3 flex items-center gap-2">
+                      <MdDescription className="w-3 h-3 sm:w-4 sm:h-4" />
                       Cover Letter
                     </h4>
-                    <div className="bg-muted p-4 rounded-lg">
+                    <div className="bg-muted p-3 sm:p-4 rounded-lg">
                       <p className="text-foreground text-sm leading-relaxed">
                         {application.coverLetter}
                       </p>
@@ -814,12 +876,12 @@ export default function JobApplications() {
                 {/* Interviews Section */}
                 {application.interviews &&
                   application.interviews.length > 0 && (
-                    <div className="mb-6">
-                      <h4 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
-                        <MdEventNote className="w-4 h-4" />
+                    <div className="mb-4 sm:mb-6">
+                      <h4 className="text-sm font-medium text-foreground mb-2 sm:mb-3 flex items-center gap-2">
+                        <MdEventNote className="w-3 h-3 sm:w-4 sm:h-4" />
                         Scheduled Interviews ({application.interviews.length})
                       </h4>
-                      <div className="space-y-3">
+                      <div className="space-y-2 sm:space-y-3">
                         {application.interviews.map((interview) => (
                           <div
                             key={interview.id}
@@ -868,7 +930,8 @@ export default function JobApplications() {
                                     ).toLocaleDateString()}
                                   </p>
                                   <p className="text-xs opacity-75">
-                                    at {interview.scheduledTime}
+                                    at{" "}
+                                    {formatTimeToAMPM(interview.scheduledTime)}
                                   </p>
                                 </div>
                               </div>
@@ -941,61 +1004,75 @@ export default function JobApplications() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mt-12 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4"
+            className="mt-8 sm:mt-12 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4"
           >
-            <div className="bg-card p-6 rounded-xl border border-border">
-              <div className="text-3xl font-bold text-foreground">
+            <div className="bg-card p-3 sm:p-4 lg:p-6 rounded-lg sm:rounded-xl border border-border">
+              <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">
                 {applications.length}
               </div>
-              <div className="text-muted-foreground text-sm">Total</div>
+              <div className="text-muted-foreground text-xs sm:text-sm">
+                Total
+              </div>
             </div>
-            <div className="bg-card p-6 rounded-xl border border-border">
+            <div className="bg-card p-3 sm:p-4 lg:p-6 rounded-lg sm:rounded-xl border border-border">
               <div
-                className={`text-3xl font-bold ${getStatusBadgeColor(
+                className={`text-xl sm:text-2xl lg:text-3xl font-bold ${getStatusBadgeColor(
                   "PENDING"
                 )}`}
               >
                 {applications.filter((a) => a.status === "PENDING").length}
               </div>
-              <div className="text-muted-foreground text-sm">Pending</div>
+              <div className="text-muted-foreground text-xs sm:text-sm">
+                Pending
+              </div>
             </div>
-            <div className="bg-card p-6 rounded-xl border border-border">
+            <div className="bg-card p-3 sm:p-4 lg:p-6 rounded-lg sm:rounded-xl border border-border">
               <div
-                className={`text-3xl font-bold ${getStatusBadgeColor(
+                className={`text-xl sm:text-2xl lg:text-3xl font-bold ${getStatusBadgeColor(
                   "REVIEWED"
                 )}`}
               >
                 {applications.filter((a) => a.status === "REVIEWED").length}
               </div>
-              <div className="text-muted-foreground text-sm">Reviewed</div>
+              <div className="text-muted-foreground text-xs sm:text-sm">
+                Reviewed
+              </div>
             </div>
-            <div className="bg-card p-6 rounded-xl border border-border">
+            <div className="bg-card p-3 sm:p-4 lg:p-6 rounded-lg sm:rounded-xl border border-border">
               <div
-                className={`text-3xl font-bold ${getStatusBadgeColor(
+                className={`text-xl sm:text-2xl lg:text-3xl font-bold ${getStatusBadgeColor(
                   "SHORTLISTED"
                 )}`}
               >
                 {applications.filter((a) => a.status === "SHORTLISTED").length}
               </div>
-              <div className="text-muted-foreground text-sm">Shortlisted</div>
+              <div className="text-muted-foreground text-xs sm:text-sm">
+                Shortlisted
+              </div>
             </div>
-            <div className="bg-card p-6 rounded-xl border border-border">
+            <div className="bg-card p-3 sm:p-4 lg:p-6 rounded-lg sm:rounded-xl border border-border">
               <div
-                className={`text-3xl font-bold ${getStatusBadgeColor("HIRED")}`}
+                className={`text-xl sm:text-2xl lg:text-3xl font-bold ${getStatusBadgeColor(
+                  "HIRED"
+                )}`}
               >
                 {applications.filter((a) => a.status === "HIRED").length}
               </div>
-              <div className="text-muted-foreground text-sm">Hired</div>
+              <div className="text-muted-foreground text-xs sm:text-sm">
+                Hired
+              </div>
             </div>
-            <div className="bg-card p-6 rounded-xl border border-border">
+            <div className="bg-card p-3 sm:p-4 lg:p-6 rounded-lg sm:rounded-xl border border-border">
               <div
-                className={`text-3xl font-bold ${getStatusBadgeColor(
+                className={`text-xl sm:text-2xl lg:text-3xl font-bold ${getStatusBadgeColor(
                   "REJECTED"
                 )}`}
               >
                 {applications.filter((a) => a.status === "REJECTED").length}
               </div>
-              <div className="text-muted-foreground text-sm">Rejected</div>
+              <div className="text-muted-foreground text-xs sm:text-sm">
+                Rejected
+              </div>
             </div>
           </motion.div>
         )}
@@ -1011,6 +1088,69 @@ export default function JobApplications() {
           jobTitle={job?.title || "Position"}
           onScheduled={handleInterviewScheduled}
         />
+      )}
+
+      {/* Status Change Confirmation Modal */}
+      {showStatusConfirm && pendingStatusChange && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md"
+          >
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                Confirm Status Change
+              </h3>
+
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg mb-4">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <MdEmail className="w-5 h-5 text-blue-500 mt-0.5" />
+                  </div>
+                  <div className="ml-3">
+                    <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                      📧 Email Notification
+                    </h4>
+                    <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                      {pendingStatusChange.applicantName} will receive an email
+                      notification about this status change.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-gray-600 dark:text-gray-300 mb-6">
+                Are you sure you want to change{" "}
+                <strong>{pendingStatusChange.applicantName}</strong>'s
+                application status from{" "}
+                <strong>{pendingStatusChange.currentStatus}</strong> to{" "}
+                <strong>{pendingStatusChange.newStatus}</strong>?
+              </p>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowStatusConfirm(false);
+                    setPendingStatusChange(null);
+                  }}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={confirmStatusChange}
+                  className="flex-1"
+                >
+                  Confirm Change
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
       )}
     </div>
   );

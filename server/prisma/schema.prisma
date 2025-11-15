@@ -17,6 +17,7 @@ model User {
   role                   UserRole        @default(JOB_SEEKER)
   isActive               Boolean         @default(true)
   isVerified             Boolean         @default(false)
+  lastLogin              DateTime?
   createdAt              DateTime        @default(now())
   updatedAt              DateTime        @updatedAt
   resetCode              String?
@@ -125,6 +126,7 @@ model Job {
   salaryMax          Int?
   deadline           DateTime?
   isActive           Boolean          @default(true)
+  isApproved         Boolean          @default(false)
   isFeatured         Boolean          @default(false)
   viewCount          Int              @default(0)
   createdAt          DateTime         @default(now())
@@ -281,4 +283,18 @@ enum InterviewStatus {
   COMPLETED
   CANCELLED
   RESCHEDULED
+}
+
+model Newsletter {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  isActive    Boolean  @default(true)
+  source      String?  // Track where the subscription came from
+  ipAddress   String?  // For analytics
+  userAgent   String?  // For analytics
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  unsubscribedAt DateTime?
+
+  @@map("newsletters")
 }
