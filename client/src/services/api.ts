@@ -538,5 +538,61 @@ export const adminAPI = {
   getProfile: () => apiClient.get("/admin/profile"),
 };
 
+// Chat API
+export const chatAPI = {
+  // Get eligible contacts for messaging
+  getEligibleContacts: () => apiClient.get("/chat/eligible-contacts"),
+
+  // Get all conversations
+  getConversations: () => apiClient.get("/chat/conversations"),
+
+  // Get or create conversation with a specific user
+  getOrCreateConversation: (participantId: string) =>
+    apiClient.get(`/chat/conversations/${participantId}`),
+
+  // Get messages in a conversation
+  getMessages: (conversationId: string, page = 1, limit = 50) =>
+    apiClient.get(
+      `/chat/conversations/${conversationId}/messages?page=${page}&limit=${limit}`
+    ),
+
+  // Send a message
+  sendMessage: (
+    conversationId: string,
+    content: string,
+    attachmentUrl?: string,
+    attachmentType?: string
+  ) =>
+    apiClient.post(`/chat/conversations/${conversationId}/messages`, {
+      content,
+      attachmentUrl,
+      attachmentType,
+    }),
+
+  // Mark messages as read
+  markAsRead: (conversationId: string) =>
+    apiClient.patch(`/chat/conversations/${conversationId}/read`, {}),
+
+  // Edit a message
+  editMessage: (conversationId: string, messageId: string, content: string) =>
+    apiClient.patch(
+      `/chat/conversations/${conversationId}/messages/${messageId}`,
+      { content }
+    ),
+
+  // Delete a message
+  deleteMessage: (conversationId: string, messageId: string) =>
+    apiClient.delete(
+      `/chat/conversations/${conversationId}/messages/${messageId}`
+    ),
+
+  // Delete conversation
+  deleteConversation: (conversationId: string) =>
+    apiClient.delete(`/chat/conversations/${conversationId}`),
+
+  // Get unread count
+  getUnreadCount: () => apiClient.get("/chat/unread-count"),
+};
+
 // Export default instance
 export default apiClient;

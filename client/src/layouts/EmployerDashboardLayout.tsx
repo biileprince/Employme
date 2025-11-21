@@ -11,8 +11,10 @@ import {
   MdLogout,
   MdMenu,
   MdClose,
+  MdMessage,
 } from "react-icons/md";
 import { useAuth } from "../contexts/AuthContext";
+import { useChat } from "../contexts/ChatContext";
 import ThemeToggle from "../components/ui/ThemeToggle";
 import ScrollToTop from "../components/common/ScrollToTop";
 
@@ -22,6 +24,7 @@ const sidebarLinks = [
   { to: "/employer/my-jobs", label: "My Jobs", icon: MdWork },
   { to: "/employer/applications", label: "Applications", icon: MdDescription },
   { to: "/employer/candidates", label: "Find Candidates", icon: MdPeople },
+  { to: "/employer/messages", label: "Messages", icon: MdMessage },
   { to: "/employer/profile", label: "Profile", icon: MdSettings },
 ];
 
@@ -29,6 +32,7 @@ export default function EmployerDashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const { unreadCount } = useChat();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const handleLogout = async () => {
@@ -95,12 +99,13 @@ export default function EmployerDashboardLayout() {
         <nav className="flex flex-col gap-2 p-4 flex-1">
           {sidebarLinks.map((link) => {
             const IconComponent = link.icon;
+            const isMessages = link.to === "/employer/messages";
             return (
               <Link
                 key={link.to}
                 to={link.to}
                 onClick={() => setIsSidebarOpen(false)}
-                className={`flex items-center gap-3 py-3 px-4 rounded-lg transition-all duration-200 ${
+                className={`flex items-center gap-3 py-3 px-4 rounded-lg transition-all duration-200 relative ${
                   location.pathname === link.to
                     ? "bg-primary text-primary-foreground shadow-md"
                     : "text-foreground hover:bg-muted hover:text-primary"
@@ -108,6 +113,11 @@ export default function EmployerDashboardLayout() {
               >
                 <IconComponent className="w-5 h-5" />
                 <span className="font-medium">{link.label}</span>
+                {isMessages && unreadCount > 0 && (
+                  <span className="ml-auto bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full min-w-[20px] text-center">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
               </Link>
             );
           })}

@@ -200,7 +200,7 @@ export default function AdminEmployers() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-600 p-4 rounded-lg mb-6">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-200 p-4 rounded-lg mb-6">
           {error}
         </div>
       )}
@@ -250,10 +250,10 @@ export default function AdminEmployers() {
                         {employer.companyName}
                       </h3>
                       {employer.isVerified && (
-                        <MdVerified className="w-6 h-6 text-green-500" />
+                        <MdVerified className="w-6 h-6 text-success" />
                       )}
                       {!employer.isVerified && (
-                        <span className="bg-yellow-100 text-yellow-800 text-xs font-semibold px-2 py-1 rounded">
+                        <span className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200 text-xs font-semibold px-2 py-1 rounded">
                           Pending Verification
                         </span>
                       )}
@@ -315,7 +315,7 @@ export default function AdminEmployers() {
                         onClick={() =>
                           handleVerificationClick(employer, "approve")
                         }
-                        className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors"
+                        className="flex items-center gap-2 bg-success hover:bg-success/90 text-success-foreground px-4 py-2 rounded-lg transition-colors"
                       >
                         <MdCheck className="w-5 h-5" />
                         Approve
@@ -324,7 +324,7 @@ export default function AdminEmployers() {
                         onClick={() =>
                           handleVerificationClick(employer, "reject")
                         }
-                        className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
+                        className="flex items-center gap-2 bg-destructive hover:bg-destructive/90 text-destructive-foreground px-4 py-2 rounded-lg transition-colors"
                       >
                         <MdClose className="w-5 h-5" />
                         Reject
@@ -335,7 +335,7 @@ export default function AdminEmployers() {
                       onClick={() =>
                         handleVerificationClick(employer, "reject")
                       }
-                      className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg transition-colors"
+                      className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 dark:bg-yellow-600 dark:hover:bg-yellow-700 text-white px-4 py-2 rounded-lg transition-colors"
                     >
                       <MdClose className="w-5 h-5" />
                       Unverify
@@ -395,8 +395,8 @@ export default function AdminEmployers() {
             )}
 
             {verificationAction === "approve" && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-                <p className="text-sm text-green-800">
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-6">
+                <p className="text-sm text-green-800 dark:text-green-200">
                   This employer will be verified and their jobs can be approved.
                   They will receive an email notification.
                 </p>
@@ -404,8 +404,8 @@ export default function AdminEmployers() {
             )}
 
             {verificationAction === "reject" && selectedEmployer.isVerified && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-                <p className="text-sm text-yellow-800">
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-6">
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">
                   This will remove verification status. The employer's active
                   jobs may be hidden from public view. They will receive an
                   email notification.
@@ -414,7 +414,7 @@ export default function AdminEmployers() {
             )}
 
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg mb-4 text-sm">
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-200 p-3 rounded-lg mb-4 text-sm">
                 {error}
               </div>
             )}
@@ -435,10 +435,10 @@ export default function AdminEmployers() {
               </button>
               <button
                 onClick={handleVerificationSubmit}
-                className={`flex-1 px-4 py-3 rounded-lg text-white font-semibold transition-colors ${
+                className={`flex-1 px-4 py-3 rounded-lg font-semibold transition-colors ${
                   verificationAction === "approve"
-                    ? "bg-green-500 hover:bg-green-600"
-                    : "bg-red-500 hover:bg-red-600"
+                    ? "bg-success hover:bg-success/90 text-success-foreground"
+                    : "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
                 }`}
                 disabled={isSubmitting}
               >

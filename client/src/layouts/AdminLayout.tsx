@@ -13,8 +13,10 @@ import {
   MdAnalytics,
   MdEmail,
   MdBusiness,
+  MdMessage,
 } from "react-icons/md";
 import { useAuth } from "../contexts/AuthContext";
+import { useChat } from "../contexts/ChatContext";
 import ThemeToggle from "../components/ui/ThemeToggle";
 import Button from "../components/ui/Button";
 import ScrollToTop from "../components/common/ScrollToTop";
@@ -62,6 +64,11 @@ const navItems: NavItem[] = [
     icon: MdEmail,
   },
   {
+    path: "/admin/messages",
+    label: "Messages",
+    icon: MdMessage,
+  },
+  {
     path: "/admin/create-admin",
     label: "Create Admin",
     icon: MdPersonAdd,
@@ -73,6 +80,7 @@ export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { unreadCount } = useChat();
 
   const handleLogout = async () => {
     try {
@@ -123,12 +131,13 @@ export default function AdminLayout() {
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = isActiveRoute(item.path);
+              const isMessages = item.path === "/admin/messages";
 
               return (
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors relative ${
                     isActive
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -136,6 +145,11 @@ export default function AdminLayout() {
                 >
                   <Icon className="w-5 h-5 flex-shrink-0" />
                   <span className="font-medium">{item.label}</span>
+                  {isMessages && unreadCount > 0 && (
+                    <span className="ml-auto bg-destructive text-destructive-foreground text-xs font-semibold px-2 py-0.5 rounded-full">
+                      {unreadCount}
+                    </span>
+                  )}
                 </Link>
               );
             })}
@@ -211,13 +225,14 @@ export default function AdminLayout() {
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = isActiveRoute(item.path);
+              const isMessages = item.path === "/admin/messages";
 
               return (
                 <Link
                   key={item.path}
                   to={item.path}
                   onClick={() => setSidebarOpen(false)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors relative ${
                     isActive
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -225,6 +240,11 @@ export default function AdminLayout() {
                 >
                   <Icon className="w-5 h-5 flex-shrink-0" />
                   <span className="font-medium">{item.label}</span>
+                  {isMessages && unreadCount > 0 && (
+                    <span className="ml-auto bg-destructive text-destructive-foreground text-xs font-semibold px-2 py-0.5 rounded-full">
+                      {unreadCount}
+                    </span>
+                  )}
                 </Link>
               );
             })}

@@ -36,6 +36,7 @@ import {
   AllApplications,
   CandidateSearch,
 } from "./pages";
+import Messages from "./pages/Messages";
 
 // Import admin pages
 import {
@@ -180,6 +181,14 @@ const router = createBrowserRouter(
             </ProtectedRoute>
           ),
         },
+        {
+          path: "messages",
+          element: (
+            <ProtectedRoute requireRole="EMPLOYER">
+              <Messages />
+            </ProtectedRoute>
+          ),
+        },
       ],
     },
     // Job Seeker Dashboard Routes (separate layout)
@@ -217,6 +226,14 @@ const router = createBrowserRouter(
           element: (
             <ProtectedRoute requireRole="JOB_SEEKER">
               <JobSeekerProfile />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "messages",
+          element: (
+            <ProtectedRoute requireRole="JOB_SEEKER">
+              <Messages />
             </ProtectedRoute>
           ),
         },
@@ -293,6 +310,14 @@ const router = createBrowserRouter(
           element: (
             <ProtectedRoute requireRole="ADMIN">
               <CreateAdmin />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "messages",
+          element: (
+            <ProtectedRoute requireRole="ADMIN">
+              <Messages />
             </ProtectedRoute>
           ),
         },
