@@ -1,1662 +1,528 @@
 # Employ.me Copilot Instructions
 
-This is a full-stack job platform targeting Ghana's job market with React/TypeScript frontend and Express/Prisma backend.
+Full-stack job platform for Ghana's market. React 19 + TypeScript + Vite frontend, Express + Prisma + PostgreSQL backend with 3-tier role system (JOB_SEEKER, EMPLOYER, ADMIN).
 
 ## Quick Start Commands
 
 ```bash
-# Backend setup (Terminal 1)
-cd server && npm run dev          # Starts on :5001 with tsx watch
+# Backend (Terminal 1) - Port 5001
+cd server && npm run dev          # tsx watch with hot reload (Express + Socket.IO)
 npm run db:studio                 # Prisma Studio on :5555
 
-# Frontend setup (Terminal 2)
-cd client && npm run dev          # Starts on :5173 with Vite HMR
+# Frontend (Terminal 2) - Port 5173
+cd client && npm run dev          # Vite with HMR (React + Socket.IO client)
 
-# Database operations
-cd server
-npm run db:push                   # Push schema changes (dev)
-npm run db:migrate                # Create migrations (prod)
-npm run db:seed                   # Populate with sample data
+# Database operations (from server/)
+npm run db:generate               # Regenerate Prisma client after schema changes
+npm run db:push                   # Push schema changes (dev only, no migrations)
+npm run db:migrate                # Create migration (required for prod)
+npm run db:seed                   # Seed with test data (preserves admin)
 ```
 
 ## Architecture Overview
 
-**Frontend**: React 19 + TypeScript + Vite + Tailwind CSS 4.1 + Framer Motion + React Icons
-**Backend**: Express + TypeScript + Prisma + PostgreSQL + Socket.io + Cloudinary
-**Authentication**: JWT tokens with role-based access (JOB_SEEKER, EMPLOYER, ADMIN)
+**Tech Stack**: React 19.1 + TypeScript 5.8 + Vite 7.1 + Tailwind CSS 4.1 + Framer Motion 12.23 | Express 4.18 + Prisma 5.22 + PostgreSQL + Socket.io 4.x + Cloudinary + Nodemailer
 
-### Current Tech Stack (Updated Jan 2025)
+**Critical Design Decisions**:
 
-**Frontend Dependencies:**
+- **Role-based profiles**: User model has `role` field, one-to-one relations create JobSeeker/Employer/Admin profiles
+- **Two-tier moderation**: Employers need `isVerified=true` (admin manual approval), Jobs need `isApproved=true` (separate admin approval)
+- **Request deduplication**: ApiClient caches pending requests by `${method}:${endpoint}:${data}` to prevent duplicate API calls
+- **JWT + localStorage**: `apiClient.setToken()` stores token, auto-included in all requests via Authorization header
+- **Graceful empty states**: Backend returns `success: true, data: []` even for empty results; frontend always initializes state as `[]`
 
-- React 19.1.1 with React Router DOM 7.8.2
-- TypeScript 5.8.3 with strict type checking
-- Vite 7.1.2 as build tool and dev server
-- Tailwind CSS 4.1.13 with @tailwindcss/vite plugin
-- Framer Motion 12.23.12 for animations
-- React Icons 5.5.0 for consistent iconography
-- Axios 1.11.0 for HTTP requests (alongside fetch API)
-
-**Backend Dependencies:**
-
-- Express 4.18.2 with TypeScript support via tsx
-- Prisma 5.22.0 as ORM with PostgreSQL
-- JWT authentication with bcryptjs password hashing
-- Cloudinary 1.41.0 for file uploads
-- Express Validator 7.2.1 for request validation
-- Multer for multipart form handling
-- Nodemailer 6.10.1 for email services
-
-### Key Project Structure
+**Project Structure**:
 
 ```
 client/src/
-├── pages/             # Feature-organized pages
-│   ├── auth/          # Login, signup, onboarding
-│   ├── employer/      # Employer dashboard, job management
-│   ├── job-seeker/    # Job seeker dashboard, applications
-│   └── jobs/          # Public job listings and details
-├── components/        # Reusable UI components
-│   ├── auth/          # Auth-specific components
-│   ├── common/        # Shared components (Header, Footer)
-│   ├── features/      # Feature-specific components
-│   └── ui/            # Base UI components
-├── contexts/          # React contexts (AuthContext)
-├── services/          # API client and service functions
-└── layouts/           # Page layouts
+├── pages/          # Feature-organized: auth/, employer/, job-seeker/, jobs/, admin/
+│   ├── Messages.tsx  # Real-time chat UI with Socket.IO
+├── components/
+│   ├── ui/         # Reusable: Button, PhoneInput (with variant/size props)
+│   ├── common/     # Header, Footer, ScrollToTop
+│   ├── auth/       # LoginForm, RegisterForm, SocialLogin, EmailVerification
+│   └── features/   # Newsletter, JobApplicationModal
+├── contexts/       # AuthContext (useAuth hook for user state), ChatContext (Socket.IO + messaging)
+├── services/       # api.ts (centralized ApiClient with token management)
+└── layouts/        # Role-specific: JobSeekerDashboardLayout, EmployerDashboardLayout, AdminLayout
 
 server/src/
-├── controllers/       # Business logic handlers
-├── routes/            # Express route definitions
-├── middleware/        # Auth, validation, error handling
-└── prisma/           # Database schema and migrations
+├── controllers/    # Business logic: authController, jobController, adminController, newsletterController, interviewController, chatController
+├── routes/         # Express routes with middleware applied
+├── middleware/     # auth.ts (authMiddleware populates req.user), errorHandler.ts (catchAsync wrapper)
+├── services/       # emailService.ts (Nodemailer for verification/notifications)
+├── index.ts        # Express + Socket.IO setup with JWT authentication
+└── prisma/         # schema.prisma (includes Conversation + Message models), migrations/, seed.ts
 ```
 
-## Database Schema (Prisma)
+## Database Schema (Prisma) - Critical Patterns
 
-### Core Models & Relationships
+**Core Relationships**:
 
 ```typescript
-// User -> Profile (one-to-one based on role)
-User { role: UserRole }
-├── JobSeeker (role === 'JOB_SEEKER')
-├── Employer (role === 'EMPLOYER')
-└── Admin (role === 'ADMIN')
-
-// Job Application Flow
-Job (employer) ← Application → JobSeeker
-Job ← SavedJob → JobSeeker (many-to-many)
-
-// File Management
-User/Job/Application → Attachment (one-to-many)
+User (role: JOB_SEEKER|EMPLOYER|ADMIN) →1:1→ JobSeeker|Employer|Admin
+Employer →1:many→ Job (employer posts jobs)
+Job →many:many→ JobSeeker via Application (unique constraint: [jobId, jobSeekerId])
+Job →many:many→ JobSeeker via SavedJob (bookmarks)
+User/Job/Application →1:many→ Attachment (file uploads)
 ```
 
-### Detailed Model Structure
+**Key Fields** (from schema.prisma):
 
-#### User Model (Central Authentication)
+- `User.isVerified`: Email verification (boolean)
+- `Employer.isVerified`: Admin approval for employer (boolean) - **required to post jobs that can be approved**
+- `Job.isApproved`: Admin approval for individual job (boolean) - **required for public visibility**
+- `Job.isActive`: Employer control (boolean) - deactivate without deleting
+- `Job.isFeatured`: Premium placement (boolean)
+- `Application.status`: PENDING|REVIEWED|SHORTLISTED|REJECTED|HIRED
+- `JobSeeker.skills`: String[] - array of skill strings
+- `Job.requirements`: String[] - array of requirements
+- `Job.benefits`: String[] - array of benefits
 
-```typescript
-model User {
-  id: String @id @default(cuid())           // CUID for unique IDs
-  email: String @unique                     // Primary login identifier
-  password: String                          // Hashed password
-  role: UserRole @default(JOB_SEEKER)      // Determines profile type
-  isActive: Boolean @default(true)          // Soft delete flag
-  isVerified: Boolean @default(false)       // Email verification status
-
-  // Profile Relations (one-to-one based on role)
-  jobSeeker: JobSeeker?                     // Only if role === JOB_SEEKER
-  employer: Employer?                       // Only if role === EMPLOYER
-  admin: Admin?                             // Only if role === ADMIN
-
-  // File Management
-  attachments: Attachment[]                 // User's uploaded files
-  socialAccounts: SocialAccount[]           // OAuth connections
-}
-```
-
-#### JobSeeker Profile
+**CRITICAL Query Pattern** - Always include role profiles:
 
 ```typescript
-model JobSeeker {
-  userId: String @unique                    // Foreign key to User
-  skills: String[]                          // Array of skill strings
-  experience: ExperienceLevel?              // Career level
-  applications: Application[]               // Job applications
-  savedJobs: SavedJob[]                     // Bookmarked jobs
-
-  // Contact Information
-  phone: String?
-  countryCode: String?                      // For international numbers
-}
-```
-
-#### Employer Profile
-
-```typescript
-model Employer {
-  userId: String @unique                    // Foreign key to User
-  companyName: String                       // Required business name
-  isVerified: Boolean @default(false)       // Manual verification flag
-  jobs: Job[]                               // Posted job listings
-
-  // Company Details
-  industry: String?
-  companySize: String?                      // e.g., "10-50 employees"
-  founded: Int?                             // Year founded
-}
-```
-
-#### Job Model (Core Business Entity)
-
-```typescript
-model Job {
-  employerId: String                        // Foreign key to Employer
-  requirements: String[]                    // Array of job requirements
-  benefits: String[]                        // Array of job benefits
-  category: JobCategory @default(OTHER)     // Industry categorization
-  experience: ExperienceLevel?              // Required experience level
-
-  // Salary Information
-  salaryMin: Int?                           // Minimum salary
-  salaryMax: Int?                           // Maximum salary
-
-  // Status & Analytics
-  isActive: Boolean @default(true)          // Job posting status
-  isFeatured: Boolean @default(false)       // Premium placement
-  viewCount: Int @default(0)                // Analytics tracking
-
-  // Relations
-  applications: Application[]               // Job applications
-  savedJobs: SavedJob[]                     // User bookmarks
-  attachments: Attachment[]                 // Job-related files
-}
-```
-
-#### Application Model (Core Business Logic)
-
-```typescript
-model Application {
-  jobId: String                             // Foreign key to Job
-  jobSeekerId: String                       // Foreign key to JobSeeker
-  status: ApplicationStatus @default(PENDING)
-  coverLetter: String?                      // Optional cover letter
-  attachments: Attachment[]                 // Resume, portfolio files
-
-  @@unique([jobId, jobSeekerId])           // Prevents duplicate applications
-}
-```
-
-### Key Enums & Values
-
-```typescript
-enum UserRole {
-  JOB_SEEKER    // Default role for job seekers
-  EMPLOYER      // Company representatives
-  ADMIN         // Platform administrators
-}
-
-enum ApplicationStatus {
-  PENDING       // Initial state
-  REVIEWED      // Employer has viewed
-  SHORTLISTED   // Moved to interview stage
-  REJECTED      // Application declined
-  HIRED         // Successful application
-}
-
-enum JobType {
-  FULL_TIME     // Standard employment
-  PART_TIME     // Reduced hours
-  CONTRACT      // Fixed-term work
-  INTERNSHIP    // Student/entry positions
-  FREELANCE     // Project-based work
-}
-
-enum ExperienceLevel {
-  ENTRY_LEVEL   // 0-2 years experience
-  MID_LEVEL     // 2-5 years experience
-  SENIOR_LEVEL  // 5+ years experience
-  EXECUTIVE     // Leadership positions
-}
-
-enum JobCategory {
-  TECHNOLOGY, FINANCE, HEALTHCARE, EDUCATION, MARKETING,
-  SALES, DESIGN, ENGINEERING, OPERATIONS, HUMAN_RESOURCES,
-  LEGAL, CUSTOMER_SERVICE, MANUFACTURING, CONSULTING,
-  MEDIA, GOVERNMENT, NON_PROFIT, AGRICULTURE, CONSTRUCTION,
-  HOSPITALITY, TRANSPORTATION, RETAIL, REAL_ESTATE,
-  TELECOMMUNICATIONS, OTHER
-}
-```
-
-### Cascade Delete Behavior
-
-```typescript
-// User deletion cascades to all related records
-User → JobSeeker/Employer/Admin (CASCADE)
-User → SocialAccount (CASCADE)
-User → Attachment (CASCADE)
-
-// Job deletion removes all applications and saved jobs
-Job → Application (CASCADE)
-Job → SavedJob (CASCADE)
-Job → Attachment (CASCADE)
-
-// Application deletion removes associated attachments
-Application → Attachment (CASCADE)
-```
-
-### Critical Query Patterns
-
-```typescript
-// Always include role-specific profile when fetching users
 const user = await prisma.user.findUnique({
   where: { id },
-  include: {
-    jobSeeker: true,
-    employer: true,
-    admin: true,
-  },
+  include: { jobSeeker: true, employer: true, admin: true }, // Include ALL role profiles
 });
+```
 
-// Include job and employer data for applications
-const applications = await prisma.application.findMany({
-  where: { jobSeekerId },
-  include: {
-    job: {
-      include: { employer: true },
-    },
-    attachments: true,
-  },
-});
+**Duplicate Prevention**:
 
-// Employer job listings with application counts
-const jobs = await prisma.job.findMany({
-  where: { employerId },
-  include: {
-    _count: { select: { applications: true } },
-    applications: {
-      include: { jobSeeker: true },
-    },
-  },
-});
-
-// Prevent duplicate applications with unique constraint
+```typescript
+// Application model has @@unique([jobId, jobSeekerId])
 try {
   await prisma.application.create({
     data: { jobId, jobSeekerId, coverLetter },
   });
 } catch (error) {
   if (error.code === "P2002") {
+    // Prisma unique constraint violation
     throw new AppError("You have already applied to this job", 400);
   }
 }
 ```
 
-### Database Connection Best Practices
+**Cascade Deletes**:
 
-```typescript
-// Single Prisma instance with connection pooling
-const prisma = new PrismaClient({
-  log: process.env.NODE_ENV === "development" ? ["query"] : [],
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL,
-    },
-  },
-});
-
-// Graceful shutdown
-process.on("beforeExit", async () => {
-  await prisma.$disconnect();
-});
-
-// Transaction handling for related data
-await prisma.$transaction(async (tx) => {
-  const user = await tx.user.create({ data: userData });
-  await tx.jobSeeker.create({
-    data: { userId: user.id, ...profileData },
-  });
-});
-```
+- User deletion → cascades to JobSeeker/Employer/Admin, SocialAccount, Attachment
+- Job deletion → cascades to Application, SavedJob, Attachment
+- Application deletion → cascades to Attachment
 
 ## Frontend Component Patterns
 
-### Component Composition Strategy
+**Icon Integration (CRITICAL)**: ALWAYS use React Icons (react-icons/md, react-icons/hi), NEVER SVG or emojis:
 
 ```typescript
-// Feature-based organization with barrel exports
-import { Dashboard, MyApplications } from "../pages/job-seeker";
-import { Button, PhoneInput } from "../components/ui";
-import { Header, Footer } from "../components/common";
+import { MdPhone, MdEmail, MdWork } from "react-icons/md";
+<MdPhone className="w-5 h-5 text-muted-foreground" />;
 ```
 
-### UI Component Architecture
+**UI Component Props** (Button, PhoneInput follow this pattern):
 
 ```typescript
-// Standardized component prop patterns
-interface ComponentProps extends HTMLAttributes<HTMLElement> {
+interface ComponentProps {
   variant?: "primary" | "secondary" | "outline" | "ghost";
   size?: "sm" | "md" | "lg";
-  fullWidth?: boolean;
   isLoading?: boolean;
-  children: ReactNode;
-}
-
-// Base styling system with Tailwind CSS
-const baseStyles =
-  "font-semibold rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95";
-```
-
-### Design System Patterns
-
-```typescript
-// Consistent size variations
-const sizeStyles = {
-  sm: "text-sm px-4 py-2",
-  md: "text-base px-6 py-3",
-  lg: "text-lg px-8 py-4",
-};
-
-// Brand color variants using CSS custom properties
-const variantStyles = {
-  primary:
-    "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg hover:shadow-xl",
-  secondary:
-    "bg-secondary text-secondary-foreground hover:bg-secondary/90 shadow-lg hover:shadow-xl",
-  outline:
-    "border-2 border-border bg-transparent hover:bg-accent hover:text-accent-foreground hover:border-accent",
-  ghost: "bg-transparent hover:bg-muted hover:text-foreground",
-};
-```
-
-### Form Component Patterns
-
-```typescript
-// Standardized input components with error handling
-<PhoneInput
-  countryCode={countryCode}
-  phoneNumber={phone}
-  onCountryCodeChange={setCountryCode}
-  onPhoneNumberChange={setPhone}
-  label="Phone Number"
-  required
-  error={errors.phone}
-  className="mb-4"
-/>;
-
-// Consistent form validation display
-{
-  error && (
-    <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
-      <p className="text-red-600">{error}</p>
-      <button onClick={() => window.location.reload()}>Try Again</button>
-    </div>
-  );
+  fullWidth?: boolean;
 }
 ```
 
-### Loading State Patterns
+**File Upload Pattern** (ALWAYS reset input after processing):
 
 ```typescript
-// Integrated loading states in components
-<Button variant="primary" size="lg" isLoading={submitting} fullWidth>
-  {isLoading ? (
-    <div className="flex items-center justify-center gap-2">
-      <div className="wave-loader">
-        <div className="dot"></div>
-        <div className="dot"></div>
-        <div className="dot"></div>
-      </div>
-      <span>Submit Application</span>
-    </div>
-  ) : (
-    "Submit Application"
-  )}
-</Button>
-```
-
-### File Upload Patterns
-
-```typescript
-// File upload validation and handling
 const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
   const files = event.target.files;
-  if (!files) return;
+  // Validate: PDF, DOC, DOCX, TXT only, 5MB max
+  // Create preview with URL.createObjectURL()
 
-  Array.from(files).forEach((file) => {
-    // Validate file type
-    const isValidFile =
-      file.type === "application/pdf" ||
-      file.type === "application/msword" ||
-      file.type ===
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-      file.type === "text/plain";
-
-    if (!isValidFile) {
-      alert("Please upload PDF, DOC, DOCX, or TXT files only.");
-      return;
-    }
-
-    // Validate file size (5MB max)
-    if (file.size > 5 * 1024 * 1024) {
-      alert("File size must be less than 5MB.");
-      return;
-    }
-
-    const fileUpload: FileUpload = {
-      file,
-      preview: URL.createObjectURL(file),
-      type: file.name.toLowerCase().includes("cover")
-        ? "cover_letter"
-        : "resume",
-    };
-
-    setUploadedFiles((prev) => [...prev, fileUpload]);
-  });
-
-  // Always reset file input after processing
   if (fileInputRef.current) {
-    fileInputRef.current.value = "";
+    fileInputRef.current.value = ""; // CRITICAL: Prevent file persistence
   }
 };
 
-// File removal with cleanup
+// Cleanup on removal
 const removeFile = (index: number) => {
-  setUploadedFiles((prev) => {
-    const newFiles = [...prev];
-    URL.revokeObjectURL(newFiles[index].preview); // Prevent memory leaks
-    newFiles.splice(index, 1);
-    return newFiles;
-  });
+  URL.revokeObjectURL(files[index].preview); // Prevent memory leaks
 };
 ```
 
-### Modal and Form Component Patterns
+**Animation Pattern** (Framer Motion):
 
 ```typescript
-// Modal with progress steps and file management
-const JobApplicationModal = ({
-  isOpen,
-  onClose,
-  job,
-  onApplicationSuccess,
-}) => {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [uploadedFiles, setUploadedFiles] = useState<FileUpload[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Step icon helper
-  const getStepIcon = (step: number) => {
-    switch (step) {
-      case 1:
-        return <HiDocumentText className="w-5 h-5" />;
-      case 2:
-        return <HiUpload className="w-5 h-5" />;
-      case 3:
-        return <HiUser className="w-5 h-5" />;
-      default:
-        return null;
-    }
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-    >
-      <motion.div
-        className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Modal header with close button */}
-        <div className="flex items-center justify-between p-6 border-b border-border">
-          <h2 className="text-2xl font-bold">Apply for {job.title}</h2>
-          <button onClick={onClose} className="p-2 hover:bg-muted rounded-lg">
-            <HiX className="w-5 h-5 text-muted-foreground" />
-          </button>
-        </div>
-
-        {/* Progress steps indicator */}
-        <div className="px-6 py-4 border-b border-border">
-          <div className="flex items-center justify-between">
-            {[1, 2, 3].map((step) => (
-              <div key={step} className="flex items-center">
-                <div
-                  className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-colors ${
-                    currentStep >= step
-                      ? "bg-primary border-primary text-primary-foreground"
-                      : "border-muted-foreground text-muted-foreground"
-                  }`}
-                >
-                  {getStepIcon(step)}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </motion.div>
-    </motion.div>
-  );
-};
-```
-
-### Animation Patterns (Framer Motion)
-
-```typescript
-// Consistent page transitions
-<motion.div
-  initial={{ opacity: 0, x: -50 }}
-  animate={{ opacity: 1, x: 0 }}
-  transition={{ duration: 0.8 }}
->
-  {/* Page content */}
-</motion.div>
-
-// List item animations
 <motion.div
   initial={{ opacity: 0, y: 20 }}
   animate={{ opacity: 1, y: 0 }}
-  transition={{ delay: index * 0.1 }}
+  transition={{ delay: index * 0.1 }} // Stagger list items
 >
-  {/* List item content */}
-</motion.div>
 ```
 
-### Theme System (Tailwind CSS 4.1)
+**Tailwind Theme** (use CSS variables, NOT hardcoded colors):
 
 ```css
-/* Design tokens defined in index.css */
-@theme {
-  /* Primary colors (brand slate) */
-  --color-primary-500: #64748b;
-  --color-primary-800: #1e293b; /* Base primary */
-
-  /* Secondary colors (tech green) */
-  --color-secondary-500: #22c55e; /* Base secondary */
-
-  /* Neutral colors (brand blue) */
-  --color-neutral-500: #0ea5e9; /* Base neutral */
-
-  /* Semantic light mode tokens */
-  --color-background: #ffffff;
-  --color-foreground: #000000;
-  --color-card: #ffffff;
-  --color-popover: #ffffff;
-}
-
-/* Dark mode variants */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: #000000;
-    --color-foreground: #ffffff;
-    --color-card: #000000;
-    --color-popover: #000000;
-  }
-}
+/* client/src/index.css defines tokens */
+--color-primary-800: #1e293b; /* Use: bg-primary, text-primary */
+--color-secondary-500: #22c55e; /* Use: bg-secondary */
+/* NEVER: bg-[#1e293b], use semantic tokens */
 ```
 
-### Icon Integration Pattern (CRITICAL: Always Use React Icons)
+## API & Backend Patterns
+
+**API Response Structure** (ALL endpoints follow this):
 
 ```typescript
-// React Icons with consistent sizing - NEVER use SVG icons or emojis
-import { MdPhone, MdEmail, MdWork, MdLocationOn, MdAttachMoney } from "react-icons/md";
-import { HiX, HiUpload, HiDocumentText, HiUser } from "react-icons/hi";
-import { MdAttachFile, MdDelete, MdCheckCircle, MdBusiness } from "react-icons/md";
-
-// Standard icon usage in components - consistent sizing and positioning
-<MdPhone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
-
-// Icon usage in buttons and interactive elements
-<Button variant="outline" className="flex items-center gap-2">
-  <MdAttachFile className="w-4 h-4" />
-  Upload Resume
-</Button>
-
-// Homepage feature icons - use Material Design icons consistently
-<div className="flex items-center mb-4">
-  <MdLocationOn className="w-8 h-8 text-primary mr-3" />
-  <span>Location-based job search</span>
-</div>
-```
-
-### Component Export Strategy
-
-```typescript
-// ui/index.ts - Barrel exports for clean imports
-export { default as Button } from "./Button";
-export { default as PhoneInput } from "./PhoneInput";
-export { default as ThemeToggle } from "./ThemeToggle";
-
-// Feature-specific component groups
-export * from "./auth";
-export * from "./common";
-export * from "./features";
-```
-
-## API Response Handling
-
-### Standardized Response Structure
-
-```typescript
-// All API responses follow this pattern
 interface ApiResponse<T> {
   success: boolean;
   data?: T;
   message?: string;
-  error?: any;
 }
 
-// Frontend error handling pattern
-try {
-  const response = await jobsAPI.getAll();
-  if (response.success) {
-    setJobs(response.data.jobs);
-  } else {
-    throw new Error(response.message || "Unknown error");
-  }
-} catch (err) {
-  console.error("Failed to fetch jobs:", err);
-  // Always handle empty states gracefully
-  setJobs([]);
-  setError("Failed to load jobs. Please try again.");
+// Frontend pattern - ALWAYS check success first
+const response = await jobsAPI.getAll();
+if (response.success) {
+  setJobs(response.data.jobs || []); // Default to [] for safety
 }
 ```
 
-### API Client Architecture
+**Error Handling**:
 
 ```typescript
-// Centralized HTTP client with automatic token management and request deduplication
-class ApiClient {
-  private baseURL: string;
-  private token: string | null = null;
-  private pendingRequests: Map<string, Promise<ApiResponse<unknown>>> =
-    new Map();
-
-  constructor(baseURL: string) {
-    this.baseURL = baseURL;
-    this.token = localStorage.getItem("auth_token");
-  }
-
-  setToken(token: string) {
-    this.token = token;
-    localStorage.setItem("auth_token", token);
-  }
-
-  removeToken() {
-    this.token = null;
-    localStorage.removeItem("auth_token");
-  }
-
-  // Image URL formatting utility
-  formatImageUrl(url: string): string {
-    if (!url) return "";
-    if (url.startsWith("http://") || url.startsWith("https://")) {
-      return url;
-    }
-    const serverBaseUrl = this.baseURL.replace("/api", "");
-    return url.startsWith("/")
-      ? `${serverBaseUrl}${url}`
-      : `${serverBaseUrl}/${url}`;
-  }
-
-  private async request<T>(
-    endpoint: string,
-    method: HttpMethod = "GET",
-    data?: RequestData
-  ): Promise<ApiResponse<T>> {
-    // Request deduplication to prevent duplicate API calls
-    const requestKey = `${method}:${endpoint}:${JSON.stringify(data || {})}`;
-
-    if (this.pendingRequests.has(requestKey)) {
-      return this.pendingRequests.get(requestKey) as Promise<ApiResponse<T>>;
-    }
-
-    const url = `${this.baseURL}${endpoint}`;
-    const headers: HeadersInit = {};
-
-    // Handle FormData vs JSON content
-    if (!(data instanceof FormData)) {
-      headers["Content-Type"] = "application/json";
-    }
-
-    if (this.token) {
-      headers.Authorization = `Bearer ${this.token}`;
-    }
-
-    const config: RequestInit = {
-      method,
-      headers,
-      credentials: "include",
-    };
-
-    if (data) {
-      config.body = data instanceof FormData ? data : JSON.stringify(data);
-    }
-
-    const requestPromise = fetch(url, config)
-      .then(async (response) => {
-        const result = await response.json();
-
-        if (!response.ok) {
-          // Handle 401 unauthorized by clearing token
-          if (response.status === 401) {
-            this.removeToken();
-          }
-          throw new Error(result.message || `HTTP ${response.status}`);
-        }
-
-        return result;
-      })
-      .catch((error) => {
-        console.error(`API ${method} ${endpoint} error:`, error);
-        throw error;
-      })
-      .finally(() => {
-        this.pendingRequests.delete(requestKey);
-      });
-
-    this.pendingRequests.set(requestKey, requestPromise);
-    return requestPromise;
-  }
-}
-```
-
-### Feature-Organized API Endpoints
-
-```typescript
-// Organized by business domain for maintainability
-export const authAPI = {
-  login: (credentials: { email: string; password: string }) =>
-    apiClient.post("/auth/login", credentials),
-  register: (userData: RegisterData) =>
-    apiClient.post("/auth/register", userData),
-  logout: () => apiClient.post("/auth/logout"),
-  verifyEmail: (code: string) => apiClient.post("/auth/verify-email", { code }),
-  resendVerification: (email: string) =>
-    apiClient.post("/auth/resend-verification", { email }),
-  forgotPassword: (email: string) =>
-    apiClient.post("/auth/forgot-password", { email }),
-  resetPassword: (code: string, newPassword: string) =>
-    apiClient.post("/auth/reset-password", { code, newPassword }),
-  refreshUser: () => apiClient.get("/auth/me"),
-};
-
-export const jobsAPI = {
-  getAll: (params?: URLSearchParams) =>
-    apiClient.get(`/jobs${params ? `?${params}` : ""}`),
-  getById: (id: string) => apiClient.get(`/jobs/${id}`),
-  create: (jobData: CreateJobData) => apiClient.post("/jobs", jobData),
-  update: (id: string, jobData: Partial<CreateJobData>) =>
-    apiClient.put(`/jobs/${id}`, jobData),
-  delete: (id: string) => apiClient.delete(`/jobs/${id}`),
-  getCategories: () => apiClient.get("/jobs/categories"),
-  getFeatured: () => apiClient.get("/jobs/featured"),
-};
-
-export const applicationsAPI = {
-  getByJobSeeker: () => apiClient.get("/applications/job-seeker"),
-  getByEmployer: () => apiClient.get("/applications/employer"),
-  apply: (jobId: string, coverLetter?: string) =>
-    apiClient.post("/applications", { jobId, coverLetter }),
-  updateStatus: (id: string, status: string) =>
-    apiClient.put(`/applications/${id}/status`, { status }),
-  withdraw: (id: string) => apiClient.delete(`/applications/${id}`),
-};
-
-export const savedJobsAPI = {
-  getSaved: () => apiClient.get("/saved-jobs"),
-  saveJob: (jobId: string) => apiClient.post("/saved-jobs", { jobId }),
-  unsaveJob: (jobId: string) => apiClient.delete(`/saved-jobs/${jobId}`),
-  checkSaved: (jobId: string) => apiClient.get(`/saved-jobs/check/${jobId}`),
-};
-
-export const attachmentAPI = {
-  upload: (files: FileList) => {
-    const formData = new FormData();
-    Array.from(files).forEach((file) => formData.append("files", file));
-    return apiClient.post("/attachments/upload", formData);
-  },
-  getUserAttachments: () => apiClient.get("/attachments/my-attachments"),
-  getAttachments: (entityType: string, entityId: string) =>
-    apiClient.get(`/attachments/${entityType}/${entityId}`),
-  delete: (id: string) => apiClient.delete(`/attachments/${id}`),
-};
-
-export const userAPI = {
-  getProfile: () => apiClient.get("/users/profile"),
-  updateProfile: (profileData: UpdateProfileData) =>
-    apiClient.put("/users/profile", profileData),
-  uploadAvatar: (file: File) => {
-    const formData = new FormData();
-    formData.append("avatar", file);
-    return apiClient.post("/users/avatar", formData);
-  },
-  changePassword: (currentPassword: string, newPassword: string) =>
-    apiClient.put("/users/change-password", { currentPassword, newPassword }),
-};
-```
-
-### Backend Error Patterns
-
-```typescript
-// Custom error class for operational errors
-class AppError extends Error {
-  statusCode: number;
-  isOperational: boolean;
-
-  constructor(message: string, statusCode: number) {
-    super(message);
-    this.statusCode = statusCode;
-    this.isOperational = true;
-  }
-}
-
-// Usage in controllers
+// Backend: Custom error class
 throw new AppError("Job not found", 404);
 throw new AppError("You have already applied to this job", 400);
-throw new AppError("Unauthorized access", 401);
 
-// Async wrapper for error handling
-const catchAsync = (fn: Function) => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    fn(req, res, next).catch(next);
-  };
-};
-
-// Controller pattern with catchAsync
+// Controller wrapper (ALWAYS use catchAsync)
 export const getJobs = catchAsync(async (req: Request, res: Response) => {
   const jobs = await prisma.job.findMany({
-    where: { isActive: true },
-    include: { employer: true },
+    where: { isActive: true, isApproved: true },
   });
-
-  res.status(200).json({
-    success: true,
-    data: { jobs, count: jobs.length },
-  });
+  res.status(200).json({ success: true, data: { jobs, count: jobs.length } });
 });
 
-// Express Request extension for auth
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        id: string;
-        email: string;
-        firstName?: string;
-        lastName?: string;
-        role: "JOB_SEEKER" | "EMPLOYER" | "ADMIN";
-        imageUrl?: string;
-        profile?: any;
-      };
-      userId?: string;
-    }
-  }
-}
-
-// Authentication middleware pattern
-export const authMiddleware = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    let token: string | undefined;
-
-    // Get token from Authorization header or cookies
-    if (
-      req.headers.authorization &&
-      req.headers.authorization.startsWith("Bearer ")
-    ) {
-      token = req.headers.authorization.split(" ")[1];
-    } else if (req.cookies?.token) {
-      token = req.cookies.token;
-    }
-
-    if (!token) {
-      throw new AppError("Access denied. No token provided.", 401);
-    }
-
-    const decoded = verifyToken(token);
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      include: { jobSeeker: true, employer: true, admin: true },
-    });
-
-    if (!user || !user.isActive) {
-      throw new AppError("User not found or deactivated", 404);
-    }
-
-    req.user = {
-      id: user.id,
-      email: user.email,
-      role: user.role as "JOB_SEEKER" | "EMPLOYER" | "ADMIN",
-      profile: user.jobSeeker || user.employer || user.admin || null,
-      ...(user.firstName && { firstName: user.firstName }),
-      ...(user.lastName && { lastName: user.lastName }),
-    };
-
-    next();
-  } catch (error) {
-    next(error);
-  }
-};
+// Prisma errors: error.code === "P2002" = unique constraint violation
 ```
 
-### Graceful Empty State Handling
+**Authentication Middleware** (populates `req.user`):
 
 ```typescript
-// Backend: Always return success with empty arrays
-if (!applications.length) {
-  return res.status(200).json({
-    success: true,
-    data: {
-      applications: [],
-      pagination: { total: 0, page: 1, pages: 0 },
-    },
-    message: "No applications found",
-  });
-}
-
-// Frontend: Handle empty states in UI
-const MyApplications = () => {
-  const [applications, setApplications] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    const loadApplications = async () => {
-      try {
-        const response = await applicationsAPI.getByJobSeeker();
-        if (response.success) {
-          setApplications(response.data.applications || []);
-        }
-      } catch (err) {
-        setError("Failed to load applications");
-        setApplications([]); // Ensure empty array on error
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadApplications();
-  }, []);
-
-  if (isLoading) return <LoadingSpinner />;
-
-  if (error) {
-    return (
-      <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
-        <p className="text-red-600">{error}</p>
-        <button onClick={() => window.location.reload()}>Try Again</button>
-      </div>
-    );
-  }
-
-  if (applications.length === 0) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-muted-foreground">No applications yet</p>
-        <Button variant="primary" onClick={() => navigate("/jobs")}>
-          Browse Jobs
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      {applications.map((application) => (
-        <ApplicationCard key={application.id} application={application} />
-      ))}
-    </div>
-  );
-};
-```
-
-### Authentication Flow Integration
-
-```typescript
-// Login flow with token management
-const handleLogin = async (credentials: LoginCredentials) => {
-  try {
-    const response = await authAPI.login(credentials);
-
-    if (response.success && response.data.token) {
-      // Set token for subsequent requests
-      apiClient.setToken(response.data.token);
-
-      // Update auth context
-      setUser(response.data.user);
-      setIsAuthenticated(true);
-
-      // Redirect based on role
-      const redirectPath =
-        response.data.user.role === "EMPLOYER"
-          ? "/employer/dashboard"
-          : "/job-seeker/dashboard";
-      navigate(redirectPath);
-    }
-  } catch (error) {
-    setError("Invalid credentials. Please try again.");
-  }
-};
-
-// Auth Context Interface
-export interface User {
+// Backend sets req.user from JWT token
+req.user = {
   id: string;
   email: string;
-  firstName: string;
-  lastName: string;
   role: "JOB_SEEKER" | "EMPLOYER" | "ADMIN";
-  isVerified: boolean;
-  hasProfile: boolean;
-  profile: Record<string, unknown> | null;
-  imageUrl?: string;
-}
-
-interface AuthContextType {
-  user: User | null;
-  isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (
-    email: string,
-    password: string,
-    firstName: string,
-    lastName: string,
-    role?: string
-  ) => Promise<void>;
-  logout: () => Promise<void>;
-  verifyEmail: (code: string) => Promise<void>;
-  resendVerificationCode: (email: string) => Promise<void>;
-  forgotPassword: (email: string) => Promise<void>;
-  resetPassword: (code: string, newPassword: string) => Promise<void>;
-  refreshUser: () => Promise<void>;
-}
-
-// Protected route pattern
-const ProtectedRoute = ({
-  children,
-  requiredRole,
-}: {
-  children: ReactNode;
-  requiredRole?: UserRole;
-}) => {
-  const { isAuthenticated, user } = useAuth();
-
-  if (!isAuthenticated) {
-    return <Navigate to="/auth/login" replace />;
-  }
-
-  if (requiredRole && user?.role !== requiredRole) {
-    return <Navigate to="/unauthorized" replace />;
-  }
-
-  return <>{children}</>;
+  profile: JobSeeker | Employer | Admin | null;
 };
+
+// Frontend: apiClient.setToken() called in AuthContext login
+// Token auto-included in all requests via Authorization header
 ```
 
-### Error Boundary Pattern
+**Request Deduplication** (ApiClient pattern):
 
 ```typescript
-// Global error boundary for API failures
-class ApiErrorBoundary extends Component<Props, State> {
-  constructor(props: Props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("API Error Boundary caught an error:", error, errorInfo);
-
-    // Log to monitoring service in production
-    if (process.env.NODE_ENV === "production") {
-      // logErrorToService(error, errorInfo);
-    }
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="flex flex-col items-center justify-center min-h-screen">
-          <h2 className="text-2xl font-bold mb-4">Something went wrong</h2>
-          <p className="text-muted-foreground mb-4">
-            We're sorry, but something went wrong. Please try refreshing the
-            page.
-          </p>
-          <Button onClick={() => window.location.reload()}>Refresh Page</Button>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
+// Prevents duplicate API calls with same parameters
+const requestKey = `${method}:${endpoint}:${JSON.stringify(data)}`;
+if (pendingRequests.has(requestKey)) {
+  return pendingRequests.get(requestKey); // Return existing promise
 }
 ```
+
+**Email Service** (Nodemailer + Mailtrap):
+
+```typescript
+// server/src/services/emailService.ts handles all notifications
+await sendEmployerVerificationNotification(
+  employer,
+  isApproved,
+  rejectionReason
+);
+await sendJobDeactivationNotification(job, employer);
+// HTML templates with green (approval) / red (rejection) themes
+```
+
+## Two-Tier Moderation System (CRITICAL Business Logic)
+
+**Employer Verification** (`Employer.isVerified`):
+
+- Admin manually verifies employers at `/admin/employers`
+- Unverified employers CAN post jobs, but jobs won't be approved
+- Admin can "Unverify" verified employers (removes verification status)
+- Email notifications sent on approval/rejection
+
+**Job Approval** (`Job.isApproved`):
+
+- Admin approves individual jobs at `/admin/jobs`
+- Jobs only appear publicly if `isApproved=true AND isActive=true`
+- Employers can post without verification, but jobs need both employer verification AND job approval for public visibility
+- Filter: "Pending Approval" shows unapproved jobs
+
+**Admin Actions** (adminController.ts):
+
+```typescript
+// Toggle employer verification
+PATCH /api/admin/employers/:id/verification { isVerified, rejectionReason? }
+
+// Manage job (actions: approve, reject, activate, deactivate, feature, unfeature)
+PATCH /api/admin/jobs/:id { action: "approve" | "reject" }
+
+// Get pending items
+GET /api/admin/employers/pending  // isVerified=false
+GET /api/admin/jobs/pending       // isApproved=false, isActive=true
+```
+
+**Frontend Implementation**:
+
+- `AdminEmployers.tsx`: Verification modal with approve/reject/unverify buttons
+- `AdminJobs.tsx`: Approval filter dropdown + approve/reject buttons for pending jobs
+- Both show badges: green "Approved/Verified" | yellow "Pending"
 
 ## Environment Setup
 
-### Backend Environment (.env)
+**Backend** (server/.env):
 
 ```bash
-# Database
-DATABASE_URL="postgresql://user:password@localhost:5432/employme"
-
-# JWT
-JWT_SECRET="your-super-secret-jwt-key"
+DATABASE_URL="postgresql://user:pass@localhost:5432/employme"
+JWT_SECRET="your-secret-key"
 JWT_EXPIRES_IN="7d"
+PORT=5001
+CORS_ORIGIN="http://localhost:5173"
+CLIENT_URL="http://localhost:5173"  # For Socket.IO CORS
 
 # Email (Mailtrap for dev)
-EMAIL_HOST="smtp.mailtrap.io"
+EMAIL_HOST="sandbox.smtp.mailtrap.io"
 EMAIL_PORT=2525
-EMAIL_USER="your-mailtrap-user"
-EMAIL_PASS="your-mailtrap-password"
+EMAIL_USER="your-user"
+EMAIL_PASS="your-pass"
 
 # Cloudinary (file uploads)
-CLOUDINARY_CLOUD_NAME="your-cloud-name"
-CLOUDINARY_API_KEY="your-api-key"
-CLOUDINARY_API_SECRET="your-api-secret"
-
-# OAuth (optional)
-GOOGLE_CLIENT_ID="your-google-client-id"
-GOOGLE_CLIENT_SECRET="your-google-client-secret"
-
-# Server Configuration
-NODE_ENV="development"
-PORT=5000
-CORS_ORIGIN="http://localhost:5173"
+CLOUDINARY_CLOUD_NAME="your-cloud"
+CLOUDINARY_API_KEY="your-key"
+CLOUDINARY_API_SECRET="your-secret"
 ```
 
-### Frontend Environment (.env)
+**Frontend** (client/.env):
 
 ```bash
-# Backend API URL
-VITE_API_URL=http://localhost:5000/api
-
-# Optional: Environment-specific settings
-VITE_APP_NAME="Employ.me"
-VITE_ENVIRONMENT="development"
+VITE_API_URL=http://localhost:5001/api
+# Socket.IO connects to http://localhost:5001 (derived from VITE_API_URL)
 ```
 
-### Database Connection Patterns
+## Common Workflows
 
-```typescript
-// Prisma client configuration with connection pooling
-const prisma = new PrismaClient({
-  log: process.env.NODE_ENV === "development" ? ["query"] : [],
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL,
-    },
-  },
-});
-
-// Connection health check
-export const checkDatabaseConnection = async () => {
-  try {
-    await prisma.$connect();
-    console.log("✅ Database connected successfully");
-    return true;
-  } catch (error) {
-    console.error("❌ Database connection failed:", error);
-    return false;
-  }
-};
-
-// Graceful shutdown handling
-process.on("beforeExit", async () => {
-  await prisma.$disconnect();
-  console.log("🔌 Database disconnected");
-});
-
-process.on("SIGINT", async () => {
-  await prisma.$disconnect();
-  process.exit(0);
-});
-
-process.on("SIGTERM", async () => {
-  await prisma.$disconnect();
-  process.exit(0);
-});
-```
-
-### Development Workflow Setup
-
-```typescript
-// Server configuration with environment-based settings
-const app = express();
-
-// CORS configuration for development
-app.use(
-  cors({
-    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
-
-// Environment-specific middleware
-if (process.env.NODE_ENV === "development") {
-  app.use(morgan("dev")); // HTTP request logging
-}
-
-// Health check endpoint
-app.get("/health", (req, res) => {
-  res.status(200).json({
-    status: "healthy",
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV,
-    version: process.env.npm_package_version || "1.0.0",
-  });
-});
-```
-
-### Database Migration Management
+**Database Changes**:
 
 ```bash
-# Development workflow
-npm run db:generate    # Generate Prisma client
-npm run db:push        # Push schema changes (dev only)
-npm run db:studio      # Open Prisma Studio
-npm run db:seed        # Seed database with sample data
-
-# Production workflow
-npm run db:migrate     # Create and apply migrations
-npm run db:deploy      # Deploy migrations (production)
-npm run db:reset       # Reset database (dev only)
-
-# Useful Prisma commands
-npx prisma migrate dev --name add_new_feature
-npx prisma migrate reset
-npx prisma db seed
-npx prisma studio
-```
-
-### Error Handling Configuration
-
-```typescript
-// Global error handler middleware
-const globalErrorHandler = (
-  err: Error | AppError,
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  let error = { ...err };
-  error.message = err.message;
-
-  // Log error details in development
-  if (process.env.NODE_ENV === "development") {
-    console.error("Error details:", err);
-  }
-
-  // Mongoose bad ObjectId
-  if (err.name === "CastError") {
-    const message = "Resource not found";
-    error = new AppError(message, 404);
-  }
-
-  // Prisma errors
-  if (err.code === "P2002") {
-    const message = "Duplicate field value entered";
-    error = new AppError(message, 400);
-  }
-
-  // JWT errors
-  if (err.name === "JsonWebTokenError") {
-    const message = "Invalid token. Please log in again";
-    error = new AppError(message, 401);
-  }
-
-  res.status(error.statusCode || 500).json({
-    success: false,
-    error: error.message || "Server Error",
-    ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
-  });
-};
-```
-
-### File Upload Configuration (Cloudinary)
-
-```typescript
-// Cloudinary configuration
-import { v2 as cloudinary } from "cloudinary";
-
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-// File upload utility
-export const uploadToCloudinary = async (
-  file: Buffer,
-  folder: string,
-  resourceType: "image" | "raw" = "image"
-) => {
-  return new Promise((resolve, reject) => {
-    cloudinary.uploader
-      .upload_stream(
-        {
-          folder: `employme/${folder}`,
-          resource_type: resourceType,
-          allowed_formats:
-            resourceType === "image"
-              ? ["jpg", "jpeg", "png", "gif"]
-              : ["pdf", "doc", "docx"],
-        },
-        (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
-        }
-      )
-      .end(file);
-  });
-};
-```
-
-### Authentication Configuration
-
-```typescript
-// JWT configuration
-const signToken = (id: string) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET!, {
-    expiresIn: process.env.JWT_EXPIRES_IN,
-  });
-};
-
-// Cookie configuration for JWT
-const createSendToken = (user: User, statusCode: number, res: Response) => {
-  const token = signToken(user.id);
-
-  const cookieOptions = {
-    expires: new Date(
-      Date.now() +
-        parseInt(process.env.JWT_COOKIE_EXPIRES_IN || "7") * 24 * 60 * 60 * 1000
-    ),
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict" as const,
-  };
-
-  res.cookie("jwt", token, cookieOptions);
-
-  // Remove password from output
-  user.password = undefined;
-
-  res.status(statusCode).json({
-    success: true,
-    token,
-    data: { user },
-  });
-};
-```
-
-### Socket.IO Configuration
-
-```typescript
-// Socket.IO setup with CORS
-import { Server as SocketIOServer } from "socket.io";
-
-const io = new SocketIOServer(server, {
-  cors: {
-    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
-    methods: ["GET", "POST"],
-    credentials: true,
-  },
-});
-
-// Socket authentication middleware
-io.use(async (socket, next) => {
-  try {
-    const token = socket.handshake.auth.token;
-    if (!token) {
-      return next(new Error("Authentication error"));
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
-      id: string;
-    };
-    const user = await prisma.user.findUnique({ where: { id: decoded.id } });
-
-    if (!user) {
-      return next(new Error("User not found"));
-    }
-
-    socket.userId = user.id;
-    next();
-  } catch (err) {
-    next(new Error("Authentication error"));
-  }
-});
-```
-
-### Package.json Scripts Configuration
-
-```json
-// Backend package.json scripts
-{
-  "scripts": {
-    "start": "node dist/index.js",
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc",
-    "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev",
-    "db:studio": "prisma studio",
-    "db:seed": "tsx prisma/seed.ts"
-  }
-}
-
-// Frontend package.json scripts
-{
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
-  }
-}
-```
-
-### Local Development Setup Commands
-
-```bash
-# Initial setup
-git clone <repository-url>
-cd employme
-
-# Backend setup
-cd server
-npm install
-cp .env.example .env
-# Edit .env with your configuration
-npm run db:generate
+# 1. Edit server/prisma/schema.prisma
+# 2. Generate Prisma client
+cd server && npm run db:generate
+# 3. Development: Push changes
 npm run db:push
-npm run db:seed
-npm run dev
-
-# Frontend setup (new terminal)
-cd client
-npm install
-cp .env.example .env
-# Edit .env with your configuration
-npm run dev
-
-# Full stack running
-# Backend: http://localhost:5001
-# Frontend: http://localhost:5173
-# Prisma Studio: http://localhost:5555 (npm run db:studio)
+# 4. Production: Create migration
+npm run db:migrate -- --name descriptive_name
 ```
 
-## Critical Patterns for Immediate Productivity
+**Seeding Test Data**:
 
-### 1. API Client Pattern (Essential)
+```bash
+cd server && npm run db:seed
+# Creates: 1 admin, 3 employers (2 verified), 3 job seekers, 5 jobs (3 approved), 4 applications
+# Admin: admin@employme.com / AdminPassword123!
+# Employers: tech@company.com, hr@financecorp.com, info@healthplus.com (all Password123!)
+```
+
+**Adding New Feature**:
+
+1. Backend: Add controller → route → apply middleware
+2. Frontend: Add API endpoint in `services/api.ts`
+3. Create component using existing UI patterns (Button, animations, icons)
+4. Test with Postman → Integrate with AuthContext if needed
+
+## Real-Time Chat System (Socket.IO)
+
+**Critical Architecture**: Socket.IO server runs alongside Express on port 5001, frontend connects from port 5173.
+
+**Socket.IO Setup** (server/src/index.ts):
 
 ```typescript
-// services/api.ts - All API calls use centralized client with auto token management
-import { authAPI, jobsAPI, applicationsAPI } from "../services/api";
+import { createServer } from "http";
+import { Server } from "socket.io";
 
-const response = await jobsAPI.getAll();
-if (response.success) {
-  setJobs(response.data.jobs); // Always check success before using data
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: { origin: ["http://localhost:5173"], methods: ["GET", "POST"] },
+});
+
+// CRITICAL: Authentication uses userId in JWT payload
+io.use((socket, next) => {
+  const token = socket.handshake.auth.token;
+  const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
+    userId: string;
+  };
+  socket.data.userId = decoded.userId; // NOT decoded.id
+  next();
+});
+```
+
+**Database Models** (Prisma schema):
+
+```typescript
+model Conversation {
+  id              String   @id @default(cuid())
+  participant1Id  String
+  participant2Id  String
+  lastMessageAt   DateTime @default(now())
+  participant1    User     @relation("ConversationsAsParticipant1", fields: [participant1Id], references: [id], onDelete: Cascade)
+  participant2    User     @relation("ConversationsAsParticipant2", fields: [participant2Id], references: [id], onDelete: Cascade)
+  messages        Message[]
+  @@unique([participant1Id, participant2Id]) // Prevent duplicate conversations
+}
+
+model Message {
+  id             String  @id @default(cuid())
+  conversationId String
+  senderId       String
+  content        String  @db.Text
+  isRead         Boolean @default(false)
+  isEdited       Boolean @default(false)
+  isDeleted      Boolean @default(false)
+  attachmentUrl  String?
+  attachmentType String?
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User    @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
 }
 ```
 
-### 2. Authentication Flow
-
-- JWT stored in localStorage via `apiClient.setToken()` in AuthContext
-- All components use `useAuth()` hook for user state
-- Protected routes check role: `<ProtectedRoute requiredRole="EMPLOYER">`
-- Backend middleware: `authMiddleware` → `req.user` populated
-
-### 3. Component Organization
+**Socket.IO Events Pattern**:
 
 ```typescript
-// Feature-based imports using barrel exports
-import { Dashboard, MyApplications } from "../pages/job-seeker";
-import { Button, PhoneInput } from "../components/ui";
-import { Header } from "../components/common";
-```
-
-### 4. Database Patterns
-
-```typescript
-// Always include related profile data when fetching users
-const user = await prisma.user.findUnique({
-  where: { id },
-  include: { jobSeeker: true, employer: true, admin: true },
+// Backend: Broadcast to receiver only (NOT back to sender)
+socket.on("message_sent", (data: { conversationId; message; receiverId }) => {
+  io.to(`user_${data.receiverId}`).emit("new_message", {
+    conversationId: data.conversationId,
+    message: data.message,
+  });
+  // DON'T emit to conversation room - causes duplicates
 });
 
-// Prevent duplicate applications with unique constraint
-await prisma.application.create({
-  data: { jobId, jobSeekerId, coverLetter },
-}); // Throws P2002 error if duplicate
+// Frontend: Skip own messages to prevent duplicates
+newSocket.on("new_message", (data) => {
+  if (data.message.senderId === currentUserId) return; // CRITICAL
+
+  setMessages((prev) => {
+    // Check if message already exists
+    if (prev.some((msg) => msg.id === data.message.id)) return prev;
+    return [...prev, data.message];
+  });
+});
 ```
 
-### 5. File Upload Pattern
+**CRITICAL: Preventing Stale Closures** (ChatContext pattern):
 
-- Multer → local `/server/uploads/` → Cloudinary (production)
-- Frontend: FormData with `attachmentAPI.upload(files)`
-- Always validate file types: PDF, DOC, DOCX, images
+```typescript
+// Use useRef to track current user ID - prevents stale closures in socket listeners
+const userIdRef = useRef<string | null>(null);
 
-## Role-Based Access & Routes
+useEffect(() => {
+  if (user?.id) {
+    userIdRef.current = user.id;
+  }
+}, [user?.id]);
 
-### Job Seekers (`JOB_SEEKER`)
-
-- Dashboard: `/job-seeker/dashboard` - applications, saved jobs
-- Pages: `/jobs` (browse), `/jobs/:id/apply` (application modal)
-
-### Employers (`EMPLOYER`)
-
-- Dashboard: `/employer/dashboard` - posted jobs, applications
-- Job management: Create/edit via modals, view applicant CVs
-
-### Common Patterns
-
-- Role-specific redirects after login in `AuthContext`
-- Each role has dedicated layout: `JobSeekerDashboardLayout`, `EmployerDashboardLayout`
-- API routes are role-protected via middleware
-
-## Troubleshooting Common Issues
-
-### "API calls failing after login"
-
-- Check if `apiClient.setToken()` called in AuthContext login method
-- Verify backend `authMiddleware` sets `req.user`
-
-### "Database connection issues"
-
-- Ensure `DATABASE_URL` in server/.env matches running PostgreSQL
-- Run `cd server && npm run db:push` to sync schema
-
-### "File uploads not working"
-
-- Check server/uploads/ directory exists (created automatically)
-- Verify Cloudinary env vars for production uploads
-
-### "Hot reload issues"
-
-- Clear Vite cache: `cd client && rm -rf node_modules/.vite`
-- Restart with `npm run dev`
-
-## Key Integration Points
-
-### Socket.IO
-
-Real-time messaging configured in `server/src/index.ts` with CORS for localhost:5173
-
-### File Uploads
-
-Cloudinary integration via `attachmentRoutes` for resumes/logos
-
-### Social Auth
-
-Passport.js with Google/LinkedIn/Facebook OAuth configured
-
-## Common Gotchas
-
-1. **Route Organization**: Application routes include auth middleware internally - don't double-apply
-2. **Token Management**: Login must call `apiClient.setToken()` or subsequent API calls fail
-3. **Role Validation**: Always check user role before rendering role-specific UI
-4. **Error Boundaries**: Empty states should render gracefully, not throw errors
-5. **Migration Safety**: Use `db:push` for development, `db:migrate` for production
-6. **Component Imports**: Use barrel exports from index.ts files for cleaner imports
-
-## Testing Endpoints
-
-```bash
-# Health check
-curl http://localhost:5000/health
-
-# Login test
-curl -X POST http://localhost:5000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"password"}'
+// Socket listener uses ref, not state
+newSocket.on("new_message", (data) => {
+  const currentUserId = userIdRef.current; // Always current value
+  if (data.message.senderId === currentUserId) return;
+});
 ```
 
-When working on this codebase, prioritize understanding the user role context and ensure API calls include proper authentication headers.
+**Typing Indicators** (without activeConversation dependency):
 
-### Socket.IO
+```typescript
+// Frontend: Start typing
+const startTyping = () => {
+  if (!socket || !activeConversation) return;
+  const receiverId = getOtherParticipantId(activeConversation);
+  socket.emit("typing_start", {
+    conversationId: activeConversation.id,
+    receiverId,
+  });
+};
 
-Real-time messaging configured in `server/src/index.ts` with CORS for localhost:5173
-
-### File Uploads
-
-Cloudinary integration via `attachmentRoutes` for resumes/logos
-
-### Social Auth
-
-Passport.js with Google/LinkedIn/Facebook OAuth configured
-
-## Common Gotchas
-
-1. **Route Organization**: Application routes include auth middleware internally - don't double-apply
-2. **Token Management**: Login must call `apiClient.setToken()` or subsequent API calls fail
-3. **Role Validation**: Always check user role before rendering role-specific UI
-4. **Error Boundaries**: Empty states should render gracefully, not throw errors
-5. **Migration Safety**: Use `db:push` for development, `db:migrate` for production
-6. **Component Imports**: Use barrel exports from index.ts files for cleaner imports
-
-## Testing Endpoints
-
-```bash
-# Health check
-curl http://localhost:5000/health
-
-# Login test
-curl -X POST http://localhost:5000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"password"}'
+// Backend: Broadcast to receiver
+socket.on("typing_start", (data: { conversationId; receiverId }) => {
+  io.to(`user_${data.receiverId}`).emit("user_typing", {
+    conversationId: data.conversationId,
+    userId: socket.data.userId,
+  });
+});
 ```
 
-When working on this codebase, prioritize understanding the user role context and ensure API calls include proper authentication headers.
+**Role-Based Messaging Rules**:
+
+- **Admin**: Can message ANY user (job seekers, employers)
+- **Job Seeker**: Can message employers who posted jobs they applied to
+- **Employer**: Can message job seekers who applied to their jobs
+- Backend: `getEligibleContacts` filters based on role + applications
+
+**Responsive Chat UI Patterns**:
+
+```typescript
+// Mobile: Conditional sidebar/chat visibility
+const [showMobileChat, setShowMobileChat] = useState(false);
+
+// Sidebar: Hidden on mobile when chat open
+<div className={`${showMobileChat ? "hidden md:flex" : "flex"} md:w-80 lg:w-72`}>
+
+// Chat: Hidden on mobile until conversation selected
+<div className={`${showMobileChat ? "flex" : "hidden md:flex"} flex-1`}>
+  {/* Back button for mobile */}
+  <button onClick={() => setShowMobileChat(false)}>Back</button>
+
+  {/* Message bubbles: Responsive max-widths */}
+  <div className="max-w-[85%] sm:max-w-[80%] md:max-w-[75%] lg:max-w-[70%]">
+    {/* Text wrapping: CRITICAL to prevent horizontal scroll */}
+    <p className="break-words whitespace-pre-wrap overflow-wrap-anywhere hyphens-auto">
+      {message.content}
+    </p>
+  </div>
+</div>
+```
+
+**Auto-Resizing Textarea** (for message editing):
+
+```typescript
+const editTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+useEffect(() => {
+  const textarea = editTextareaRef.current;
+  if (textarea && editingMessageId) {
+    textarea.style.height = "auto";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }
+}, [editContent, editingMessageId]);
+```
+
+**Common Chat Issues**:
+
+| Issue                         | Root Cause                                            | Solution                                                             |
+| ----------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------- |
+| Messages appear 2-3 times     | Broadcasting to sender + receiver + conversation room | Only emit to `user_${receiverId}`, skip own messages in listener     |
+| "User ID: undefined"          | JWT payload uses `id` instead of `userId`             | Change to `decoded.userId` in Socket.IO auth                         |
+| Typing indicators not working | Stale `activeConversation` in closure                 | Use `useRef` for current user ID, don't depend on activeConversation |
+| Horizontal scroll in chat     | Text overflow + wide sidebar                          | Use `break-words whitespace-pre-wrap`, reduce sidebar to `md:w-80`   |
+| Socket disconnects on auth    | Token not passed in handshake                         | Use `auth: { token }` in io() constructor                            |
+
+## Troubleshooting
+
+| Issue                      | Solution                                                         |
+| -------------------------- | ---------------------------------------------------------------- |
+| API calls fail after login | Check `apiClient.setToken()` called in AuthContext               |
+| Database connection error  | Verify `DATABASE_URL` in server/.env matches PostgreSQL          |
+| File upload not working    | Ensure server/uploads/ exists; check Cloudinary env vars         |
+| Hot reload issues          | Clear Vite cache: `cd client && rm -rf node_modules/.vite`       |
+| Migration errors           | Run `npm run db:generate` then `npm run db:push`                 |
+| Duplicate applications     | Unique constraint `@@unique([jobId, jobSeekerId])` prevents this |
+| Icons not showing          | Use React Icons (react-icons/md or /hi), never SVG               |
+| Empty state errors         | Always initialize state as `[]`, check `response.success` first  |

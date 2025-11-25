@@ -10,6 +10,7 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import path from "path";
 import fs from "fs";
+import jwt from "jsonwebtoken";
 
 // Import routes
 import authRoutes from "./routes/authRoutes.js";
@@ -21,6 +22,7 @@ import attachmentRoutes from "./routes/attachmentRoutes.js";
 import interviewRoutes from "./routes/interviewRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import newsletterRoutes from "./routes/newsletterRoutes.js";
+import chatRoutes from "./routes/chatRoutes.js";
 
 // Import middleware
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
@@ -78,8 +80,9 @@ app.use(
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 500, // Increased from 100 to 500 for chat functionality
   message: "Too many requests from this IP, please try again later.",
+  skip: (req) => req.path.startsWith("/api/chat"), // Skip rate limiting for chat routes
 });
 app.use(limiter);
 
@@ -170,24 +173,125 @@ app.use("/api/saved-jobs", authMiddleware, savedJobsRoutes);
 app.use("/api/attachments", authMiddleware, attachmentRoutes);
 app.use("/api/interviews", interviewRoutes);
 app.use("/api/admin", authMiddleware, adminRoutes);
+app.use("/api/chat", chatRoutes);
+
+// Socket.IO connection handling
+const onlineUsers = new Map<string, string>(); // userId -> socketId
+
+// Socket.IO authentication middleware
+io.use((socket, next) => {
+  try {
+    const token = socket.handshake.auth.token;
+
+    console.log("[Socket Auth] Attempting authentication...", {
+      hasAuth: !!socket.handshake.auth,
+      hasToken: !!token,
+      tokenPreview: token ? `${token.substring(0, 20)}...` : null,
+      authKeys: Object.keys(socket.handshake.auth),
+    });
+
+    if (!token) {
+      console.error("[Socket Auth] No token provided");
+      return next(new Error("Authentication error: No token provided"));
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
+      userId: string; // Changed from 'id' to 'userId' to match JWT payload
+    };
+    socket.data.userId = decoded.userId; // Changed from decoded.id to decoded.userId
+    console.log(
+      "[Socket Auth] Authentication successful, userId:",
+      decoded.userId
+    );
+    next();
+  } catch (err) {
+    console.error("[Socket Auth] Token verification failed:", err);
+    next(new Error("Authentication error: Invalid token"));
+  }
+});
 
 // Socket.IO connection handling
 io.on("connection", (socket) => {
-  console.log("User connected:", socket.id);
+  const userId = socket.data.userId;
+  console.log("User connected:", socket.id, "User ID:", userId);
 
-  // Join user to their own room for notifications
-  socket.on("join", (userId) => {
-    socket.join(`user_${userId}`);
-    console.log(`User ${userId} joined their room`);
+  // Add user to online users and join their personal room
+  onlineUsers.set(userId, socket.id);
+  socket.join(`user_${userId}`);
+
+  // Broadcast user's online status to ALL connected clients
+  io.emit("user_online", { userId });
+
+  // Send list of online users to the newly connected user
+  socket.emit("online_users", { userIds: Array.from(onlineUsers.keys()) });
+
+  // Handle joining a conversation room
+  socket.on("join_conversation", (conversationId: string) => {
+    socket.join(`conversation_${conversationId}`);
+    console.log(`User ${userId} joined conversation ${conversationId}`);
   });
 
-  // Handle real-time messaging (future feature)
-  socket.on("send_message", (data) => {
-    io.to(`user_${data.receiverId}`).emit("new_message", data);
+  // Handle leaving a conversation room
+  socket.on("leave_conversation", (conversationId: string) => {
+    socket.leave(`conversation_${conversationId}`);
+    console.log(`User ${userId} left conversation ${conversationId}`);
   });
 
+  // Handle new message notification (message already saved via API)
+  socket.on(
+    "message_sent",
+    (data: { conversationId: string; message: any; receiverId: string }) => {
+      // Send to specific receiver only (not to sender)
+      io.to(`user_${data.receiverId}`).emit("new_message", {
+        conversationId: data.conversationId,
+        message: data.message,
+      });
+
+      // Note: We don't emit to conversation room because:
+      // 1. Sender already added message locally
+      // 2. Receiver gets it via user room above
+    }
+  );
+
+  // Handle typing indicator
+  socket.on(
+    "typing_start",
+    (data: { conversationId: string; receiverId: string }) => {
+      io.to(`user_${data.receiverId}`).emit("user_typing", {
+        conversationId: data.conversationId,
+        userId,
+      });
+    }
+  );
+
+  socket.on(
+    "typing_stop",
+    (data: { conversationId: string; receiverId: string }) => {
+      io.to(`user_${data.receiverId}`).emit("user_stopped_typing", {
+        conversationId: data.conversationId,
+        userId,
+      });
+    }
+  );
+
+  // Handle message read receipts
+  socket.on(
+    "messages_read",
+    (data: { conversationId: string; senderId: string }) => {
+      io.to(`user_${data.senderId}`).emit("messages_marked_read", {
+        conversationId: data.conversationId,
+        readBy: userId,
+      });
+    }
+  );
+
+  // Handle disconnect
   socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
+    console.log("User disconnected:", socket.id, "User ID:", userId);
+    onlineUsers.delete(userId);
+
+    // Broadcast user's offline status to ALL connected clients
+    io.emit("user_offline", { userId });
   });
 });
 
@@ -214,4 +318,5 @@ httpServer.listen(PORT, async () => {
   }
 });
 
+export { io }; // Export io instance for use in controllers
 export default app;

@@ -29,6 +29,9 @@ model User {
   employer               Employer?
   jobSeeker              JobSeeker?
   socialAccounts         SocialAccount[]
+  conversationsAsParticipant1  Conversation[] @relation("ConversationsAsParticipant1")
+  conversationsAsParticipant2  Conversation[] @relation("ConversationsAsParticipant2")
+  sentMessages           Message[]       @relation("SentMessages")
 
   @@map("users")
 }
@@ -297,4 +300,41 @@ model Newsletter {
   unsubscribedAt DateTime?
 
   @@map("newsletters")
+}
+
+model Conversation {
+  id                String    @id @default(cuid())
+  participant1Id    String
+  participant2Id    String
+  lastMessageAt     DateTime  @default(now())
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  participant1      User      @relation("ConversationsAsParticipant1", fields: [participant1Id], references: [id], onDelete: Cascade)
+  participant2      User      @relation("ConversationsAsParticipant2", fields: [participant2Id], references: [id], onDelete: Cascade)
+  messages          Message[]
+
+  @@unique([participant1Id, participant2Id])
+  @@map("conversations")
+}
+
+model Message {
+  id              String       @id @default(cuid())
+  conversationId  String
+  senderId        String
+  content         String       @db.Text
+  isRead          Boolean      @default(false)
+  isEdited        Boolean      @default(false)
+  isDeleted       Boolean      @default(false)
+  attachmentUrl   String?
+  attachmentType  String?      // 'image', 'document', etc.
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender          User         @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@map("messages")
 }
