@@ -69,12 +69,20 @@ export default function MyApplications() {
   const fetchApplications = async () => {
     try {
       const response = await applicationsAPI.getMyApplications();
+      console.log("=== Applications Response ===");
+      console.log("Full response:", response);
+      console.log("response.success:", response.success);
+      console.log("response.data:", response.data);
+
       if (response.success && response.data) {
         // Ensure we get an array
         const applicationsData = Array.isArray(response.data)
           ? response.data
           : (response.data as { applications: Application[] })?.applications ||
             [];
+
+        console.log("Applications data:", applicationsData);
+        console.log("Applications count:", applicationsData.length);
 
         // Fetch interviews for each application
         const applicationsWithInterviews = await Promise.all(

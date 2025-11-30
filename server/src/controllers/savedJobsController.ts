@@ -44,10 +44,34 @@ export const saveJob = [
           jobSeekerId,
         },
       },
+      include: {
+        job: {
+          select: {
+            id: true,
+            title: true,
+            location: true,
+            salaryMin: true,
+            salaryMax: true,
+            jobType: true,
+            employer: {
+              select: {
+                companyName: true,
+                logoUrl: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (existingSavedJob) {
-      throw new AppError("Job is already saved", 400);
+      // Job is already saved, return success instead of error
+      res.status(200).json({
+        success: true,
+        message: "Job is already saved",
+        data: { savedJob: existingSavedJob },
+      });
+      return;
     }
 
     // Save the job

@@ -458,14 +458,6 @@ export const updateJobSeekerProfile = catchAsync(
       throw new AppError("Only job seekers can update this profile type", 403);
     }
 
-    const profile = await prisma.jobSeeker.findUnique({
-      where: { userId: req.user.id },
-    });
-
-    if (!profile) {
-      throw new AppError("Job seeker profile not found", 404);
-    }
-
     const {
       firstName,
       lastName,
@@ -482,12 +474,55 @@ export const updateJobSeekerProfile = catchAsync(
       isProfilePublic,
     } = req.body;
 
+    // Use upsert to create profile if it doesn't exist or update if it does
+    const updatedProfile = await prisma.jobSeeker.upsert({
+      where: { userId: req.user.id },
+      create: {
+        userId: req.user.id,
+        firstName: firstName || req.user.firstName || "",
+        lastName: lastName || req.user.lastName || "",
+        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
+        location: location || null,
+        bio: bio || null,
+        skills: skills || [],
+        experience: experience || null,
+        education: education || null,
+        cvUrl: cvUrl || null,
+        profileImageUrl: profileImageUrl || null,
+        phone: phone || null,
+        countryCode: countryCode || "+233",
+        isProfilePublic: isProfilePublic !== undefined ? isProfilePublic : true,
+      },
+      update: {
+        firstName: firstName !== undefined ? firstName : undefined,
+        lastName: lastName !== undefined ? lastName : undefined,
+        dateOfBirth:
+          dateOfBirth !== undefined
+            ? dateOfBirth
+              ? new Date(dateOfBirth)
+              : null
+            : undefined,
+        location: location !== undefined ? location : undefined,
+        bio: bio !== undefined ? bio : undefined,
+        skills: skills !== undefined ? skills : undefined,
+        experience: experience !== undefined ? experience : undefined,
+        education: education !== undefined ? education : undefined,
+        cvUrl: cvUrl !== undefined ? cvUrl : undefined,
+        profileImageUrl:
+          profileImageUrl !== undefined ? profileImageUrl : undefined,
+        phone: phone !== undefined ? phone : undefined,
+        countryCode: countryCode !== undefined ? countryCode : undefined,
+        isProfilePublic:
+          isProfilePublic !== undefined ? isProfilePublic : undefined,
+      },
+    });
+
     // Update User table if firstName or lastName changed
     const userUpdateData: any = {};
-    if (firstName !== undefined && firstName !== profile.firstName) {
+    if (firstName !== undefined) {
       userUpdateData.firstName = firstName;
     }
-    if (lastName !== undefined && lastName !== profile.lastName) {
+    if (lastName !== undefined) {
       userUpdateData.lastName = lastName;
     }
 
@@ -497,37 +532,6 @@ export const updateJobSeekerProfile = catchAsync(
         data: userUpdateData,
       });
     }
-
-    const updatedProfile = await prisma.jobSeeker.update({
-      where: { userId: req.user.id },
-      data: {
-        firstName: firstName !== undefined ? firstName : profile.firstName,
-        lastName: lastName !== undefined ? lastName : profile.lastName,
-        dateOfBirth:
-          dateOfBirth !== undefined
-            ? dateOfBirth
-              ? new Date(dateOfBirth)
-              : null
-            : profile.dateOfBirth,
-        location: location !== undefined ? location : profile.location,
-        bio: bio !== undefined ? bio : profile.bio,
-        skills: skills !== undefined ? skills : profile.skills,
-        experience: experience !== undefined ? experience : profile.experience,
-        education: education !== undefined ? education : profile.education,
-        cvUrl: cvUrl !== undefined ? cvUrl : profile.cvUrl,
-        profileImageUrl:
-          profileImageUrl !== undefined
-            ? profileImageUrl
-            : profile.profileImageUrl,
-        phone: phone !== undefined ? phone : profile.phone,
-        countryCode:
-          countryCode !== undefined ? countryCode : profile.countryCode,
-        isProfilePublic:
-          isProfilePublic !== undefined
-            ? isProfilePublic
-            : profile.isProfilePublic,
-      },
-    });
 
     res.status(200).json({
       success: true,

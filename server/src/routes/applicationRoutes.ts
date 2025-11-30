@@ -16,12 +16,16 @@ const router = Router();
 // All application routes require authentication
 router.use(authMiddleware);
 
-// Job seeker routes
-router.post("/apply", applyForJob);
+// IMPORTANT: Specific routes MUST come before dynamic parameter routes
+// Job seeker routes - specific paths first
 router.get("/my-applications", getMyApplications);
+router.post("/apply", applyForJob); // Accept jobId in request body
 
-// Employer routes (must come before /:id route)
+// Employer routes - specific paths first
 router.get("/employer", employerOnly, getEmployerApplications);
+
+// Dynamic parameter routes - must come after specific routes
+router.post("/:id/apply", applyForJob); // Legacy route - accept jobId as URL param
 router.get("/:id", getApplicationById);
 router.get("/job/:jobId", employerOnly, getJobApplications);
 router.patch("/:id/status", employerOnly, updateApplicationStatus);

@@ -24,8 +24,24 @@ export const applyForJob = [
   catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { jobId, coverLetter, attachmentIds } = req.body;
 
-    // For now, use a mock job seeker ID until auth is properly implemented
-    const jobSeekerId = req.user?.profile?.id || "mock-jobseeker-id";
+    // Ensure user has a job seeker profile (create if doesn't exist)
+    let jobSeeker = await prisma.jobSeeker.findUnique({
+      where: { userId: req.user!.id },
+    });
+
+    if (!jobSeeker) {
+      jobSeeker = await prisma.jobSeeker.create({
+        data: {
+          userId: req.user!.id,
+          firstName: req.user!.firstName || "",
+          lastName: req.user!.lastName || "",
+          countryCode: "+233",
+          isProfilePublic: true,
+        },
+      });
+    }
+
+    const jobSeekerId = jobSeeker.id;
 
     // Check if job exists and is active
     const job = await prisma.job.findUnique({
@@ -433,8 +449,26 @@ export const getMyApplications = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const { status, page = 1, limit = 10 } = req.query;
 
-    // For now, use a mock job seeker ID until auth is properly implemented
-    const jobSeekerId = req.user?.profile?.id || "mock-jobseeker-id";
+    const jobSeekerId = req.user?.profile?.id;
+
+    if (!jobSeekerId) {
+      res.status(200).json({
+        success: true,
+        data: {
+          applications: [],
+          pagination: {
+            page: Number(page),
+            limit: Number(limit),
+            total: 0,
+            totalPages: 0,
+            hasNext: false,
+            hasPrev: false,
+          },
+        },
+        message: "Please complete your profile setup to view applications",
+      });
+      return;
+    }
 
     const skip = (Number(page) - 1) * Number(limit);
     const take = Number(limit);
