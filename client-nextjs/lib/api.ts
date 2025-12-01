@@ -215,3 +215,43 @@ export const authAPI = {
   completeSocialAuth: (data: { role: string; email: string }) =>
     apiClient.post("/auth/complete-social-auth", data),
 };
+
+export const adminAPI = {
+  getStats: () => apiClient.get("/admin/stats"),
+
+  // User management
+  getAllUsers: (params?: URLSearchParams) =>
+    apiClient.get(`/admin/users${params ? `?${params}` : ""}`),
+  toggleUserStatus: (userId: string) =>
+    apiClient.patch(`/admin/users/${userId}/toggle-status`, {}),
+  toggleUserVerification: (userId: string) =>
+    apiClient.patch(`/admin/users/${userId}/toggle-verification`, {}),
+  deleteUser: (userId: string) => apiClient.delete(`/admin/users/${userId}`),
+
+  // Employer verification management
+  getAllEmployers: (params?: URLSearchParams) =>
+    apiClient.get(`/admin/employers${params ? `?${params}` : ""}`),
+  getPendingEmployers: () => apiClient.get("/admin/employers/pending"),
+  verifyEmployer: (
+    employerId: string,
+    isVerified: boolean,
+    rejectionReason?: string
+  ) =>
+    apiClient.patch(`/admin/employers/${employerId}/verification`, {
+      isVerified,
+      rejectionReason,
+    }),
+
+  // Job management
+  getAllJobs: (params?: URLSearchParams) =>
+    apiClient.get(`/admin/jobs${params ? `?${params}` : ""}`),
+  getPendingJobs: () => apiClient.get("/admin/jobs/pending"),
+  manageJob: (jobId: string, action: string) =>
+    apiClient.patch(`/admin/jobs/${jobId}`, { action }),
+
+  // Application management
+  getAllApplications: (params?: URLSearchParams) =>
+    apiClient.get(`/admin/applications${params ? `?${params}` : ""}`),
+  deleteApplication: (applicationId: string) =>
+    apiClient.delete(`/admin/applications/${applicationId}`),
+};

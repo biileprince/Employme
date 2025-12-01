@@ -583,7 +583,7 @@ export default function JobDetailPage() {
                   <h2 className="mb-4 text-xl font-semibold text-foreground">
                     Job Images
                   </h2>
-                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     {jobImages.map((image, index) => (
                       <a
                         key={index}
@@ -596,6 +596,7 @@ export default function JobDetailPage() {
                           src={formatImageUrl(image.url)}
                           alt={`Job image ${index + 1}`}
                           fill
+                          unoptimized
                           className="object-cover transition-transform duration-300 group-hover:scale-110"
                         />
                         <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-all duration-300 group-hover:bg-black/50">
