@@ -254,4 +254,78 @@ export const adminAPI = {
     apiClient.get(`/admin/applications${params ? `?${params}` : ""}`),
   deleteApplication: (applicationId: string) =>
     apiClient.delete(`/admin/applications/${applicationId}`),
+
+  // Newsletter management
+  getNewsletterSubscriptions: (params?: URLSearchParams) =>
+    apiClient.get(`/newsletter/subscriptions${params ? `?${params}` : ""}`),
+  getNewsletterAnalytics: (days: number = 30) =>
+    apiClient.get(`/newsletter/analytics?days=${days}`),
+  deleteNewsletterSubscription: (subscriptionId: string) =>
+    apiClient.delete(`/newsletter/subscriptions/${subscriptionId}`),
+  exportNewsletterEmails: (status: string = "all") =>
+    apiClient.get(`/newsletter/export?status=${status}`),
+
+  // Admin creation
+  createAdmin: (adminData: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    secretKey: string;
+  }) => apiClient.post("/admin/create-admin", adminData),
+};
+
+export const chatAPI = {
+  // Get eligible contacts for messaging
+  getEligibleContacts: () => apiClient.get("/chat/eligible-contacts"),
+
+  // Get all conversations
+  getConversations: () => apiClient.get("/chat/conversations"),
+
+  // Get or create conversation with a specific user
+  getOrCreateConversation: (participantId: string) =>
+    apiClient.get(`/chat/conversations/${participantId}`),
+
+  // Get messages in a conversation
+  getMessages: (conversationId: string, page = 1, limit = 50) =>
+    apiClient.get(
+      `/chat/conversations/${conversationId}/messages?page=${page}&limit=${limit}`
+    ),
+
+  // Send a message
+  sendMessage: (
+    conversationId: string,
+    content: string,
+    attachmentUrl?: string,
+    attachmentType?: string
+  ) =>
+    apiClient.post(`/chat/conversations/${conversationId}/messages`, {
+      content,
+      attachmentUrl,
+      attachmentType,
+    }),
+
+  // Mark messages as read
+  markAsRead: (conversationId: string) =>
+    apiClient.patch(`/chat/conversations/${conversationId}/read`, {}),
+
+  // Edit a message
+  editMessage: (conversationId: string, messageId: string, content: string) =>
+    apiClient.patch(
+      `/chat/conversations/${conversationId}/messages/${messageId}`,
+      { content }
+    ),
+
+  // Delete a message
+  deleteMessage: (conversationId: string, messageId: string) =>
+    apiClient.delete(
+      `/chat/conversations/${conversationId}/messages/${messageId}`
+    ),
+
+  // Delete conversation
+  deleteConversation: (conversationId: string) =>
+    apiClient.delete(`/chat/conversations/${conversationId}`),
+
+  // Get unread count
+  getUnreadCount: () => apiClient.get("/chat/unread-count"),
 };
