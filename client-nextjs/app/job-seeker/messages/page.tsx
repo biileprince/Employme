@@ -301,14 +301,14 @@ export default function JobSeekerMessagesPage() {
                       key={conv.id}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className={`p-4 border-b border-border cursor-pointer hover:bg-muted/50 ${
+                      className={`p-4 border-b border-border cursor-pointer hover:bg-muted/50 overflow-hidden ${
                         activeConversation?.id === conv.id
                           ? "bg-primary/10"
                           : ""
                       }`}
                       onClick={() => handleSelectConversation(conv.id)}
                     >
-                      <div className="flex gap-3">
+                      <div className="flex items-start gap-3">
                         <div className="relative w-12 h-12 rounded-full bg-muted overflow-hidden flex-shrink-0">
                           {image ? (
                             <img
@@ -327,19 +327,35 @@ export default function JobSeekerMessagesPage() {
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex justify-between mb-1">
-                            <h3 className="font-semibold truncate">{name}</h3>
+                          <div className="flex justify-between items-center gap-2 mb-1">
+                            <h3 className="font-semibold truncate flex-1 min-w-0">
+                              {name}
+                            </h3>
                             {lastMessage && (
-                              <span className="text-xs text-muted-foreground">
+                              <span className="text-xs text-muted-foreground flex-shrink-0 max-w-[60px] sm:max-w-none">
                                 {formatTime(lastMessage.createdAt)}
                               </span>
                             )}
                           </div>
                           {lastMessage && (
                             <p className="text-sm text-muted-foreground truncate">
-                              {lastMessage.senderId === user?.id && "You: "}
-                              {lastMessage.content}
+                              {lastMessage.isDeleted ? (
+                                "Message deleted"
+                              ) : (
+                                <>
+                                  {lastMessage.senderId === user?.id &&
+                                    "You: "}
+                                  {lastMessage.content}
+                                </>
+                              )}
                             </p>
+                          )}
+                          {conv.unreadCount && conv.unreadCount > 0 && (
+                            <div className="mt-1 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-primary text-primary-foreground rounded-full text-xs font-semibold">
+                              {conv.unreadCount > 99
+                                ? "99+"
+                                : conv.unreadCount}
+                            </div>
                           )}
                         </div>
                       </div>

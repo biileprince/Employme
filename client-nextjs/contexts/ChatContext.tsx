@@ -102,6 +102,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
 }) => {
   const { user } = useAuth();
   const userIdRef = useRef<string | null>(null);
+  const activeConversationRef = useRef<Conversation | null>(null);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] =
@@ -116,6 +117,11 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
   useEffect(() => {
     userIdRef.current = user?.id || null;
   }, [user]);
+
+  // Keep activeConversationRef in sync with activeConversation
+  useEffect(() => {
+    activeConversationRef.current = activeConversation;
+  }, [activeConversation]);
 
   // Initialize Socket.IO connection
   useEffect(() => {
@@ -222,23 +228,36 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
             return current;
           }
           // Not viewing this conversation, increment unread
-          setUnreadCount((prev) => prev + 1);
+          console.log("[Socket] Incrementing unread count");
           return current;
         });
 
-        // Update conversation in the list with the new message
+        // Update conversation in the list with the new message and unread count
         setConversations((prev) =>
           prev.map((conv) => {
             if (conv.id === data.conversationId) {
+              const isActive =
+                activeConversationRef.current?.id === data.conversationId;
               return {
                 ...conv,
                 messages: [data.message, ...(conv.messages || [])],
                 lastMessageAt: data.message.createdAt,
+                unreadCount: isActive ? 0 : (conv.unreadCount || 0) + 1,
               };
             }
             return conv;
           })
         );
+
+        // Update global unread count if not viewing this conversation
+        if (activeConversationRef.current?.id !== data.conversationId) {
+          setUnreadCount((prev) => prev + 1);
+        }
+
+        // Update global unread count if not viewing this conversation
+        if (activeConversation?.id !== data.conversationId) {
+          setUnreadCount((prev) => prev + 1);
+        }
       }
     );
 
@@ -281,11 +300,34 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
     newSocket.on(
       "message_edited",
       (data: { conversationId: string; message: Message }) => {
-        if (activeConversation?.id === data.conversationId) {
-          setMessages((prev) =>
-            prev.map((msg) => (msg.id === data.message.id ? data.message : msg))
-          );
-        }
+        console.log("[Socket] Message edited:", data);
+
+        // Update messages if viewing this conversation
+        setActiveConversation((current) => {
+          if (current?.id === data.conversationId) {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === data.message.id ? data.message : msg
+              )
+            );
+          }
+          return current;
+        });
+
+        // Update conversation in the list with the edited message
+        setConversations((prev) =>
+          prev.map((conv) => {
+            if (conv.id === data.conversationId) {
+              return {
+                ...conv,
+                messages: conv.messages?.map((msg) =>
+                  msg.id === data.message.id ? data.message : msg
+                ) || [data.message],
+              };
+            }
+            return conv;
+          })
+        );
       }
     );
 
@@ -293,11 +335,34 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
     newSocket.on(
       "message_deleted",
       (data: { conversationId: string; message: Message }) => {
-        if (activeConversation?.id === data.conversationId) {
-          setMessages((prev) =>
-            prev.map((msg) => (msg.id === data.message.id ? data.message : msg))
-          );
-        }
+        console.log("[Socket] Message deleted:", data);
+
+        // Update messages if viewing this conversation
+        setActiveConversation((current) => {
+          if (current?.id === data.conversationId) {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === data.message.id ? data.message : msg
+              )
+            );
+          }
+          return current;
+        });
+
+        // Update conversation in the list with the deleted message
+        setConversations((prev) =>
+          prev.map((conv) => {
+            if (conv.id === data.conversationId) {
+              return {
+                ...conv,
+                messages: conv.messages?.map((msg) =>
+                  msg.id === data.message.id ? data.message : msg
+                ) || [data.message],
+              };
+            }
+            return conv;
+          })
+        );
       }
     );
 
@@ -451,6 +516,21 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
             prev.map((msg) => (msg.id === messageId ? updatedMessage : msg))
           );
 
+          // Update conversation list with edited message
+          setConversations((prev) =>
+            prev.map((conv) => {
+              if (conv.id === activeConversation.id) {
+                return {
+                  ...conv,
+                  messages: conv.messages?.map((msg) =>
+                    msg.id === messageId ? updatedMessage : msg
+                  ) || [updatedMessage],
+                };
+              }
+              return conv;
+            })
+          );
+
           // Emit socket event for real-time update
           if (socket && user) {
             const receiverId =
@@ -491,6 +571,21 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
           // Update message in local state
           setMessages((prev) =>
             prev.map((msg) => (msg.id === messageId ? deletedMessage : msg))
+          );
+
+          // Update conversation list with deleted message
+          setConversations((prev) =>
+            prev.map((conv) => {
+              if (conv.id === activeConversation.id) {
+                return {
+                  ...conv,
+                  messages: conv.messages?.map((msg) =>
+                    msg.id === messageId ? deletedMessage : msg
+                  ) || [deletedMessage],
+                };
+              }
+              return conv;
+            })
           );
 
           // Emit socket event for real-time update

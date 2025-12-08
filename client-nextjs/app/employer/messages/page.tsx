@@ -124,9 +124,7 @@ export default function EmployerMessagesPage() {
 
   const filteredConversations = conversations.filter((conv) => {
     const otherParticipant =
-      conv.participant1Id === user?.id
-        ? conv.participant2
-        : conv.participant1;
+      conv.participant1Id === user?.id ? conv.participant2 : conv.participant1;
     const name = getParticipantName(otherParticipant);
     return name.toLowerCase().includes(searchQuery.toLowerCase());
   });
@@ -236,7 +234,9 @@ export default function EmployerMessagesPage() {
       {/* Connection status indicator */}
       <div className="mb-4 flex items-center gap-2 text-sm">
         <MdFiberManualRecord
-          className={`w-3 h-3 ${isConnected ? "text-green-500" : "text-red-500"}`}
+          className={`w-3 h-3 ${
+            isConnected ? "text-green-500" : "text-red-500"
+          }`}
         />
         <span className="text-muted-foreground">
           {isConnected ? "Connected" : "Disconnected"}
@@ -298,14 +298,14 @@ export default function EmployerMessagesPage() {
                       key={conv.id}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className={`p-4 border-b border-border cursor-pointer hover:bg-muted/50 ${
+                      className={`p-4 border-b border-border cursor-pointer hover:bg-muted/50 overflow-hidden ${
                         activeConversation?.id === conv.id
                           ? "bg-primary/10"
                           : ""
                       }`}
                       onClick={() => handleSelectConversation(conv.id)}
                     >
-                      <div className="flex gap-3">
+                      <div className="flex items-start gap-3">
                         <div className="relative w-12 h-12 rounded-full bg-muted overflow-hidden flex-shrink-0">
                           {image ? (
                             <img
@@ -324,19 +324,37 @@ export default function EmployerMessagesPage() {
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex justify-between mb-1">
-                            <h3 className="font-semibold truncate">{name}</h3>
+                          <div className="flex justify-between items-center gap-2 mb-1">
+                            <h3 className="font-semibold truncate flex-1 min-w-0">
+                              {name}
+                            </h3>
                             {lastMessage && (
-                              <span className="text-xs text-muted-foreground">
+                              <span className="text-xs text-muted-foreground flex-shrink-0 max-w-[60px] sm:max-w-none">
                                 {formatTime(lastMessage.createdAt)}
                               </span>
                             )}
                           </div>
                           {lastMessage && (
-                            <p className="text-sm text-muted-foreground truncate">
-                              {lastMessage.senderId === user?.id && "You: "}
-                              {lastMessage.content}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm text-muted-foreground truncate flex-1 min-w-0">
+                                {lastMessage.isDeleted ? (
+                                  "Message deleted"
+                                ) : (
+                                  <>
+                                    {lastMessage.senderId === user?.id &&
+                                      "You: "}
+                                    {lastMessage.content}
+                                  </>
+                                )}
+                              </p>
+                              {conv.unreadCount && conv.unreadCount > 0 && (
+                                <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 bg-primary text-primary-foreground rounded-full text-xs font-semibold flex items-center justify-center">
+                                  {conv.unreadCount > 99
+                                    ? "99+"
+                                    : conv.unreadCount}
+                                </span>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -439,7 +457,9 @@ export default function EmployerMessagesPage() {
                     return (
                       <div
                         key={msg.id}
-                        className={`flex ${isOwn ? "justify-end" : "justify-start"}`}
+                        className={`flex ${
+                          isOwn ? "justify-end" : "justify-start"
+                        }`}
                       >
                         <div className="max-w-[70%] rounded-lg px-4 py-2 bg-muted/50 border border-dashed italic text-muted-foreground text-sm">
                           This message was deleted
@@ -451,7 +471,9 @@ export default function EmployerMessagesPage() {
                   return (
                     <div
                       key={msg.id}
-                      className={`flex ${isOwn ? "justify-end" : "justify-start"} group`}
+                      className={`flex ${
+                        isOwn ? "justify-end" : "justify-start"
+                      } group`}
                     >
                       <div
                         className={`max-w-[70%] rounded-lg px-4 py-2 ${
@@ -564,7 +586,10 @@ export default function EmployerMessagesPage() {
               </div>
 
               {/* Message Input */}
-              <form onSubmit={handleSendMessage} className="p-4 border-t bg-card">
+              <form
+                onSubmit={handleSendMessage}
+                className="p-4 border-t bg-card"
+              >
                 <div className="flex gap-2">
                   <input
                     type="text"
