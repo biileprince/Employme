@@ -233,7 +233,7 @@ export default function JobSeekerMessagesPage() {
     : false;
 
   return (
-    <div className="px-4 sm:px-6">
+    <div className="px-4 sm:px-6 overflow-x-hidden">
       {/* Connection status indicator */}
       <div className="mb-4 flex items-center gap-2 text-sm">
         <MdFiberManualRecord
@@ -246,22 +246,22 @@ export default function JobSeekerMessagesPage() {
         </span>
       </div>
 
-      <div className="flex h-[calc(100vh-200px)] bg-card rounded-xl shadow-sm overflow-hidden border border-border">
+      <div className="flex h-[calc(100vh-180px)] bg-card rounded-xl shadow-sm overflow-hidden overflow-x-hidden border border-border">
         {/* Conversations Sidebar */}
         <div
-          className={`w-full md:w-80 border-r border-border flex flex-col ${
+          className={`w-full md:w-80 border-r border-border flex flex-col overflow-hidden overflow-x-hidden ${
             showMobileChat ? "hidden md:flex" : "flex"
           }`}
         >
-          <div className="p-4 border-b border-border space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Messages</h2>
+          <div className="p-4 border-b border-border space-y-3 overflow-hidden">
+            <div className="flex items-center justify-between gap-2 overflow-hidden">
+              <h2 className="text-lg font-semibold truncate">Messages</h2>
               <button
                 onClick={() => {
                   setShowNewMessageModal(true);
                   loadEligibleContacts();
                 }}
-                className="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+                className="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 flex-shrink-0"
               >
                 <MdAdd className="w-5 h-5" />
                 <span className="text-sm font-medium">New</span>
@@ -308,7 +308,7 @@ export default function JobSeekerMessagesPage() {
                       }`}
                       onClick={() => handleSelectConversation(conv.id)}
                     >
-                      <div className="flex items-start gap-3">
+                      <div className="flex items-start gap-3 overflow-hidden">
                         <div className="relative w-12 h-12 rounded-full bg-muted overflow-hidden flex-shrink-0">
                           {image ? (
                             <img
@@ -326,9 +326,9 @@ export default function JobSeekerMessagesPage() {
                             <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-card rounded-full" />
                           )}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex justify-between items-center gap-2 mb-1">
-                            <h3 className="font-semibold truncate flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 max-w-full w-0">
+                          <div className="flex justify-between items-center gap-2 mb-1 overflow-hidden">
+                            <h3 className="font-semibold truncate flex-1 min-w-0 max-w-[120px] sm:max-w-[200px] md:max-w-none">
                               {name}
                             </h3>
                             {lastMessage && (
@@ -343,8 +343,7 @@ export default function JobSeekerMessagesPage() {
                                 "Message deleted"
                               ) : (
                                 <>
-                                  {lastMessage.senderId === user?.id &&
-                                    "You: "}
+                                  {lastMessage.senderId === user?.id && "You: "}
                                   {lastMessage.content}
                                 </>
                               )}
@@ -352,9 +351,7 @@ export default function JobSeekerMessagesPage() {
                           )}
                           {conv.unreadCount && conv.unreadCount > 0 && (
                             <div className="mt-1 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-primary text-primary-foreground rounded-full text-xs font-semibold">
-                              {conv.unreadCount > 99
-                                ? "99+"
-                                : conv.unreadCount}
+                              {conv.unreadCount > 99 ? "99+" : conv.unreadCount}
                             </div>
                           )}
                         </div>

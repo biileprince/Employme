@@ -307,6 +307,8 @@ model Conversation {
   participant1Id    String
   participant2Id    String
   lastMessageAt     DateTime  @default(now())
+  deletedByParticipant1 Boolean @default(false)
+  deletedByParticipant2 Boolean @default(false)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   

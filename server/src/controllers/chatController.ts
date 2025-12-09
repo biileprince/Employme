@@ -169,7 +169,14 @@ export const getConversations = catchAsync(
 
     const conversations = await prisma.conversation.findMany({
       where: {
-        OR: [{ participant1Id: userId }, { participant2Id: userId }],
+        OR: [
+          {
+            participant1Id: userId,
+          },
+          {
+            participant2Id: userId,
+          },
+        ],
       },
       include: {
         participant1: {
@@ -227,15 +234,27 @@ export const getConversations = catchAsync(
             createdAt: true,
             isRead: true,
             senderId: true,
+            isDeleted: true,
           },
         },
       },
       orderBy: { lastMessageAt: "desc" },
     });
 
+    // Filter out conversations deleted by the current user
+    const activeConversations = conversations.filter((conv) => {
+      if (conv.participant1Id === userId && conv.deletedByParticipant1) {
+        return false;
+      }
+      if (conv.participant2Id === userId && conv.deletedByParticipant2) {
+        return false;
+      }
+      return true;
+    });
+
     // Calculate unread count for each conversation
     const conversationsWithUnread = await Promise.all(
-      conversations.map(async (conv) => {
+      activeConversations.map(async (conv) => {
         const unreadCount = await prisma.message.count({
           where: {
             conversationId: conv.id,
@@ -404,6 +423,68 @@ export const getOrCreateConversation = catchAsync(
           },
         },
       });
+    } else {
+      // If conversation exists but was deleted by either participant, restore it
+      if (
+        conversation.deletedByParticipant1 ||
+        conversation.deletedByParticipant2
+      ) {
+        conversation = await prisma.conversation.update({
+          where: { id: conversation.id },
+          data: {
+            deletedByParticipant1: false,
+            deletedByParticipant2: false,
+          },
+          include: {
+            participant1: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                imageUrl: true,
+                role: true,
+                employer: {
+                  select: {
+                    companyName: true,
+                    logoUrl: true,
+                  },
+                },
+                jobSeeker: {
+                  select: {
+                    firstName: true,
+                    lastName: true,
+                    profileImageUrl: true,
+                  },
+                },
+              },
+            },
+            participant2: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                imageUrl: true,
+                role: true,
+                employer: {
+                  select: {
+                    companyName: true,
+                    logoUrl: true,
+                  },
+                },
+                jobSeeker: {
+                  select: {
+                    firstName: true,
+                    lastName: true,
+                    profileImageUrl: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+      }
     }
 
     res.status(200).json({
@@ -605,9 +686,26 @@ export const deleteConversation = catchAsync(
       throw new AppError("You are not part of this conversation", 403);
     }
 
-    await prisma.conversation.delete({
+    // Determine which participant is deleting
+    const isParticipant1 = conversation.participant1Id === userId;
+
+    // Update the conversation to mark as deleted by this user
+    const updatedConversation = await prisma.conversation.update({
       where: { id: conversationId },
+      data: isParticipant1
+        ? { deletedByParticipant1: true }
+        : { deletedByParticipant2: true },
     });
+
+    // If both participants have deleted, actually delete the conversation
+    if (
+      updatedConversation.deletedByParticipant1 &&
+      updatedConversation.deletedByParticipant2
+    ) {
+      await prisma.conversation.delete({
+        where: { id: conversationId },
+      });
+    }
 
     res.status(200).json({
       success: true,
