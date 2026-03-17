@@ -84,7 +84,7 @@ export default function Onboarding() {
   const [cvFileName, setCvFileName] = useState<string>("");
 
   // Use route guard to handle authentication and onboarding checks
-  const { isLoading: isAuthLoading } = useRouteGuard({
+  useRouteGuard({
     requireAuth: true,
     requireOnboarding: true,
   });
@@ -249,8 +249,6 @@ export default function Onboarding() {
         console.log("CV uploaded:", cvUrl);
       }
 
-      const profileData =
-        user?.role === "JOB_SEEKER" ? jobSeekerData : employerData;
 
       // Transform and add the role and appropriate file URLs to the profile data
       let profileDataWithRole: Record<string, unknown>;

@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Header } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
 import Link from "next/link";
+import Image from "next/image";
 
 type LoginStep =
   | "login"
@@ -90,10 +91,11 @@ function LoginContent() {
             {/* Left side - Image */}
             <div className="relative hidden overflow-hidden lg:flex lg:w-1/2">
               <div className="absolute inset-0 z-10 bg-gradient-to-br from-primary-600/90 via-primary-700/90 to-primary-800/90" />
-              <img
+              <Image
                 src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=1000"
                 alt="Professional woman with laptop"
-                className="absolute inset-0 h-full w-full object-cover"
+                fill
+                className="object-cover"
               />
               <div className="relative z-20 flex flex-col justify-center px-12 text-white">
                 <motion.div
@@ -159,7 +161,7 @@ function LoginContent() {
 
                   <div className="mt-6 text-center">
                     <p className="text-sm text-muted-foreground">
-                      Don't have an account?{" "}
+                      Don&apos;t have an account?{" "}
                       <Link
                         href="/auth/signup"
                         className="font-medium text-primary transition-colors hover:text-primary/80"

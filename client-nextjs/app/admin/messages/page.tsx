@@ -19,6 +19,7 @@ import {
 } from "react-icons/md";
 import { chatAPI, formatImageUrl } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import Image from "next/image";
 import { useChat } from "@/contexts/ChatContext";
 import { useRouteGuard } from "@/hooks/useRouteGuard";
 import type { Participant } from "@/contexts/ChatContext";
@@ -87,9 +88,7 @@ export default function AdminMessagesPage() {
     setLoadingContacts(true);
     try {
       const response = await chatAPI.getEligibleContacts();
-      if (response.success && response.data) {
-        setEligibleContacts((response.data as any).contacts || []);
-      }
+        setEligibleContacts((response.data as { contacts?: Participant[] }).contacts || []);
     } catch (error) {
       console.error("Failed to load contacts:", error);
     } finally {
@@ -328,7 +327,7 @@ export default function AdminMessagesPage() {
             {filteredConversations.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full p-4 text-muted-foreground">
                 <p>No conversations yet</p>
-                <p className="text-sm mt-2">Click "New" to start</p>
+                <p className="text-sm mt-2">Click &quot;New&quot; to start</p>
               </div>
             ) : (
               <AnimatePresence>
@@ -358,10 +357,11 @@ export default function AdminMessagesPage() {
                       <div className="flex items-start gap-3 overflow-hidden">
                         <div className="relative w-12 h-12 rounded-full bg-muted overflow-hidden flex-shrink-0">
                           {image ? (
-                            <img
+                            <Image
                               src={formatImageUrl(image)}
                               alt={name}
-                              className="w-full h-full object-cover"
+                              fill
+                              className="object-cover"
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-lg font-semibold">
@@ -433,12 +433,13 @@ export default function AdminMessagesPage() {
                 <div className="flex items-center gap-3 flex-1">
                   <div className="relative w-10 h-10 rounded-full bg-muted overflow-hidden">
                     {getParticipantImage(activeParticipant) ? (
-                      <img
+                      <Image
                         src={formatImageUrl(
                           getParticipantImage(activeParticipant)!,
                         )}
                         alt={getParticipantName(activeParticipant)}
-                        className="w-full h-full object-cover"
+                        fill
+                        className="object-cover"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-sm font-semibold">
@@ -714,10 +715,11 @@ export default function AdminMessagesPage() {
                       >
                         <div className="relative w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
                           {image ? (
-                            <img
+                            <Image
                               src={formatImageUrl(image)}
                               alt={name}
-                              className="w-full h-full object-cover rounded-full"
+                              fill
+                              className="object-cover rounded-full"
                             />
                           ) : (
                             <span className="text-primary font-semibold">

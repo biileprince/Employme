@@ -144,6 +144,7 @@ export default function JobAlertsPage() {
 
   useEffect(() => {
     loadAlerts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleToggleItem = <T extends string>(

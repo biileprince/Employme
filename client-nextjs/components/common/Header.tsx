@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import {
@@ -440,16 +441,18 @@ export function Header() {
                         (user?.profile as Record<string, unknown>)
                           ?.profileImageUrl ||
                         (user?.profile as Record<string, unknown>)?.logoUrl) ? (
-                        <img
+                        <Image
                           src={formatImageUrl(
                             user.imageUrl ||
                               ((user.profile as Record<string, unknown>)
                                 ?.profileImageUrl as string) ||
                               ((user.profile as Record<string, unknown>)
-                                ?.logoUrl as string)
+                                ?.logoUrl as string),
                           )}
                           alt="Profile"
-                          className="h-8 w-8 rounded-full border border-border object-cover"
+                          width={32}
+                          height={32}
+                          className="rounded-full border border-border object-cover"
                           onError={() => {
                             setImageLoadError(true);
                           }}

@@ -46,6 +46,7 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     loadNotifications();
+
   }, []);
 
   const markOne = async (id: string) => {

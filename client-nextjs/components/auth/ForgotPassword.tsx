@@ -32,7 +32,7 @@ export function ForgotPassword({
     try {
       await forgotPassword(email);
       setMessage(
-        "If an account with that email exists, we have sent a password reset code to your email."
+        "If an account with that email exists, we have sent a password reset code to your email.",
       );
 
       // Wait a moment to let user read the message, then switch to reset form
@@ -43,7 +43,7 @@ export function ForgotPassword({
       setError(
         err instanceof Error
           ? err.message
-          : "Failed to send reset email. Please try again."
+          : "Failed to send reset email. Please try again.",
       );
     } finally {
       setIsLoading(false);
@@ -63,7 +63,7 @@ export function ForgotPassword({
           Forgot Password?
         </h2>
         <p className="text-muted-foreground">
-          No worries! Enter your email and we'll send you a reset code.
+          No worries! Enter your email and we&apos;ll send you a reset code.
         </p>
       </div>
 

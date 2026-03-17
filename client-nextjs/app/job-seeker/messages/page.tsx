@@ -19,6 +19,7 @@ import {
 } from "react-icons/md";
 import { chatAPI, formatImageUrl } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import Image from "next/image";
 import { useChat } from "@/contexts/ChatContext";
 import { useRouteGuard } from "@/hooks/useRouteGuard";
 import type { Participant } from "@/contexts/ChatContext";
@@ -87,9 +88,7 @@ export default function JobSeekerMessagesPage() {
     setLoadingContacts(true);
     try {
       const response = await chatAPI.getEligibleContacts();
-      if (response.success && response.data) {
-        setEligibleContacts((response.data as any).contacts || []);
-      }
+        setEligibleContacts((response.data as { contacts?: Participant[] }).contacts || []);
     } catch (error) {
       console.error("Failed to load contacts:", error);
     } finally {
@@ -318,7 +317,7 @@ export default function JobSeekerMessagesPage() {
             {filteredConversations.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full p-4 text-muted-foreground">
                 <p>No conversations yet</p>
-                <p className="text-sm mt-2">Click "New" to start</p>
+                <p className="text-sm mt-2">Click &quot;New&quot; to start</p>
               </div>
             ) : (
               <AnimatePresence>
@@ -347,10 +346,11 @@ export default function JobSeekerMessagesPage() {
                       <div className="flex items-start gap-3 overflow-hidden">
                         <div className="relative w-12 h-12 rounded-full bg-muted overflow-hidden flex-shrink-0">
                           {image ? (
-                            <img
+                            <Image
                               src={formatImageUrl(image)}
                               alt={name}
-                              className="w-full h-full object-cover"
+                              fill
+                              className="object-cover"
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-lg font-semibold">
@@ -419,12 +419,13 @@ export default function JobSeekerMessagesPage() {
                 <div className="flex items-center gap-3 flex-1">
                   <div className="relative w-10 h-10 rounded-full bg-muted overflow-hidden">
                     {getParticipantImage(activeParticipant) ? (
-                      <img
+                      <Image
                         src={formatImageUrl(
                           getParticipantImage(activeParticipant)!,
                         )}
                         alt={getParticipantName(activeParticipant)}
-                        className="w-full h-full object-cover"
+                        fill
+                        className="object-cover"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-sm font-semibold">
@@ -682,7 +683,7 @@ export default function JobSeekerMessagesPage() {
                   <MdBusiness className="w-12 h-12 mx-auto mb-3 opacity-50" />
                   <p>No contacts available</p>
                   <p className="text-sm mt-1">
-                    Employers you've applied to will appear here
+                    Employers you&apos;ve applied to will appear here
                   </p>
                 </div>
               ) : (
@@ -701,10 +702,11 @@ export default function JobSeekerMessagesPage() {
                       >
                         <div className="relative w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
                           {contact.employer?.logoUrl ? (
-                            <img
+                            <Image
                               src={formatImageUrl(contact.employer.logoUrl)}
                               alt={companyName}
-                              className="w-full h-full object-cover rounded-full"
+                              fill
+                              className="object-cover rounded-full"
                             />
                           ) : (
                             <MdBusiness className="w-6 h-6 text-primary" />

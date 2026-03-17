@@ -273,9 +273,6 @@ export default function JobSeekerProfilePage() {
     }));
   };
 
-  const handlePhoneChange = (phone: string, countryCode: string) => {
-    setFormData((prev) => ({ ...prev, phone, countryCode }));
-  };
 
   const addSkill = () => {
     if (skillInput.trim() && !formData.skills.includes(skillInput.trim())) {

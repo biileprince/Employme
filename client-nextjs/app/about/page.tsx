@@ -29,7 +29,7 @@ export default function AboutPage() {
                 About Employ.me
               </h1>
               <p className="mx-auto max-w-3xl text-xl text-primary-100">
-                Ghana's leading job platform connecting talented professionals
+                Ghana&apos;s leading job platform connecting talented professionals
                 with top employers
               </p>
             </motion.div>
@@ -50,14 +50,14 @@ export default function AboutPage() {
                   Our Mission
                 </h2>
                 <p className="mb-4 text-lg text-muted-foreground">
-                  At Employ.me, we're dedicated to transforming the job search
+                  At Employ.me, we&apos;re dedicated to transforming the job search
                   and recruitment experience in Ghana. Our mission is to bridge
                   the gap between talented professionals and forward-thinking
                   companies.
                 </p>
                 <p className="text-lg text-muted-foreground">
                   We believe that finding the right job or the right candidate
-                  shouldn't be difficult. That's why we've built a platform that
+                  shouldn&apos;t be difficult. That&apos;s why we&apos;ve built a platform that
                   makes the process simple, efficient, and effective for
                   everyone.
                 </p>
@@ -79,7 +79,7 @@ export default function AboutPage() {
                   grow.
                 </p>
                 <p className="text-lg text-muted-foreground">
-                  Through technology and innovation, we're making this vision a
+                  Through technology and innovation, we&apos;re making this vision a
                   reality, one connection at a time.
                 </p>
               </motion.div>

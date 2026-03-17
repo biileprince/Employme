@@ -11,7 +11,7 @@ export default function CompanyPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = use(params);
+  use(params);
 
   return (
     <>

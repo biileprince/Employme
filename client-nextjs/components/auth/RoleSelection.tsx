@@ -54,7 +54,7 @@ export const RoleSelection: React.FC<RoleSelectionProps> = ({
               </div>
 
               <h3 className="mb-3 text-2xl font-bold text-foreground">
-                I'm looking for a job
+                I&apos;m looking for a job
               </h3>
 
               <p className="mb-6 text-muted-foreground">
@@ -127,7 +127,7 @@ export const RoleSelection: React.FC<RoleSelectionProps> = ({
               </div>
 
               <h3 className="mb-3 text-2xl font-bold text-foreground">
-                I'm hiring talent
+                I&apos;m hiring talent
               </h3>
 
               <p className="mb-6 text-muted-foreground">

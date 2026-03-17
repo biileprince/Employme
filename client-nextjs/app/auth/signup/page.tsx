@@ -11,6 +11,7 @@ import { Header } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
 import { apiClient } from "@/lib/api";
 import type { UserRole, User } from "@/types/auth";
+import Image from "next/image";
 
 type SignupStep = "role-selection" | "register" | "verify-email";
 
@@ -137,10 +138,11 @@ function SignupContent() {
             {/* Background Image */}
             <div className="absolute inset-0 z-0">
               <div className="absolute inset-0 z-10 bg-gradient-to-r from-blue-900/10 to-purple-900/10 dark:from-blue-900/20 dark:to-purple-900/20"></div>
-              <img
+              <Image
                 src="https://images.unsplash.com/photo-1557804506-669a67965ba0?q=80&w=1000"
                 alt="Professional background"
-                className="h-full w-full object-cover opacity-5 dark:opacity-10"
+                fill
+                className="object-cover opacity-5 dark:opacity-10"
               />
             </div>
 
@@ -164,10 +166,11 @@ function SignupContent() {
             {/* Left side - Image */}
             <div className="relative hidden lg:flex lg:w-1/2">
               <div className="absolute inset-0 z-10 bg-gradient-to-br from-primary-800/40 to-primary-900/60 dark:from-primary-900/70 dark:to-background/80"></div>
-              <img
+              <Image
                 src="https://images.unsplash.com/photo-1521737711867-e3b97375f902?q=80&w=1000"
                 alt="Professional background"
-                className="h-full w-full object-cover"
+                fill
+                className="object-cover"
               />
               <div className="absolute inset-0 z-20 flex items-center justify-center p-12">
                 <div className="text-center text-white">

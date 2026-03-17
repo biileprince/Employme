@@ -22,22 +22,14 @@ import {
   MdWork,
   MdCalendarToday,
   MdRefresh,
-  MdPhone,
-  MdLanguage,
-  MdSchool,
-  MdDescription,
-  MdPublic,
   MdAttachment,
   MdGroups,
-  MdCake,
   MdUpdate,
-  MdImage,
   MdFileDownload,
 } from "react-icons/md";
-import { apiClient, formatImageUrl, adminAPI } from "@/lib/api";
+import { adminAPI } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useRouteGuard } from "@/hooks/useRouteGuard";
-import Image from "next/image";
 import ExcelJS from "exceljs";
 
 interface User {

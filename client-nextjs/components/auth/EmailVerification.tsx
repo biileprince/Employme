@@ -34,7 +34,7 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
     try {
       await verifyEmail(code);
       setSuccess(
-        "Email verified successfully! Redirecting to your dashboard..."
+        "Email verified successfully! Redirecting to your dashboard...",
       );
       setTimeout(() => {
         onVerificationSuccess();
@@ -66,7 +66,7 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
           Verify your email
         </h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          We've sent a 6-digit verification code to:
+          We&apos;ve sent a 6-digit verification code to:
         </p>
         <p className="font-medium text-primary">{email}</p>
       </div>
@@ -124,7 +124,7 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
 
       <div className="space-y-2 text-center">
         <p className="text-sm text-muted-foreground">
-          Didn't receive the code?
+          Didn&apos;t receive the code?
         </p>
         <button
           onClick={handleResendCode}

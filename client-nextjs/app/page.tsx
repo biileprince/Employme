@@ -25,6 +25,7 @@ import {
   MdPeople,
   MdHowToReg,
 } from "react-icons/md";
+import Image from "next/image";
 
 const fadeInUp: Variants = {
   hidden: { opacity: 0, y: 20 },
@@ -190,9 +191,11 @@ export default function Home() {
                 className="relative hidden lg:block"
               >
                 <Card className="overflow-hidden border-2 shadow-2xl">
-                  <img
+                  <Image
                     src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=600&h=800&fit=crop"
                     alt="Professional woman working on laptop"
+                    width={600}
+                    height={800}
                     className="h-auto w-full object-cover"
                   />
                 </Card>
@@ -774,10 +777,11 @@ export default function Home() {
 
                 {/* Image Side */}
                 <div className="relative min-h-[300px] bg-muted/20 lg:min-h-[400px]">
-                  <img
+                  <Image
                     src="https://images.unsplash.com/photo-1556745753-b2904692b3cd?w=800&h=600&fit=crop"
                     alt="Happy professional greeting"
-                    className="h-full w-full object-cover"
+                    fill
+                    className="object-cover"
                   />
                 </div>
               </div>

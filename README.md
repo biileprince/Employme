@@ -94,4 +94,3 @@ npm run db:studio
 
 - `client/` remains the active production-like frontend.
 - `client-nextjs/` is the migration and feature track for Next.js 16.
-
