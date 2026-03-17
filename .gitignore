@@ -2,7 +2,6 @@
 BACKEND_STATUS.md
 DATABASE_SETUP.md
 instruction.md
-README.md
 SETUP.md
 Design.md
 
@@ -60,7 +59,6 @@ Thumbs.db
 # Local-only docs (do not track)
 .github/copilot-instructions.md
 CHAT_IMPLEMENTATION.md
-README.md
 SOCIAL_AUTH_ROLE_FIX.md
 TEST_DATA.md
 client-nextjs/AUTH_IMPLEMENTATION.md
