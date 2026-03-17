@@ -57,6 +57,19 @@ Thumbs.db
 # Copilot skills
 .github/skills/
 
+# Local-only docs (do not track)
+.github/copilot-instructions.md
+CHAT_IMPLEMENTATION.md
+README.md
+SOCIAL_AUTH_ROLE_FIX.md
+TEST_DATA.md
+client-nextjs/AUTH_IMPLEMENTATION.md
+client-nextjs/IMPLEMENTATION_SUMMARY.md
+client-nextjs/MCP_SETUP.md
+client-nextjs/NAVIGATION.md
+client-nextjs/QUICK_START.md
+server/EMAIL_NOTIFICATIONS.md
+
 # Temporary files
 *.tmp
 *.temp
