@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { RegisterForm } from "@/components/auth/RegisterForm";
@@ -14,7 +14,7 @@ import type { UserRole, User } from "@/types/auth";
 
 type SignupStep = "role-selection" | "register" | "verify-email";
 
-export default function SignupPage() {
+function SignupContent() {
   const searchParams = useSearchParams();
   const [currentStep, setCurrentStep] = useState<SignupStep>("role-selection");
   const [selectedRole, setSelectedRole] = useState<UserRole | undefined>();
@@ -27,7 +27,7 @@ export default function SignupPage() {
   const completeSocialRegistration = useCallback(
     async (role: UserRole, email: string) => {
       try {
-        const response = await apiClient.post<{ token: string; user: User }>(
+        const response = await apiClient.post<{ user: User }>(
           "/auth/complete-social-auth",
           {
             role,
@@ -36,7 +36,6 @@ export default function SignupPage() {
         );
 
         if (response.success && response.data) {
-          apiClient.setToken(response.data.token);
           localStorage.removeItem("pending_social_auth_role");
           router.push("/onboarding");
         }
@@ -110,7 +109,7 @@ export default function SignupPage() {
 
     if (isSocialAuth && socialEmail) {
       try {
-        const response = await apiClient.post<{ token: string; user: User }>(
+        const response = await apiClient.post<{ user: User }>(
           "/auth/complete-social-auth",
           {
             role,
@@ -119,7 +118,6 @@ export default function SignupPage() {
         );
 
         if (response.success && response.data) {
-          apiClient.setToken(response.data.token);
           router.push("/onboarding");
         }
       } catch (error) {
@@ -245,5 +243,19 @@ export default function SignupPage() {
       {renderStep()}
       <Footer />
     </>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      }
+    >
+      <SignupContent />
+    </Suspense>
   );
 }

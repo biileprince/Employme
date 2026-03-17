@@ -52,41 +52,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // Check for social auth success in URL parameters
-        if (typeof window !== "undefined") {
-          const urlParams = new URLSearchParams(window.location.search);
-          const token = urlParams.get("token");
-          const socialAuth = urlParams.get("social");
-
-          if (token && socialAuth) {
-            // Set token and fetch user data
-            apiClient.setToken(token);
-
-            // Clear the URL parameters
-            window.history.replaceState(
-              {},
-              document.title,
-              window.location.pathname
-            );
-          } else {
-            // Ensure token is loaded from localStorage
-            const storedToken = localStorage.getItem("token");
-            if (storedToken) {
-              apiClient.setToken(storedToken);
-            }
-          }
-        }
-
-        // Only fetch user if we have a token
-        if (apiClient.getToken()) {
-          const response = await apiClient.get<{ user: User }>("/auth/me");
-          if (response.success && response.data) {
-            setUser(response.data.user);
-          }
+        // Cookie-based auth: just ask the server who is logged in.
+        const response = await apiClient.get<{ user: User }>("/auth/me");
+        if (response.success && response.data) {
+          setUser(response.data.user);
         }
       } catch (error) {
         console.log("User not authenticated", error);
-        // Clear invalid token
+        // Legacy cleanup for old bearer-token flow
         apiClient.setToken(null);
       } finally {
         setIsLoading(false);
@@ -101,15 +74,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const response = await apiClient.post<{
         user: User;
-        token: string;
       }>("/auth/login", { email, password });
 
       if (response.success && response.data) {
         setUser(response.data.user);
-        // Set the token in the API client
-        if (response.data.token) {
-          apiClient.setToken(response.data.token);
-        }
       } else {
         throw new Error(response.message || "Login failed");
       }
@@ -160,14 +128,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const verifyEmail = async (code: string) => {
     const response = await apiClient.post<{
       user: User;
-      token: string;
     }>("/auth/verify-email", { code });
 
     if (response.success && response.data) {
       setUser(response.data.user);
-      if (response.data.token) {
-        apiClient.setToken(response.data.token);
-      }
     } else {
       throw new Error(response.message || "Verification failed");
     }

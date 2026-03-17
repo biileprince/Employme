@@ -7,7 +7,7 @@ export default function JobSeekerLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ProtectedRoute requireRole="JOB_SEEKER">
+    <ProtectedRoute requiredRole="JOB_SEEKER">
       <JobSeekerDashboardLayout>{children}</JobSeekerDashboardLayout>
     </ProtectedRoute>
   );

@@ -11,7 +11,7 @@ import React, {
 } from "react";
 import { io, Socket } from "socket.io-client";
 import { useAuth } from "./AuthContext";
-import { chatAPI } from "@/lib/api";
+import { authAPI, chatAPI } from "@/lib/api";
 
 // Types
 export interface Message {
@@ -81,6 +81,7 @@ interface ChatContextType {
   isConnected: boolean;
   loadConversations: () => Promise<void>;
   selectConversation: (conversationId: string) => Promise<void>;
+  clearActiveConversation: () => void;
   sendMessage: (content: string, attachmentUrl?: string) => Promise<void>;
   editMessage: (messageId: string, content: string) => Promise<void>;
   deleteMessage: (messageId: string) => Promise<void>;
@@ -89,6 +90,26 @@ interface ChatContextType {
   startConversation: (participantId: string) => Promise<void>;
   startTyping: () => void;
   stopTyping: () => void;
+}
+
+interface ConversationsResponse {
+  conversations: Conversation[];
+}
+
+interface UnreadCountResponse {
+  unreadCount: number;
+}
+
+interface MessagesResponse {
+  messages: Message[];
+}
+
+interface MessageResponse {
+  message: Message;
+}
+
+interface ConversationResponse {
+  conversation: Conversation;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -100,7 +121,7 @@ const SERVER_URL =
 export const ChatProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const userIdRef = useRef<string | null>(null);
   const activeConversationRef = useRef<Conversation | null>(null);
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -125,260 +146,339 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
 
   // Initialize Socket.IO connection
   useEffect(() => {
-    const token = localStorage.getItem("token"); // Match the key used in AuthContext/apiClient
-
-    console.log("[ChatContext] Initializing socket connection...", {
-      hasUser: !!user,
-      hasToken: !!token,
-      tokenPreview: token ? `${token.substring(0, 20)}...` : null,
-    });
-
-    if (!user || !token) {
-      console.log(
-        "[ChatContext] Missing user or token, skipping socket connection"
-      );
+    if (isAuthLoading) {
       return;
     }
 
-    const newSocket = io(SERVER_URL, {
-      auth: { token },
-      autoConnect: true,
-    });
-
-    newSocket.on("connect", () => {
-      console.log("Socket connected:", newSocket.id);
-      setIsConnected(true);
-    });
-
-    newSocket.on("disconnect", () => {
-      console.log("Socket disconnected");
+    if (!user) {
       setIsConnected(false);
-    });
+      return;
+    }
 
-    newSocket.on("connect_error", (error) => {
-      console.error("Socket connection error:", error);
-      setIsConnected(false);
-    });
+    let mounted = true;
+    let newSocket: Socket | null = null;
+    let isRefreshingToken = false;
+    let authRetryCount = 0;
+    const maxAuthRetries = 2;
 
-    // Listen for online users
-    newSocket.on("online_users", (data: { userIds: string[] }) => {
-      console.log("[Socket] Online users received:", data.userIds);
-      setOnlineUsers(data.userIds);
-    });
+    const fetchSocketToken = async (): Promise<string | null> => {
+      try {
+        const response = await authAPI.getSocketToken();
+        const socketToken = response.data?.token;
 
-    newSocket.on("user_online", (data: { userId: string }) => {
-      console.log("[Socket] User came online:", data.userId);
-      setOnlineUsers((prev) => {
-        const updated = [...new Set([...prev, data.userId])];
-        console.log("[Socket] Updated online users:", updated);
-        return updated;
-      });
-    });
+        if (!response.success || !socketToken) {
+          return null;
+        }
 
-    newSocket.on("user_offline", (data: { userId: string }) => {
-      console.log("[Socket] User went offline:", data.userId);
-      setOnlineUsers((prev) => prev.filter((id) => id !== data.userId));
-    });
+        return socketToken;
+      } catch (error) {
+        console.error("Failed to fetch socket token", error);
+        return null;
+      }
+    };
 
-    // Listen for new messages
-    newSocket.on(
-      "new_message",
-      (data: { conversationId: string; message: Message }) => {
-        console.log("[Socket] New message received:", data);
-        const currentUserId = userIdRef.current;
-        console.log(
-          "[Socket] Message sender ID:",
-          data.message.senderId,
-          "Current user ID:",
-          currentUserId
-        );
+    const initializeSocket = async () => {
+      try {
+        const socketToken = await fetchSocketToken();
 
-        // Skip if this is our own message (we already added it when sending)
-        if (data.message.senderId === currentUserId) {
-          console.log("[Socket] Skipping own message");
+        if (!mounted || !socketToken) {
+          setIsConnected(false);
           return;
         }
 
-        // Add message to the messages array only if it's for active conversation
-        setActiveConversation((current) => {
-          console.log(
-            "[Socket] Active conversation ID:",
-            current?.id,
-            "Message conversation ID:",
-            data.conversationId
-          );
-
-          if (current?.id === data.conversationId) {
-            setMessages((prev) => {
-              // Check if message already exists to prevent duplicates
-              const messageExists = prev.some(
-                (msg) => msg.id === data.message.id
-              );
-              if (messageExists) {
-                console.log("[Socket] Message already exists, skipping");
-                return prev;
-              }
-              console.log(
-                "[Socket] Adding message to active conversation. Previous count:",
-                prev.length
-              );
-              return [...prev, data.message];
-            });
-            // Mark as read since we're viewing the conversation
-            return current;
-          }
-          // Not viewing this conversation, increment unread
-          console.log("[Socket] Incrementing unread count");
-          return current;
+        newSocket = io(SERVER_URL, {
+          auth: { token: socketToken },
+          autoConnect: false,
+          withCredentials: true,
         });
 
-        // Update conversation in the list with the new message and unread count
-        setConversations((prev) =>
-          prev.map((conv) => {
-            if (conv.id === data.conversationId) {
+        newSocket.on("connect", () => {
+          console.log("Socket connected:", newSocket?.id);
+          authRetryCount = 0;
+          setIsConnected(true);
+        });
+
+        newSocket.on("disconnect", () => {
+          console.log("Socket disconnected");
+          setIsConnected(false);
+        });
+
+        newSocket.on("connect_error", async (error) => {
+          console.error("Socket connection error:", error);
+          setIsConnected(false);
+
+          const message = error?.message?.toLowerCase() || "";
+          const isAuthError =
+            message.includes("invalid token") ||
+            message.includes("authentication error") ||
+            message.includes("no token provided");
+
+          if (!isAuthError || isRefreshingToken || !newSocket || !mounted) {
+            return;
+          }
+
+          if (authRetryCount >= maxAuthRetries) {
+            console.error(
+              "Socket auth retry limit reached; stopping reconnect attempts.",
+            );
+            newSocket.disconnect();
+            return;
+          }
+
+          isRefreshingToken = true;
+          try {
+            const refreshedToken = await fetchSocketToken();
+            if (!mounted || !newSocket || !refreshedToken) {
+              return;
+            }
+
+            authRetryCount += 1;
+            newSocket.auth = { token: refreshedToken };
+            newSocket.connect();
+          } finally {
+            isRefreshingToken = false;
+          }
+        });
+
+        // Listen for online users
+        newSocket.on("online_users", (data: { userIds: string[] }) => {
+          console.log("[Socket] Online users received:", data.userIds);
+          setOnlineUsers(data.userIds);
+        });
+
+        newSocket.on("user_online", (data: { userId: string }) => {
+          console.log("[Socket] User came online:", data.userId);
+          setOnlineUsers((prev) => {
+            const updated = [...new Set([...prev, data.userId])];
+            console.log("[Socket] Updated online users:", updated);
+            return updated;
+          });
+        });
+
+        newSocket.on("user_offline", (data: { userId: string }) => {
+          console.log("[Socket] User went offline:", data.userId);
+          setOnlineUsers((prev) => prev.filter((id) => id !== data.userId));
+        });
+
+        // Listen for new messages
+        newSocket.on(
+          "new_message",
+          (data: { conversationId: string; message: Message }) => {
+            console.log("[Socket] New message received:", data);
+            const currentUserId = userIdRef.current;
+            console.log(
+              "[Socket] Message sender ID:",
+              data.message.senderId,
+              "Current user ID:",
+              currentUserId,
+            );
+
+            // Skip if this is our own message (we already added it when sending)
+            if (data.message.senderId === currentUserId) {
+              console.log("[Socket] Skipping own message");
+              return;
+            }
+
+            // Add message to the messages array only if it's for active conversation
+            setActiveConversation((current) => {
+              console.log(
+                "[Socket] Active conversation ID:",
+                current?.id,
+                "Message conversation ID:",
+                data.conversationId,
+              );
+
+              if (current?.id === data.conversationId) {
+                setMessages((prev) => {
+                  // Check if message already exists to prevent duplicates
+                  const messageExists = prev.some(
+                    (msg) => msg.id === data.message.id,
+                  );
+                  if (messageExists) {
+                    console.log("[Socket] Message already exists, skipping");
+                    return prev;
+                  }
+                  console.log(
+                    "[Socket] Adding message to active conversation. Previous count:",
+                    prev.length,
+                  );
+                  return [...prev, data.message];
+                });
+                // Mark as read since we're viewing the conversation
+                return current;
+              }
+              // Not viewing this conversation, increment unread
+              console.log("[Socket] Incrementing unread count");
+              return current;
+            });
+
+            // Update conversation in the list with the new message and unread count
+            setConversations((prev) => {
+              const target = prev.find(
+                (conv) => conv.id === data.conversationId,
+              );
+              if (!target) return prev;
+
               const isActive =
                 activeConversationRef.current?.id === data.conversationId;
-              return {
-                ...conv,
-                messages: [data.message, ...(conv.messages || [])],
+              const updatedConversation: Conversation = {
+                ...target,
+                messages: [
+                  data.message,
+                  ...(target.messages || []).filter(
+                    (msg) => msg.id !== data.message.id,
+                  ),
+                ],
                 lastMessageAt: data.message.createdAt,
-                unreadCount: isActive ? 0 : (conv.unreadCount || 0) + 1,
+                unreadCount: isActive ? 0 : (target.unreadCount || 0) + 1,
               };
+
+              return [
+                updatedConversation,
+                ...prev.filter((conv) => conv.id !== data.conversationId),
+              ];
+            });
+
+            // Update global unread count if not viewing this conversation
+            if (activeConversationRef.current?.id !== data.conversationId) {
+              setUnreadCount((prev) => prev + 1);
             }
-            return conv;
-          })
+          },
         );
 
-        // Update global unread count if not viewing this conversation
-        if (activeConversationRef.current?.id !== data.conversationId) {
-          setUnreadCount((prev) => prev + 1);
-        }
+        // Listen for typing indicators
+        newSocket.on(
+          "user_typing",
+          (data: { conversationId: string; userId: string }) => {
+            console.log("[Socket] User typing:", data);
+            setTypingUsers((prev) => ({ ...prev, [data.userId]: true }));
+          },
+        );
 
-        // Update global unread count if not viewing this conversation
-        if (activeConversation?.id !== data.conversationId) {
-          setUnreadCount((prev) => prev + 1);
-        }
-      }
-    );
+        newSocket.on(
+          "user_stopped_typing",
+          (data: { conversationId: string; userId: string }) => {
+            console.log("[Socket] User stopped typing:", data);
+            setTypingUsers((prev) => {
+              const updated = { ...prev };
+              delete updated[data.userId];
+              return updated;
+            });
+          },
+        );
 
-    // Listen for typing indicators
-    newSocket.on(
-      "user_typing",
-      (data: { conversationId: string; userId: string }) => {
-        console.log("[Socket] User typing:", data);
-        setTypingUsers((prev) => ({ ...prev, [data.userId]: true }));
-      }
-    );
+        // Listen for read receipts
+        newSocket.on(
+          "messages_marked_read",
+          (data: { conversationId: string; readBy: string }) => {
+            if (activeConversationRef.current?.id === data.conversationId) {
+              const currentUserId = userIdRef.current;
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.senderId === currentUserId
+                    ? { ...msg, isRead: true }
+                    : msg,
+                ),
+              );
+            }
+          },
+        );
 
-    newSocket.on(
-      "user_stopped_typing",
-      (data: { conversationId: string; userId: string }) => {
-        console.log("[Socket] User stopped typing:", data);
-        setTypingUsers((prev) => {
-          const updated = { ...prev };
-          delete updated[data.userId];
-          return updated;
-        });
-      }
-    );
+        // Listen for message edits
+        newSocket.on(
+          "message_edited",
+          (data: { conversationId: string; message: Message }) => {
+            console.log("[Socket] Message edited:", data);
 
-    // Listen for read receipts
-    newSocket.on(
-      "messages_marked_read",
-      (data: { conversationId: string; readBy: string }) => {
-        if (activeConversation?.id === data.conversationId) {
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.senderId === user.id ? { ...msg, isRead: true } : msg
-            )
-          );
-        }
-      }
-    );
+            // Update messages if viewing this conversation
+            setActiveConversation((current) => {
+              if (current?.id === data.conversationId) {
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === data.message.id ? data.message : msg,
+                  ),
+                );
+              }
+              return current;
+            });
 
-    // Listen for message edits
-    newSocket.on(
-      "message_edited",
-      (data: { conversationId: string; message: Message }) => {
-        console.log("[Socket] Message edited:", data);
-
-        // Update messages if viewing this conversation
-        setActiveConversation((current) => {
-          if (current?.id === data.conversationId) {
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === data.message.id ? data.message : msg
-              )
+            // Update conversation in the list with the edited message
+            setConversations((prev) =>
+              prev.map((conv) => {
+                if (conv.id === data.conversationId) {
+                  return {
+                    ...conv,
+                    messages: conv.messages?.map((msg) =>
+                      msg.id === data.message.id ? data.message : msg,
+                    ) || [data.message],
+                  };
+                }
+                return conv;
+              }),
             );
-          }
-          return current;
-        });
-
-        // Update conversation in the list with the edited message
-        setConversations((prev) =>
-          prev.map((conv) => {
-            if (conv.id === data.conversationId) {
-              return {
-                ...conv,
-                messages: conv.messages?.map((msg) =>
-                  msg.id === data.message.id ? data.message : msg
-                ) || [data.message],
-              };
-            }
-            return conv;
-          })
+          },
         );
-      }
-    );
 
-    // Listen for message deletes
-    newSocket.on(
-      "message_deleted",
-      (data: { conversationId: string; message: Message }) => {
-        console.log("[Socket] Message deleted:", data);
+        // Listen for message deletes
+        newSocket.on(
+          "message_deleted",
+          (data: { conversationId: string; message: Message }) => {
+            console.log("[Socket] Message deleted:", data);
 
-        // Update messages if viewing this conversation
-        setActiveConversation((current) => {
-          if (current?.id === data.conversationId) {
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === data.message.id ? data.message : msg
-              )
+            // Update messages if viewing this conversation
+            setActiveConversation((current) => {
+              if (current?.id === data.conversationId) {
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === data.message.id ? data.message : msg,
+                  ),
+                );
+              }
+              return current;
+            });
+
+            // Update conversation in the list with the deleted message
+            setConversations((prev) =>
+              prev.map((conv) => {
+                if (conv.id === data.conversationId) {
+                  return {
+                    ...conv,
+                    messages: conv.messages?.map((msg) =>
+                      msg.id === data.message.id ? data.message : msg,
+                    ) || [data.message],
+                  };
+                }
+                return conv;
+              }),
             );
-          }
-          return current;
-        });
-
-        // Update conversation in the list with the deleted message
-        setConversations((prev) =>
-          prev.map((conv) => {
-            if (conv.id === data.conversationId) {
-              return {
-                ...conv,
-                messages: conv.messages?.map((msg) =>
-                  msg.id === data.message.id ? data.message : msg
-                ) || [data.message],
-              };
-            }
-            return conv;
-          })
+          },
         );
-      }
-    );
 
-    setSocket(newSocket);
+        setSocket(newSocket);
+        newSocket.connect();
+      } catch (error) {
+        console.error("Failed to initialize socket session", error);
+        setIsConnected(false);
+      }
+    };
+
+    initializeSocket();
 
     return () => {
-      newSocket.disconnect();
+      mounted = false;
+      newSocket?.disconnect();
+      setSocket(null);
+      setIsConnected(false);
     };
-  }, [user]);
+  }, [user, isAuthLoading]);
 
   // Load conversations
   const loadConversations = useCallback(async () => {
     try {
       const response = await chatAPI.getConversations();
       if (response.success && response.data) {
-        setConversations((response.data as any).conversations || []);
+        const { conversations = [] } = response.data as ConversationsResponse;
+        setConversations(conversations);
       }
     } catch (error) {
       console.error("Failed to load conversations:", error);
@@ -390,7 +490,8 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
     try {
       const response = await chatAPI.getUnreadCount();
       if (response.success && response.data) {
-        setUnreadCount((response.data as any).unreadCount || 0);
+        const { unreadCount = 0 } = response.data as UnreadCountResponse;
+        setUnreadCount(unreadCount);
       }
     } catch (error) {
       console.error("Failed to load unread count:", error);
@@ -400,8 +501,13 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
   // Load conversations and unread count on mount
   useEffect(() => {
     if (user) {
-      loadConversations();
-      loadUnreadCount();
+      // Defer initial state updates to avoid sync setState in effect body.
+      const timer = setTimeout(() => {
+        void loadConversations();
+        void loadUnreadCount();
+      }, 0);
+
+      return () => clearTimeout(timer);
     }
   }, [user, loadConversations, loadUnreadCount]);
 
@@ -420,16 +526,29 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
         // Load messages
         const response = await chatAPI.getMessages(conversationId);
         if (response.success && response.data) {
-          setMessages((response.data as any).messages || []);
+          const { messages = [] } = response.data as MessagesResponse;
+          setMessages(messages);
         }
 
         // Mark as read
-        await markAsRead(conversationId);
+        await chatAPI.markAsRead(conversationId);
+        loadUnreadCount();
+        setConversations((prev) =>
+          prev.map((conv) =>
+            conv.id === conversationId ? { ...conv, unreadCount: 0 } : conv,
+          ),
+        );
+
+        if (socket && user) {
+          socket.emit("messages_read", {
+            conversationId,
+          });
+        }
       } catch (error) {
         console.error("Failed to select conversation:", error);
       }
     },
-    [conversations, socket]
+    [conversations, socket, user, loadUnreadCount],
   );
 
   // Send a message
@@ -440,60 +559,74 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
       try {
         console.log(
           "[ChatContext] Sending message to conversation:",
-          activeConversation.id
+          activeConversation.id,
         );
         const response = await chatAPI.sendMessage(
           activeConversation.id,
           content,
-          attachmentUrl
+          attachmentUrl,
         );
 
         if (response.success && response.data) {
-          const newMessage = (response.data as any).message;
+          const { message: newMessage } = response.data as MessageResponse;
           console.log("[ChatContext] Message sent successfully:", newMessage);
 
           // Add message to the messages array immediately
           setMessages((prev) => {
             console.log(
               "[ChatContext] Adding sent message. Previous count:",
-              prev.length
+              prev.length,
             );
             return [...prev, newMessage];
           });
 
-          // Update the conversation in the list with the new message
-          setConversations((prev) =>
-            prev.map((conv) => {
-              if (conv.id === activeConversation.id) {
-                return {
-                  ...conv,
-                  messages: [newMessage, ...(conv.messages || [])],
-                  lastMessageAt: newMessage.createdAt,
-                };
-              }
-              return conv;
-            })
-          );
+          // Update conversation preview and move the latest conversation to the top
+          setConversations((prev) => {
+            const target = prev.find(
+              (conv) => conv.id === activeConversation.id,
+            );
+            if (!target) return prev;
 
-          // Get receiver ID
-          const receiverId =
-            activeConversation.participant1Id === user.id
-              ? activeConversation.participant2Id
-              : activeConversation.participant1Id;
+            const updatedConversation: Conversation = {
+              ...target,
+              messages: [
+                newMessage,
+                ...(target.messages || []).filter(
+                  (msg) => msg.id !== newMessage.id,
+                ),
+              ],
+              lastMessageAt: newMessage.createdAt,
+            };
+
+            return [
+              updatedConversation,
+              ...prev.filter((conv) => conv.id !== activeConversation.id),
+            ];
+          });
 
           // Emit socket event for real-time delivery
           socket.emit("message_sent", {
             conversationId: activeConversation.id,
             message: newMessage,
-            receiverId,
           });
         }
       } catch (error) {
         console.error("Failed to send message:", error);
       }
     },
-    [activeConversation, socket, user]
+    [activeConversation, socket, user],
   );
+
+  // Clear currently selected conversation
+  const clearActiveConversation = useCallback(() => {
+    const conversationId = activeConversationRef.current?.id;
+    if (conversationId) {
+      socket?.emit("leave_conversation", conversationId);
+    }
+
+    setActiveConversation(null);
+    setMessages([]);
+  }, [socket]);
 
   // Edit a message
   const editMessage = useCallback(
@@ -504,7 +637,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
         const response = await chatAPI.editMessage(
           activeConversation.id,
           messageId,
-          content
+          content,
         );
 
         if (response.success && response.data) {
@@ -513,7 +646,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
 
           // Update message in local state
           setMessages((prev) =>
-            prev.map((msg) => (msg.id === messageId ? updatedMessage : msg))
+            prev.map((msg) => (msg.id === messageId ? updatedMessage : msg)),
           );
 
           // Update conversation list with edited message
@@ -523,25 +656,19 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
                 return {
                   ...conv,
                   messages: conv.messages?.map((msg) =>
-                    msg.id === messageId ? updatedMessage : msg
+                    msg.id === messageId ? updatedMessage : msg,
                   ) || [updatedMessage],
                 };
               }
               return conv;
-            })
+            }),
           );
 
           // Emit socket event for real-time update
           if (socket && user) {
-            const receiverId =
-              activeConversation.participant1Id === user.id
-                ? activeConversation.participant2Id
-                : activeConversation.participant1Id;
-
             socket.emit("message_edited", {
               conversationId: activeConversation.id,
               message: updatedMessage,
-              receiverId,
             });
           }
         }
@@ -550,7 +677,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
         throw error;
       }
     },
-    [activeConversation, socket, user]
+    [activeConversation, socket, user],
   );
 
   // Delete a message
@@ -561,7 +688,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
       try {
         const response = await chatAPI.deleteMessage(
           activeConversation.id,
-          messageId
+          messageId,
         );
 
         if (response.success && response.data) {
@@ -570,7 +697,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
 
           // Update message in local state
           setMessages((prev) =>
-            prev.map((msg) => (msg.id === messageId ? deletedMessage : msg))
+            prev.map((msg) => (msg.id === messageId ? deletedMessage : msg)),
           );
 
           // Update conversation list with deleted message
@@ -580,25 +707,19 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
                 return {
                   ...conv,
                   messages: conv.messages?.map((msg) =>
-                    msg.id === messageId ? deletedMessage : msg
+                    msg.id === messageId ? deletedMessage : msg,
                   ) || [deletedMessage],
                 };
               }
               return conv;
-            })
+            }),
           );
 
           // Emit socket event for real-time update
           if (socket && user) {
-            const receiverId =
-              activeConversation.participant1Id === user.id
-                ? activeConversation.participant2Id
-                : activeConversation.participant1Id;
-
             socket.emit("message_deleted", {
               conversationId: activeConversation.id,
               message: deletedMessage,
-              receiverId,
             });
           }
         }
@@ -607,7 +728,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
         throw error;
       }
     },
-    [activeConversation, socket, user]
+    [activeConversation, socket, user],
   );
 
   // Mark conversation as read
@@ -622,28 +743,21 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
         // Update conversation unread count
         setConversations((prev) =>
           prev.map((conv) =>
-            conv.id === conversationId ? { ...conv, unreadCount: 0 } : conv
-          )
+            conv.id === conversationId ? { ...conv, unreadCount: 0 } : conv,
+          ),
         );
 
         // Emit socket event
-        const conversation = conversations.find((c) => c.id === conversationId);
-        if (conversation && socket && user) {
-          const senderId =
-            conversation.participant1Id === user.id
-              ? conversation.participant2Id
-              : conversation.participant1Id;
-
+        if (socket && user) {
           socket.emit("messages_read", {
             conversationId,
-            senderId,
           });
         }
       } catch (error) {
         console.error("Failed to mark as read:", error);
       }
     },
-    [conversations, socket, user, loadUnreadCount]
+    [socket, user, loadUnreadCount],
   );
 
   // Delete conversation
@@ -666,7 +780,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
         console.error("Failed to delete conversation:", error);
       }
     },
-    [activeConversation, socket]
+    [activeConversation, socket],
   );
 
   // Start a new conversation
@@ -675,12 +789,16 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
       try {
         const response = await chatAPI.getOrCreateConversation(participantId);
         if (response.success && response.data) {
-          const conversation = (response.data as any).conversation;
+          const { conversation } = response.data as ConversationResponse;
 
-          // Add to conversations if new
+          // Add to conversations and keep newest at the top
           setConversations((prev) => {
             const exists = prev.find((c) => c.id === conversation.id);
-            return exists ? prev : [conversation, ...prev];
+            if (!exists) return [conversation, ...prev];
+            return [
+              conversation,
+              ...prev.filter((c) => c.id !== conversation.id),
+            ];
           });
 
           // Select the conversation
@@ -690,35 +808,23 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
         console.error("Failed to start conversation:", error);
       }
     },
-    [selectConversation]
+    [selectConversation],
   );
 
   // Typing indicators
   const startTyping = useCallback(() => {
     if (!activeConversation || !socket || !user) return;
 
-    const receiverId =
-      activeConversation.participant1Id === user.id
-        ? activeConversation.participant2Id
-        : activeConversation.participant1Id;
-
     socket.emit("typing_start", {
       conversationId: activeConversation.id,
-      receiverId,
     });
   }, [activeConversation, socket, user]);
 
   const stopTyping = useCallback(() => {
     if (!activeConversation || !socket || !user) return;
 
-    const receiverId =
-      activeConversation.participant1Id === user.id
-        ? activeConversation.participant2Id
-        : activeConversation.participant1Id;
-
     socket.emit("typing_stop", {
       conversationId: activeConversation.id,
-      receiverId,
     });
   }, [activeConversation, socket, user]);
 
@@ -733,6 +839,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
     isConnected,
     loadConversations,
     selectConversation,
+    clearActiveConversation,
     sendMessage,
     editMessage,
     deleteMessage,

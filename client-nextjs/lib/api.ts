@@ -33,23 +33,14 @@ interface RequestConfig {
 class ApiClient {
   private token: string | null = null;
   private pendingRequests = new Map<string, Promise<ApiResponse>>();
+  private refreshPromise: Promise<boolean> | null = null;
 
   constructor() {
-    // Initialize token from localStorage (client-side only)
-    if (typeof window !== "undefined") {
-      this.token = localStorage.getItem("token");
-    }
+    // Cookie-based auth is primary; bearer token is kept only for compatibility.
   }
 
   setToken(token: string | null) {
     this.token = token;
-    if (typeof window !== "undefined") {
-      if (token) {
-        localStorage.setItem("token", token);
-      } else {
-        localStorage.removeItem("token");
-      }
-    }
   }
 
   getToken(): string | null {
@@ -58,7 +49,8 @@ class ApiClient {
 
   private async request<T>(
     endpoint: string,
-    config: RequestConfig
+    config: RequestConfig,
+    hasRetried = false,
   ): Promise<ApiResponse<T>> {
     const { method, data, headers = {} } = config;
 
@@ -72,14 +64,6 @@ class ApiClient {
 
     const url = `${API_BASE_URL}${endpoint}`;
     const requestHeaders: Record<string, string> = { ...headers };
-
-    // Ensure token is loaded from localStorage if not already set
-    if (!this.token && typeof window !== "undefined") {
-      const storedToken = localStorage.getItem("token");
-      if (storedToken) {
-        this.token = storedToken;
-      }
-    }
 
     // Add authorization header if token exists
     if (this.token) {
@@ -110,8 +94,17 @@ class ApiClient {
         const result = await response.json();
 
         if (!response.ok) {
-          // Handle 401 Unauthorized - clear token
-          if (response.status === 401) {
+          // Cookie-based refresh flow: try rotating session once on 401
+          if (
+            response.status === 401 &&
+            !hasRetried &&
+            endpoint !== "/auth/refresh"
+          ) {
+            const refreshed = await this.refreshSession();
+            if (refreshed) {
+              return this.request<T>(endpoint, config, true);
+            }
+
             this.setToken(null);
           }
 
@@ -151,27 +144,57 @@ class ApiClient {
 
   async post<T>(
     endpoint: string,
-    data?: Record<string, unknown> | FormData
+    data?: Record<string, unknown> | FormData,
   ): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, { method: "POST", data });
   }
 
   async put<T>(
     endpoint: string,
-    data?: Record<string, unknown> | FormData
+    data?: Record<string, unknown> | FormData,
   ): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, { method: "PUT", data });
   }
 
   async patch<T>(
     endpoint: string,
-    data?: Record<string, unknown>
+    data?: Record<string, unknown>,
   ): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, { method: "PATCH", data });
   }
 
   async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, { method: "DELETE" });
+  }
+
+  private async refreshSession(): Promise<boolean> {
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.refreshPromise = (async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+          method: "POST",
+          credentials: "include",
+          cache: "no-store",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({}),
+        });
+
+        if (!response.ok) return false;
+        const result = (await response.json()) as ApiResponse;
+        return !!result.success;
+      } catch {
+        return false;
+      } finally {
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
   }
 }
 
@@ -214,6 +237,7 @@ export const attachmentAPI = {
 export const authAPI = {
   completeSocialAuth: (data: { role: string; email: string }) =>
     apiClient.post("/auth/complete-social-auth", data),
+  getSocketToken: () => apiClient.get<{ token: string }>("/auth/socket-token"),
 };
 
 export const adminAPI = {
@@ -235,7 +259,7 @@ export const adminAPI = {
   verifyEmployer: (
     employerId: string,
     isVerified: boolean,
-    rejectionReason?: string
+    rejectionReason?: string,
   ) =>
     apiClient.patch(`/admin/employers/${employerId}/verification`, {
       isVerified,
@@ -248,6 +272,7 @@ export const adminAPI = {
   getPendingJobs: () => apiClient.get("/admin/jobs/pending"),
   manageJob: (jobId: string, action: string) =>
     apiClient.patch(`/admin/jobs/${jobId}`, { action }),
+  deleteJob: (jobId: string) => apiClient.delete(`/admin/jobs/${jobId}`),
 
   // Application management
   getAllApplications: (params?: URLSearchParams) =>
@@ -289,7 +314,7 @@ export const chatAPI = {
   // Get messages in a conversation
   getMessages: (conversationId: string, page = 1, limit = 50) =>
     apiClient.get(
-      `/chat/conversations/${conversationId}/messages?page=${page}&limit=${limit}`
+      `/chat/conversations/${conversationId}/messages?page=${page}&limit=${limit}`,
     ),
 
   // Send a message
@@ -297,7 +322,7 @@ export const chatAPI = {
     conversationId: string,
     content: string,
     attachmentUrl?: string,
-    attachmentType?: string
+    attachmentType?: string,
   ) =>
     apiClient.post(`/chat/conversations/${conversationId}/messages`, {
       content,
@@ -313,13 +338,13 @@ export const chatAPI = {
   editMessage: (conversationId: string, messageId: string, content: string) =>
     apiClient.patch(
       `/chat/conversations/${conversationId}/messages/${messageId}`,
-      { content }
+      { content },
     ),
 
   // Delete a message
   deleteMessage: (conversationId: string, messageId: string) =>
     apiClient.delete(
-      `/chat/conversations/${conversationId}/messages/${messageId}`
+      `/chat/conversations/${conversationId}/messages/${messageId}`,
     ),
 
   // Delete conversation
@@ -328,4 +353,31 @@ export const chatAPI = {
 
   // Get unread count
   getUnreadCount: () => apiClient.get("/chat/unread-count"),
+};
+
+export interface JobAlertPayload {
+  name: string;
+  keywords?: string[];
+  locations?: string[];
+  jobTypes?: string[];
+  categories?: string[];
+  emailEnabled?: boolean;
+  inAppEnabled?: boolean;
+  isActive?: boolean;
+}
+
+export const jobAlertAPI = {
+  getMyAlerts: () => apiClient.get("/job-alerts"),
+  createAlert: (payload: JobAlertPayload) =>
+    apiClient.post("/job-alerts", payload as unknown as Record<string, unknown>),
+  updateAlert: (id: string, payload: Partial<JobAlertPayload>) =>
+    apiClient.patch(`/job-alerts/${id}`, payload as unknown as Record<string, unknown>),
+  deleteAlert: (id: string) => apiClient.delete(`/job-alerts/${id}`),
+
+  getMyNotifications: (page = 1, limit = 20) =>
+    apiClient.get(`/job-alerts/notifications?page=${page}&limit=${limit}`),
+  markNotificationAsRead: (id: string) =>
+    apiClient.patch(`/job-alerts/notifications/${id}/read`, {}),
+  markAllNotificationsAsRead: () =>
+    apiClient.patch("/job-alerts/notifications/read-all", {}),
 };

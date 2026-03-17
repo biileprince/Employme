@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
+import Image from "next/image";
 import {
   MdEdit,
   MdSave,
   MdCancel,
-  MdPerson,
   MdEmail,
   MdPhone,
   MdLocationOn,
@@ -53,6 +53,17 @@ interface JobSeekerProfile {
   }>;
 }
 
+const isJobSeekerProfile = (value: unknown): value is JobSeekerProfile => {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.id === "string" &&
+    typeof v.firstName === "string" &&
+    typeof v.lastName === "string" &&
+    Array.isArray(v.skills)
+  );
+};
+
 const LOCATION_API_CONFIG = {
   baseUrl: "https://nominatim.openstreetmap.org/search",
   countryCodes: "gh",
@@ -97,8 +108,8 @@ export default function JobSeekerProfilePage() {
   });
 
   useEffect(() => {
-    if (user?.profile) {
-      const profileData = user.profile as JobSeekerProfile;
+    if (user?.profile && isJobSeekerProfile(user.profile)) {
+      const profileData = user.profile;
       setProfile(profileData);
       setFormData({
         firstName: profileData.firstName || "",
@@ -119,7 +130,10 @@ export default function JobSeekerProfilePage() {
           profileData.profileImageUrl || (user?.imageUrl as string) || "",
       });
       setIsLoading(false);
+      return;
     }
+
+    setIsLoading(false);
   }, [user]);
 
   // Location search functionality
@@ -158,7 +172,7 @@ export default function JobSeekerProfilePage() {
   }, [locationSearch]);
 
   const handleLocationSearchChange = (
-    e: React.ChangeEvent<HTMLInputElement>
+    e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     setLocationSearch(e.target.value);
   };
@@ -171,7 +185,7 @@ export default function JobSeekerProfilePage() {
   };
 
   const handleProfileImageUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>
+    e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -185,11 +199,15 @@ export default function JobSeekerProfilePage() {
         attachments: Array<{ url: string; id: string; filename: string }>;
       }>("/attachments/upload", formData);
 
-      if (response.success && response.data?.attachments?.length > 0) {
+      if (
+        response.success &&
+        response.data &&
+        (response.data.attachments?.length ?? 0) > 0
+      ) {
         const imageUrl = formatImageUrl(response.data.attachments[0].url);
         setFormData((prev) => ({ ...prev, profileImageUrl: imageUrl }));
         setProfile((prev) =>
-          prev ? { ...prev, profileImageUrl: imageUrl } : prev
+          prev ? { ...prev, profileImageUrl: imageUrl } : prev,
         );
       }
     } catch (error) {
@@ -211,7 +229,11 @@ export default function JobSeekerProfilePage() {
         attachments: Array<{ url: string; id: string; filename: string }>;
       }>("/attachments/upload", formData);
 
-      if (response.success && response.data?.attachments?.length > 0) {
+      if (
+        response.success &&
+        response.data &&
+        (response.data.attachments?.length ?? 0) > 0
+      ) {
         const uploadedAttachment = response.data.attachments[0];
         setFormData((prev) => ({ ...prev, cvUrl: uploadedAttachment.url }));
         setProfile((prev) =>
@@ -229,7 +251,7 @@ export default function JobSeekerProfilePage() {
                   },
                 ],
               }
-            : prev
+            : prev,
         );
       }
     } catch (error) {
@@ -241,7 +263,7 @@ export default function JobSeekerProfilePage() {
   const handleInputChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
+    >,
   ) => {
     const { name, value, type } = e.target;
     setFormData((prev) => ({
@@ -295,7 +317,7 @@ export default function JobSeekerProfilePage() {
       setError(
         error instanceof Error
           ? error.message
-          : "Failed to update profile. Please try again."
+          : "Failed to update profile. Please try again.",
       );
     } finally {
       setIsSaving(false);
@@ -360,11 +382,13 @@ export default function JobSeekerProfilePage() {
         {/* Profile Image Display */}
         {(profile?.profileImageUrl || user?.imageUrl) && (
           <div className="shrink-0 hidden sm:block">
-            <img
+            <Image
               src={formatImageUrl(
-                profile?.profileImageUrl || (user?.imageUrl as string)
+                profile?.profileImageUrl || (user?.imageUrl as string),
               )}
               alt="Profile"
+              width={96}
+              height={96}
               className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-full border-2 border-border bg-background"
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = "none";
@@ -405,13 +429,15 @@ export default function JobSeekerProfilePage() {
                 {(formData.profileImageUrl ||
                   profile?.profileImageUrl ||
                   user?.imageUrl) && (
-                  <img
+                  <Image
                     src={formatImageUrl(
                       formData.profileImageUrl ||
                         profile?.profileImageUrl ||
-                        (user?.imageUrl as string)
+                        (user?.imageUrl as string),
                     )}
                     alt="Profile"
+                    width={80}
+                    height={80}
                     className="w-20 h-20 object-cover rounded-full border border-border"
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = "none";
@@ -439,11 +465,13 @@ export default function JobSeekerProfilePage() {
           ) : (
             <div className="flex items-center gap-4">
               {profile?.profileImageUrl || user?.imageUrl ? (
-                <img
+                <Image
                   src={formatImageUrl(
-                    profile?.profileImageUrl || (user?.imageUrl as string)
+                    profile?.profileImageUrl || (user?.imageUrl as string),
                   )}
                   alt="Profile"
+                  width={80}
+                  height={80}
                   className="w-20 h-20 object-cover rounded-full border border-border"
                   onError={(e) => {
                     (e.target as HTMLImageElement).style.display = "none";
@@ -507,9 +535,14 @@ export default function JobSeekerProfilePage() {
             </label>
             {isEditing ? (
               <PhoneInput
-                value={formData.phone}
+                phoneNumber={formData.phone}
                 countryCode={formData.countryCode}
-                onChange={handlePhoneChange}
+                onPhoneNumberChange={(phone) =>
+                  setFormData((prev) => ({ ...prev, phone }))
+                }
+                onCountryCodeChange={(countryCode) =>
+                  setFormData((prev) => ({ ...prev, countryCode }))
+                }
               />
             ) : (
               <p className="text-muted-foreground">
@@ -763,8 +796,8 @@ export default function JobSeekerProfilePage() {
                 <option value="">Select Education Level</option>
                 <option value="HIGH_SCHOOL">High School</option>
                 <option value="DIPLOMA">Diploma</option>
-                <option value="BACHELOR">Bachelor's Degree</option>
-                <option value="MASTER">Master's Degree</option>
+                <option value="BACHELOR">Bachelor&apos;s Degree</option>
+                <option value="MASTER">Master&apos;s Degree</option>
                 <option value="PHD">PhD/Doctorate</option>
                 <option value="PROFESSIONAL">Professional Certificate</option>
                 <option value="OTHER">Other</option>

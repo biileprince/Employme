@@ -31,7 +31,7 @@ export const subscribeNewsletter = catchAsync(
         if (existingSubscription.isActive) {
           throw new AppError(
             "This email is already subscribed to our newsletter",
-            409
+            409,
           );
         } else {
           // Re-activate subscription
@@ -69,13 +69,14 @@ export const subscribeNewsletter = catchAsync(
           email: subscription.email,
         },
       });
+      return;
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
       }
       throw new AppError("Failed to subscribe to newsletter", 500);
     }
-  }
+  },
 );
 
 // Unsubscribe from newsletter
@@ -111,7 +112,7 @@ export const unsubscribeNewsletter = catchAsync(
       success: true,
       message: "Successfully unsubscribed from newsletter",
     });
-  }
+  },
 );
 
 // Get all newsletter subscriptions (Admin only)
@@ -181,7 +182,7 @@ export const getNewsletterSubscriptions = catchAsync(
         },
       },
     });
-  }
+  },
 );
 
 // Get newsletter analytics (Admin only)
@@ -214,7 +215,7 @@ export const getNewsletterAnalytics = catchAsync(
         acc[date]++;
         return acc;
       },
-      {} as Record<string, number>
+      {} as Record<string, number>,
     );
 
     // Get source breakdown
@@ -254,7 +255,7 @@ export const getNewsletterAnalytics = catchAsync(
         totalNewSubscriptions: subscriptionTrends.length,
       },
     });
-  }
+  },
 );
 
 // Delete newsletter subscription (Admin only)
@@ -278,7 +279,7 @@ export const deleteNewsletterSubscription = catchAsync(
       success: true,
       message: "Newsletter subscription deleted successfully",
     });
-  }
+  },
 );
 
 // Export newsletter emails (Admin only)
@@ -312,5 +313,5 @@ export const exportNewsletterEmails = catchAsync(
         count: subscriptions.length,
       },
     });
-  }
+  },
 );

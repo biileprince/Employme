@@ -10,7 +10,7 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import path from "path";
 import fs from "fs";
-import jwt from "jsonwebtoken";
+import { PrismaClient } from "@prisma/client";
 
 // Import routes
 import authRoutes from "./routes/authRoutes.js";
@@ -23,10 +23,11 @@ import interviewRoutes from "./routes/interviewRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import newsletterRoutes from "./routes/newsletterRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
+import jobAlertRoutes from "./routes/jobAlertRoutes.js";
 
 // Import middleware
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
-import { authMiddleware } from "./middleware/auth.js";
+import { authMiddleware, verifySocketToken } from "./middleware/auth.js";
 import passport from "./middleware/passport.js";
 
 // Import email service
@@ -37,6 +38,7 @@ dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
+const prisma = new PrismaClient();
 
 // Initialize Socket.IO for real-time features
 const io = new Server(httpServer, {
@@ -47,6 +49,7 @@ const io = new Server(httpServer, {
       "http://localhost:3000", // Next.js client
     ],
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 
@@ -62,7 +65,7 @@ app.use(
         imgSrc: ["'self'", "data:", "https:", "http://localhost:5173"],
       },
     },
-  })
+  }),
 );
 app.use(morgan("dev"));
 
@@ -76,7 +79,7 @@ app.use(
       "http://localhost:3000", // Next.js client
     ],
     credentials: true,
-  })
+  }),
 );
 
 // Rate limiting
@@ -84,7 +87,8 @@ const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 500, // Increased from 100 to 500 for chat functionality
   message: "Too many requests from this IP, please try again later.",
-  skip: (req) => req.path.startsWith("/api/chat"), // Skip rate limiting for chat routes
+  skip: (req) =>
+    req.path.startsWith("/api/chat") || req.path === "/api/auth/socket-token", // Skip chat and socket token endpoint
 });
 app.use(limiter);
 
@@ -102,7 +106,7 @@ app.use(
       res.header("Access-Control-Allow-Methods", "GET");
       res.header("Cross-Origin-Resource-Policy", "cross-origin");
     },
-  })
+  }),
 );
 
 app.use(cookieParser());
@@ -119,7 +123,7 @@ app.use(
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
     },
-  })
+  }),
 );
 
 // Initialize Passport
@@ -143,12 +147,12 @@ app.get("/uploads/:filename", (req, res) => {
   // Set CORS headers
   res.header(
     "Access-Control-Allow-Origin",
-    process.env.CLIENT_URL || "http://localhost:5173"
+    process.env.CLIENT_URL || "http://localhost:5173",
   );
   res.header("Access-Control-Allow-Methods", "GET");
   res.header(
     "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept"
+    "Origin, X-Requested-With, Content-Type, Accept",
   );
 
   // Check if file exists and serve it
@@ -176,6 +180,7 @@ app.use("/api/attachments", authMiddleware, attachmentRoutes);
 app.use("/api/interviews", interviewRoutes);
 app.use("/api/admin", authMiddleware, adminRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/job-alerts", authMiddleware, jobAlertRoutes);
 
 // Socket.IO connection handling
 const onlineUsers = new Map<string, string>(); // userId -> socketId
@@ -185,29 +190,16 @@ io.use((socket, next) => {
   try {
     const token = socket.handshake.auth.token;
 
-    console.log("[Socket Auth] Attempting authentication...", {
-      hasAuth: !!socket.handshake.auth,
-      hasToken: !!token,
-      tokenPreview: token ? `${token.substring(0, 20)}...` : null,
-      authKeys: Object.keys(socket.handshake.auth),
-    });
-
     if (!token) {
-      console.error("[Socket Auth] No token provided");
       return next(new Error("Authentication error: No token provided"));
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
-      userId: string; // Changed from 'id' to 'userId' to match JWT payload
-    };
+    const decoded = verifySocketToken(token);
+
     socket.data.userId = decoded.userId; // Changed from decoded.id to decoded.userId
-    console.log(
-      "[Socket Auth] Authentication successful, userId:",
-      decoded.userId
-    );
     next();
   } catch (err) {
-    console.error("[Socket Auth] Token verification failed:", err);
+    console.error("[Socket Auth] Token verification failed");
     next(new Error("Authentication error: Invalid token"));
   }
 });
@@ -228,9 +220,26 @@ io.on("connection", (socket) => {
   socket.emit("online_users", { userIds: Array.from(onlineUsers.keys()) });
 
   // Handle joining a conversation room
-  socket.on("join_conversation", (conversationId: string) => {
-    socket.join(`conversation_${conversationId}`);
-    console.log(`User ${userId} joined conversation ${conversationId}`);
+  socket.on("join_conversation", async (conversationId: string) => {
+    try {
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        select: { participant1Id: true, participant2Id: true },
+      });
+
+      if (!conversation) return;
+      if (
+        conversation.participant1Id !== userId &&
+        conversation.participant2Id !== userId
+      ) {
+        return;
+      }
+
+      socket.join(`conversation_${conversationId}`);
+      console.log(`User ${userId} joined conversation ${conversationId}`);
+    } catch (error) {
+      console.error("Failed to join conversation room");
+    }
   });
 
   // Handle leaving a conversation room
@@ -242,50 +251,143 @@ io.on("connection", (socket) => {
   // Handle new message notification (message already saved via API)
   socket.on(
     "message_sent",
-    (data: { conversationId: string; message: any; receiverId: string }) => {
-      // Send to specific receiver only (not to sender)
-      io.to(`user_${data.receiverId}`).emit("new_message", {
-        conversationId: data.conversationId,
-        message: data.message,
-      });
+    async (data: { conversationId: string; message: any }) => {
+      try {
+        const conversation = await prisma.conversation.findUnique({
+          where: { id: data.conversationId },
+          select: { participant1Id: true, participant2Id: true },
+        });
 
-      // Note: We don't emit to conversation room because:
-      // 1. Sender already added message locally
-      // 2. Receiver gets it via user room above
-    }
+        if (!conversation) return;
+        if (
+          conversation.participant1Id !== userId &&
+          conversation.participant2Id !== userId
+        ) {
+          return;
+        }
+
+        const message = await prisma.message.findUnique({
+          where: { id: data.message?.id },
+          include: {
+            sender: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                imageUrl: true,
+                role: true,
+              },
+            },
+          },
+        });
+
+        if (!message) return;
+        if (message.conversationId !== data.conversationId) return;
+        if (message.senderId !== userId) return;
+
+        const receiverId =
+          conversation.participant1Id === userId
+            ? conversation.participant2Id
+            : conversation.participant1Id;
+
+        io.to(`user_${receiverId}`).emit("new_message", {
+          conversationId: data.conversationId,
+          message,
+        });
+      } catch (error) {
+        console.error("Failed to handle message_sent event");
+      }
+    },
   );
 
   // Handle typing indicator
-  socket.on(
-    "typing_start",
-    (data: { conversationId: string; receiverId: string }) => {
-      io.to(`user_${data.receiverId}`).emit("user_typing", {
-        conversationId: data.conversationId,
-        userId,
+  socket.on("typing_start", async (data: { conversationId: string }) => {
+    try {
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: data.conversationId },
+        select: { participant1Id: true, participant2Id: true },
       });
-    }
-  );
 
-  socket.on(
-    "typing_stop",
-    (data: { conversationId: string; receiverId: string }) => {
-      io.to(`user_${data.receiverId}`).emit("user_stopped_typing", {
+      if (!conversation) return;
+      if (
+        conversation.participant1Id !== userId &&
+        conversation.participant2Id !== userId
+      ) {
+        return;
+      }
+
+      const receiverId =
+        conversation.participant1Id === userId
+          ? conversation.participant2Id
+          : conversation.participant1Id;
+
+      io.to(`user_${receiverId}`).emit("user_typing", {
         conversationId: data.conversationId,
         userId,
       });
+    } catch (error) {
+      console.error("Failed to handle typing_start event");
     }
-  );
+  });
+
+  socket.on("typing_stop", async (data: { conversationId: string }) => {
+    try {
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: data.conversationId },
+        select: { participant1Id: true, participant2Id: true },
+      });
+
+      if (!conversation) return;
+      if (
+        conversation.participant1Id !== userId &&
+        conversation.participant2Id !== userId
+      ) {
+        return;
+      }
+
+      const receiverId =
+        conversation.participant1Id === userId
+          ? conversation.participant2Id
+          : conversation.participant1Id;
+
+      io.to(`user_${receiverId}`).emit("user_stopped_typing", {
+        conversationId: data.conversationId,
+        userId,
+      });
+    } catch (error) {
+      console.error("Failed to handle typing_stop event");
+    }
+  });
 
   // Handle message read receipts
-  socket.on(
-    "messages_read",
-    (data: { conversationId: string; senderId: string }) => {
-      io.to(`user_${data.senderId}`).emit("messages_marked_read", {
+  socket.on("messages_read", async (data: { conversationId: string }) => {
+    try {
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: data.conversationId },
+        select: { participant1Id: true, participant2Id: true },
+      });
+
+      if (!conversation) return;
+      if (
+        conversation.participant1Id !== userId &&
+        conversation.participant2Id !== userId
+      ) {
+        return;
+      }
+
+      const senderId =
+        conversation.participant1Id === userId
+          ? conversation.participant2Id
+          : conversation.participant1Id;
+
+      io.to(`user_${senderId}`).emit("messages_marked_read", {
         conversationId: data.conversationId,
         readBy: userId,
       });
+    } catch (error) {
+      console.error("Failed to handle messages_read event");
     }
-  );
+  });
 
   // Handle disconnect
   socket.on("disconnect", () => {
@@ -315,7 +417,7 @@ httpServer.listen(PORT, async () => {
     console.log(`✅ Email service is ready`);
   } else {
     console.log(
-      `⚠️  Email service connection failed - check your configuration`
+      `⚠️  Email service connection failed - check your configuration`,
     );
   }
 });

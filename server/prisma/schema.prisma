@@ -32,6 +32,9 @@ model User {
   conversationsAsParticipant1  Conversation[] @relation("ConversationsAsParticipant1")
   conversationsAsParticipant2  Conversation[] @relation("ConversationsAsParticipant2")
   sentMessages           Message[]       @relation("SentMessages")
+  jobAlerts              JobAlert[]
+  jobAlertDeliveries     JobAlertDelivery[]
+  notifications          Notification[]
 
   @@map("users")
 }
@@ -141,8 +144,73 @@ model Job {
   attachments        Attachment[]
   employer           Employer         @relation(fields: [employerId], references: [id], onDelete: Cascade)
   savedJobs          SavedJob[]
+  jobAlertMatches    JobAlertMatch[]
+  jobAlertDeliveries JobAlertDelivery[]
 
   @@map("jobs")
+}
+
+model JobAlert {
+  id           String         @id @default(cuid())
+  userId       String
+  name         String
+  keywords     String[]       @default([])
+  locations    String[]       @default([])
+  jobTypes     JobType[]      @default([])
+  categories   JobCategory[]  @default([])
+  emailEnabled Boolean        @default(true)
+  inAppEnabled Boolean        @default(true)
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  matches      JobAlertMatch[]
+
+  @@index([userId, isActive])
+  @@map("job_alerts")
+}
+
+model JobAlertMatch {
+  id         String    @id @default(cuid())
+  jobAlertId String
+  jobId      String
+  matchedAt  DateTime  @default(now())
+  jobAlert   JobAlert  @relation(fields: [jobAlertId], references: [id], onDelete: Cascade)
+  job        Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobAlertId, jobId])
+  @@index([jobId])
+  @@map("job_alert_matches")
+}
+
+model JobAlertDelivery {
+  id        String               @id @default(cuid())
+  userId    String
+  jobId     String
+  channel   AlertDeliveryChannel
+  sentAt    DateTime             @default(now())
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job       Job                  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobId, channel])
+  @@index([userId, channel])
+  @@map("job_alert_deliveries")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  data      Json?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  readAt    DateTime?
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@map("notifications")
 }
 
 model Application {
@@ -260,6 +328,15 @@ enum AttachmentType {
   PORTFOLIO
   CERTIFICATE
   OTHER
+}
+
+enum AlertDeliveryChannel {
+  EMAIL
+  IN_APP
+}
+
+enum NotificationType {
+  JOB_ALERT_MATCH
 }
 
 model Interview {

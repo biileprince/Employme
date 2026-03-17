@@ -2,7 +2,12 @@ import bcrypt from "bcryptjs";
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { catchAsync, AppError } from "../middleware/errorHandler.js";
-import { generateToken } from "../middleware/auth.js";
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  generateSocketToken,
+  verifyRefreshToken,
+} from "../middleware/auth.js";
 import {
   generateVerificationCode,
   generatePasswordResetCode,
@@ -17,6 +22,7 @@ import passport from "../middleware/passport.js";
 declare module "express-session" {
   interface SessionData {
     pendingOAuthRole?: string;
+    pendingOAuthOrigin?: string;
     socialProfileData?: {
       provider: string;
       providerId: string;
@@ -31,6 +37,62 @@ declare module "express-session" {
 }
 
 const prisma = new PrismaClient();
+
+const isProd = process.env.NODE_ENV === "production";
+
+const setAuthCookies = (res: Response, userId: string) => {
+  const accessToken = generateAccessToken(userId);
+  const refreshToken = generateRefreshToken(userId);
+
+  res.cookie("access_token", accessToken, {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "strict" : "lax",
+    maxAge: 15 * 60 * 1000, // 15 minutes
+  });
+
+  res.cookie("refresh_token", refreshToken, {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "strict" : "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: "/api/auth/refresh",
+  });
+};
+
+const clearAuthCookies = (res: Response) => {
+  res.cookie("access_token", "", {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "strict" : "lax",
+    expires: new Date(0),
+  });
+
+  res.cookie("refresh_token", "", {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "strict" : "lax",
+    expires: new Date(0),
+    path: "/api/auth/refresh",
+  });
+
+  // Backward compatibility cleanup
+  res.cookie("token", "", {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "strict" : "lax",
+    expires: new Date(0),
+  });
+};
+
+const resolveFrontendUrl = (req: Request): string => {
+  return (
+    (req.session as any)?.pendingOAuthOrigin ||
+    process.env.NEXT_CLIENT_URL ||
+    process.env.CLIENT_URL ||
+    "http://localhost:3000"
+  );
+};
 
 // Register new user
 export const register = catchAsync(
@@ -169,16 +231,7 @@ export const login = catchAsync(
       data: { lastLogin: new Date() },
     });
 
-    // Generate JWT token
-    const token = generateToken(user.id);
-
-    // Set cookie
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-    });
+    setAuthCookies(res, user.id);
 
     // Determine profile completeness
     const hasProfile =
@@ -200,7 +253,6 @@ export const login = catchAsync(
           hasProfile,
           profile: user.jobSeeker || user.employer || user.admin || null,
         },
-        token,
       },
     });
   }
@@ -209,10 +261,7 @@ export const login = catchAsync(
 // Logout user
 export const logout = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
-    res.cookie("token", "", {
-      httpOnly: true,
-      expires: new Date(0),
-    });
+    clearAuthCookies(res);
 
     res.status(200).json({
       success: true,
@@ -469,16 +518,7 @@ export const verifyEmail = catchAsync(
       console.error("Failed to send welcome email:", error);
     }
 
-    // Generate JWT token for automatic login after verification
-    const jwtToken = generateToken(updatedUser.id);
-
-    // Set cookie
-    res.cookie("token", jwtToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-    });
+    setAuthCookies(res, updatedUser.id);
 
     res.status(200).json({
       success: true,
@@ -492,7 +532,6 @@ export const verifyEmail = catchAsync(
           role: updatedUser.role,
           isVerified: updatedUser.isVerified,
         },
-        token: jwtToken,
       },
     });
   }
@@ -567,19 +606,14 @@ export const socialAuthSuccess = catchAsync(
       data: { lastLogin: new Date() },
     });
 
-    // Generate JWT token
-    const token = generateToken(user.id);
+    setAuthCookies(res, user.id);
 
-    // Set cookie
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-    });
+    // Resolve redirect target before clearing session OAuth metadata.
+    const frontendUrl = resolveFrontendUrl(req);
 
     // Clear the session after successful authentication
     delete (req.session as any).pendingOAuthRole;
+    delete (req.session as any).pendingOAuthOrigin;
     req.logout((err) => {
       if (err) {
         console.error("Error logging out session:", err);
@@ -593,20 +627,19 @@ export const socialAuthSuccess = catchAsync(
       !!(user.role === "ADMIN" && user.admin);
 
     // Determine redirect URL based on user role and profile completion
-    const frontendUrl = process.env.CLIENT_URL || "http://localhost:5173";
     let redirectUrl: string;
 
     if (!hasProfile) {
       // User needs to complete profile - redirect to onboarding
-      redirectUrl = `${frontendUrl}/onboarding?token=${token}&social=true&auth=success`;
+      redirectUrl = `${frontendUrl}/onboarding?social=true&auth=success`;
     } else {
       // User has complete profile - redirect to appropriate dashboard
       if (user.role === "EMPLOYER") {
-        redirectUrl = `${frontendUrl}/employer/dashboard?token=${token}&social=true&auth=success`;
+        redirectUrl = `${frontendUrl}/employer/dashboard?social=true&auth=success`;
       } else if (user.role === "JOB_SEEKER") {
-        redirectUrl = `${frontendUrl}/job-seeker/dashboard?token=${token}&social=true&auth=success`;
+        redirectUrl = `${frontendUrl}/job-seeker/dashboard?social=true&auth=success`;
       } else {
-        redirectUrl = `${frontendUrl}/admin/dashboard?token=${token}&social=true&auth=success`;
+        redirectUrl = `${frontendUrl}/admin/dashboard?social=true&auth=success`;
       }
     }
 
@@ -619,7 +652,7 @@ export const socialAuthSuccess = catchAsync(
 export const socialAuthFailure = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     console.error("Social auth failure:", req.query, req.params);
-    const frontendUrl = process.env.CLIENT_URL || "http://localhost:5173";
+    const frontendUrl = resolveFrontendUrl(req);
 
     // Get error details from query parameters
     const error = req.query.error || "social_auth_failed";
@@ -627,7 +660,7 @@ export const socialAuthFailure = catchAsync(
       req.query.error_description || "Authentication failed";
 
     res.redirect(
-      `${frontendUrl}/auth?error=${error}&description=${encodeURIComponent(
+      `${frontendUrl}/auth/login?error=${error}&description=${encodeURIComponent(
         errorDescription as string
       )}`
     );
@@ -835,16 +868,7 @@ export const completeSocialAuthRegistration = catchAsync(
       delete req.session.socialProfileData;
       delete req.session.pendingOAuthRole;
 
-      // Generate JWT token
-      const token = generateToken(user.id);
-
-      // Set cookie
-      res.cookie("token", token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
-        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      });
+      setAuthCookies(res, user.id);
 
       // Send response with user data and token
       res.status(201).json({
@@ -861,7 +885,6 @@ export const completeSocialAuthRegistration = catchAsync(
             isVerified: user.isVerified,
             hasProfile: false, // New user, no profile yet
           },
-          token,
         },
       });
     } catch (error) {
@@ -870,5 +893,49 @@ export const completeSocialAuthRegistration = catchAsync(
       delete req.session.pendingOAuthRole;
       throw error;
     }
+  }
+);
+
+// Refresh access token and rotate refresh token
+export const refreshToken = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    const refreshTokenCookie = req.cookies?.refresh_token;
+
+    if (!refreshTokenCookie) {
+      throw new AppError("Refresh token is required", 401);
+    }
+
+    const decoded = verifyRefreshToken(refreshTokenCookie);
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: { id: true, isActive: true },
+    });
+
+    if (!user || !user.isActive) {
+      throw new AppError("Invalid refresh token", 401);
+    }
+
+    // Rotate both tokens on refresh
+    setAuthCookies(res, user.id);
+
+    res.status(200).json({
+      success: true,
+      message: "Session refreshed",
+    });
+  }
+);
+
+// Issue a short-lived socket token derived from authenticated cookie session
+export const getSocketToken = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw new AppError("User not authenticated", 401);
+    }
+
+    const socketToken = generateSocketToken(req.user.id);
+    res.status(200).json({
+      success: true,
+      data: { token: socketToken },
+    });
   }
 );

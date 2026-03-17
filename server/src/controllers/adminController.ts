@@ -5,6 +5,7 @@ import {
   sendAccountStatusChangeNotification,
   sendJobDeactivationNotification,
 } from "../services/emailService.js";
+import { processPublishedJobAlerts } from "../services/jobAlertService.js";
 
 const prisma = new PrismaClient();
 
@@ -112,17 +113,20 @@ export const getSystemStats = catchAsync(
       },
       recentUsers,
       recentJobs,
-      applicationsByStatus: applicationsByStatus.reduce((acc, item) => {
-        acc[item.status] = item._count.status;
-        return acc;
-      }, {} as Record<string, number>),
+      applicationsByStatus: applicationsByStatus.reduce(
+        (acc, item) => {
+          acc[item.status] = item._count.status;
+          return acc;
+        },
+        {} as Record<string, number>,
+      ),
     };
 
     res.status(200).json({
       success: true,
       data: response,
     });
-  }
+  },
 );
 
 // Get all users (Admin only)
@@ -252,7 +256,7 @@ export const getAllUsers = catchAsync(
         },
       },
     });
-  }
+  },
 );
 
 // Toggle user status (Admin only)
@@ -322,7 +326,7 @@ export const toggleUserStatus = catchAsync(
       } else if (user.employer?.companyName) {
         userName = user.employer.companyName;
       } else if (user.email) {
-        userName = (user.email as string).split("@")[0];
+        userName = user.email.split("@")[0] || userName;
       }
 
       const adminName =
@@ -335,13 +339,13 @@ export const toggleUserStatus = catchAsync(
           user.email,
           userName,
           updatedUser.isActive,
-          adminName
+          adminName,
         );
       }
     } catch (emailError) {
       console.error(
         "Failed to send account status change notification:",
-        emailError
+        emailError,
       );
       // Don't fail the request if email fails
     }
@@ -353,7 +357,7 @@ export const toggleUserStatus = catchAsync(
       } successfully`,
       data: updatedUser,
     });
-  }
+  },
 );
 
 // Toggle employer verification status (Admin only)
@@ -411,7 +415,7 @@ export const toggleUserVerification = catchAsync(
         employer: updatedEmployer,
       },
     });
-  }
+  },
 );
 
 // Delete user (soft delete)
@@ -447,7 +451,7 @@ export const deleteUser = catchAsync(
       success: true,
       message: "User deleted successfully",
     });
-  }
+  },
 );
 
 // Get all jobs with pagination
@@ -509,7 +513,7 @@ export const getAllJobs = catchAsync(
         },
       },
     });
-  }
+  },
 );
 
 // Get pending job approvals (Admin only)
@@ -551,7 +555,7 @@ export const getPendingJobs = catchAsync(
         count: pendingJobs.length,
       },
     });
-  }
+  },
 );
 
 // Manage job (activate/deactivate/feature)
@@ -648,6 +652,23 @@ export const manageJob = catchAsync(
       },
     });
 
+    const becamePublished =
+      action === "approve" &&
+      !job.isApproved &&
+      updatedJob.isApproved &&
+      updatedJob.isActive;
+
+    if (becamePublished) {
+      try {
+        await processPublishedJobAlerts(updatedJob.id);
+      } catch (alertError) {
+        console.error(
+          "Failed to process job alert matching for published job",
+          alertError,
+        );
+      }
+    }
+
     // Send email notification for job activation/deactivation
     if (shouldSendEmail && (action === "activate" || action === "deactivate")) {
       try {
@@ -659,7 +680,7 @@ export const manageJob = catchAsync(
         } else if (updatedJob.employer.companyName) {
           employerName = updatedJob.employer.companyName;
         } else if (employerUser.email) {
-          employerName = (employerUser.email as string).split("@")[0];
+          employerName = employerUser.email.split("@")[0] || employerName;
         }
 
         const adminName =
@@ -674,13 +695,13 @@ export const manageJob = catchAsync(
             updatedJob.title,
             updatedJob.id,
             updatedJob.isActive,
-            adminName
+            adminName,
           );
         }
       } catch (emailError) {
         console.error(
           "Failed to send job status change notification:",
-          emailError
+          emailError,
         );
         // Don't fail the request if email fails
       }
@@ -691,7 +712,7 @@ export const manageJob = catchAsync(
       message: `Job ${action}d successfully`,
       data: { job: updatedJob },
     });
-  }
+  },
 );
 
 // Delete job
@@ -721,7 +742,7 @@ export const deleteJob = catchAsync(
       success: true,
       message: "Job deleted successfully",
     });
-  }
+  },
 );
 
 // Get all applications with pagination
@@ -799,7 +820,7 @@ export const getAllApplications = catchAsync(
         },
       },
     });
-  }
+  },
 );
 
 // Delete application
@@ -841,7 +862,7 @@ export const deleteApplication = catchAsync(
       success: true,
       message: "Application deleted successfully",
     });
-  }
+  },
 );
 
 // Update application status (admin can change any application status)
@@ -898,7 +919,7 @@ export const updateApplicationStatus = catchAsync(
       message: "Application status updated successfully",
       data: { application: updatedApplication },
     });
-  }
+  },
 );
 
 // Create new admin user
@@ -966,7 +987,7 @@ export const createAdminUser = catchAsync(
         },
       },
     });
-  }
+  },
 );
 
 // Get admin profile
@@ -1005,7 +1026,7 @@ export const getAdminProfile = catchAsync(
         },
       },
     });
-  }
+  },
 );
 
 // Get all employers (Admin only) - includes pending verification
@@ -1071,7 +1092,7 @@ export const getAllEmployers = catchAsync(
         },
       },
     });
-  }
+  },
 );
 
 // Get pending employer verifications (Admin only)
@@ -1110,7 +1131,7 @@ export const getPendingEmployers = catchAsync(
         count: pendingEmployers.length,
       },
     });
-  }
+  },
 );
 
 // Verify or reject employer (Admin only)
@@ -1172,7 +1193,7 @@ export const updateEmployerVerification = catchAsync(
           firstName: employer.user.firstName || "User",
           isVerified,
           rejectionReason: rejectionReason || undefined,
-        }
+        },
       );
     } catch (emailError) {
       console.error("Failed to send verification email:", emailError);
@@ -1184,5 +1205,5 @@ export const updateEmployerVerification = catchAsync(
       message: `Employer ${isVerified ? "verified" : "rejected"} successfully`,
       data: { employer: updatedEmployer },
     });
-  }
+  },
 );

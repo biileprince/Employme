@@ -97,7 +97,7 @@ const getJobImages = (job: Job) => {
   if (!job.attachments || job.attachments.length === 0) return [];
   const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
   return job.attachments.filter((att) =>
-    imageExtensions.some((ext) => att.url.toLowerCase().endsWith(ext))
+    imageExtensions.some((ext) => att.url.toLowerCase().endsWith(ext)),
   );
 };
 
@@ -105,7 +105,8 @@ const getDocumentAttachments = (job: Job) => {
   if (!job.attachments || job.attachments.length === 0) return [];
   const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
   return job.attachments.filter(
-    (att) => !imageExtensions.some((ext) => att.url.toLowerCase().endsWith(ext))
+    (att) =>
+      !imageExtensions.some((ext) => att.url.toLowerCase().endsWith(ext)),
   );
 };
 
@@ -125,7 +126,7 @@ export default function JobDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authModalAction, setAuthModalAction] = useState<"save" | "apply">(
-    "save"
+    "save",
   );
   const [showApplicationModal, setShowApplicationModal] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<
@@ -157,7 +158,7 @@ export default function JobDetailPage() {
             if (relatedResponse.success && relatedResponse.data) {
               // Filter out current job
               const filtered = relatedResponse.data.jobs.filter(
-                (j) => j.id !== jobId
+                (j) => j.id !== jobId,
               );
               setRelatedJobs(filtered.slice(0, 3));
             }
@@ -171,7 +172,7 @@ export default function JobDetailPage() {
               }>("/saved-jobs");
               if (savedResponse.success && savedResponse.data?.savedJobs) {
                 const savedJobIds = savedResponse.data.savedJobs.map(
-                  (saved) => saved.job.id
+                  (saved) => saved.job.id,
                 );
                 setIsSaved(savedJobIds.includes(jobId));
               }
@@ -187,7 +188,7 @@ export default function JobDetailPage() {
               if (applicationsResponse.success && applicationsResponse.data) {
                 const appliedJobIds =
                   applicationsResponse.data.applications.map(
-                    (app) => app.job.id
+                    (app) => app.job.id,
                   );
                 setHasApplied(appliedJobIds.includes(jobId));
               }
@@ -266,7 +267,7 @@ export default function JobDetailPage() {
   const handleShareJob = async () => {
     const shareUrl = window.location.href;
     const shareText = `Check out this job: ${job?.title} at ${getCompanyName(
-      job!
+      job!,
     )}`;
 
     // Try Web Share API first
@@ -307,7 +308,7 @@ export default function JobDetailPage() {
 
       if (!validTypes.includes(file.type)) {
         alert(
-          `${file.name} is not a valid file type. Please upload PDF, DOC, DOCX, or TXT files.`
+          `${file.name} is not a valid file type. Please upload PDF, DOC, DOCX, or TXT files.`,
         );
         return false;
       }
@@ -359,7 +360,7 @@ export default function JobDetailPage() {
       }
 
       const attachmentIds = uploadResponse.data.attachments.map(
-        (att) => att.id
+        (att) => att.id,
       );
 
       // Submit application
@@ -377,7 +378,7 @@ export default function JobDetailPage() {
         setHasApplied(true);
       } else {
         throw new Error(
-          applicationResponse.message || "Failed to submit application"
+          applicationResponse.message || "Failed to submit application",
         );
       }
     } catch (err) {
@@ -561,8 +562,8 @@ export default function JobDetailPage() {
                     {hasApplied
                       ? "Applied ✓"
                       : daysLeft <= 0
-                      ? "Deadline Passed"
-                      : "Apply Now"}
+                        ? "Deadline Passed"
+                        : "Apply Now"}
                   </Button>
                   {daysLeft > 0 && (
                     <p className="mt-2 text-center text-sm text-muted-foreground">
@@ -923,8 +924,8 @@ export default function JobDetailPage() {
               {hasApplied
                 ? "Applied ✓"
                 : daysLeft <= 0
-                ? "Deadline Passed"
-                : "Apply Now"}
+                  ? "Deadline Passed"
+                  : "Apply Now"}
             </Button>
           </div>
         </div>

@@ -54,6 +54,9 @@ Thumbs.db
 *.swo
 *~
 
+# Copilot skills
+.github/skills/
+
 # Temporary files
 *.tmp
 *.temp

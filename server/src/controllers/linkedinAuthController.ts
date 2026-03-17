@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
-import { generateToken } from "../middleware/auth.js";
+import { generateAccessToken, generateRefreshToken } from "../middleware/auth.js";
 import { catchAsync, AppError } from "../middleware/errorHandler.js";
 
 // Extend session type
@@ -8,10 +8,32 @@ declare module "express-session" {
   interface SessionData {
     linkedinState?: string;
     pendingOAuthRole?: string;
+    pendingOAuthOrigin?: string;
   }
 }
 
 const prisma = new PrismaClient();
+const isProd = process.env.NODE_ENV === "production";
+
+const setAuthCookies = (res: Response, userId: string) => {
+  const accessToken = generateAccessToken(userId);
+  const refreshToken = generateRefreshToken(userId);
+
+  res.cookie("access_token", accessToken, {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "strict" : "lax",
+    maxAge: 15 * 60 * 1000,
+  });
+
+  res.cookie("refresh_token", refreshToken, {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "strict" : "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: "/api/auth/refresh",
+  });
+};
 
 // LinkedIn OAuth Configuration
 const LINKEDIN_CONFIG = {
@@ -24,6 +46,15 @@ const LINKEDIN_CONFIG = {
   authURL: "https://www.linkedin.com/oauth/v2/authorization",
   tokenURL: "https://www.linkedin.com/oauth/v2/accessToken",
   userInfoURL: "https://api.linkedin.com/v2/userinfo",
+};
+
+const resolveFrontendUrl = (req: Request): string => {
+  return (
+    (req.session as any)?.pendingOAuthOrigin ||
+    process.env.NEXT_CLIENT_URL ||
+    process.env.CLIENT_URL ||
+    "http://localhost:3000"
+  );
 };
 
 // Generate LinkedIn OAuth URL
@@ -53,9 +84,9 @@ export const handleLinkedInCallback = catchAsync(
 
     // Handle OAuth errors
     if (error) {
-      const frontendUrl = process.env.CLIENT_URL || "http://localhost:5173";
+      const frontendUrl = resolveFrontendUrl(req);
       return res.redirect(
-        `${frontendUrl}/auth?error=linkedin_auth_failed&message=${error}`
+        `${frontendUrl}/auth/login?error=linkedin_auth_failed&message=${error}`
       );
     }
 
@@ -113,23 +144,18 @@ export const handleLinkedInCallback = catchAsync(
       // Step 3: Find or create user
       let user = await findOrCreateUser(req, profileData);
 
-      // Step 4: Generate JWT token
-      const token = generateToken(user.id);
+      // Step 4: Set auth cookies
+      setAuthCookies(res, user.id);
 
-      // Step 5: Set cookie
-      res.cookie("token", token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
-        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      });
+      // Resolve redirect target before clearing session OAuth metadata.
+      const frontendUrl = resolveFrontendUrl(req);
 
       // Step 6: Clean up session
       delete req.session.linkedinState;
       delete (req.session as any).pendingOAuthRole;
+      delete (req.session as any).pendingOAuthOrigin;
 
       // Step 7: Redirect to frontend
-      const frontendUrl = process.env.CLIENT_URL || "http://localhost:5173";
 
       // Determine if user needs to complete profile
       const hasProfile =
@@ -141,24 +167,24 @@ export const handleLinkedInCallback = catchAsync(
 
       if (!hasProfile) {
         // User needs to complete profile
-        redirectUrl = `${frontendUrl}/onboarding?token=${token}&social=true&auth=success`;
+        redirectUrl = `${frontendUrl}/onboarding?social=true&auth=success`;
       } else {
         // User has complete profile - redirect to appropriate dashboard
         if (user.role === "EMPLOYER") {
-          redirectUrl = `${frontendUrl}/employer/dashboard?token=${token}&social=true&auth=success`;
+          redirectUrl = `${frontendUrl}/employer/dashboard?social=true&auth=success`;
         } else if (user.role === "JOB_SEEKER") {
-          redirectUrl = `${frontendUrl}/job-seeker/dashboard?token=${token}&social=true&auth=success`;
+          redirectUrl = `${frontendUrl}/job-seeker/dashboard?social=true&auth=success`;
         } else {
-          redirectUrl = `${frontendUrl}/admin/dashboard?token=${token}&social=true&auth=success`;
+          redirectUrl = `${frontendUrl}/admin/dashboard?social=true&auth=success`;
         }
       }
 
       res.redirect(redirectUrl);
     } catch (error: any) {
       console.error("LinkedIn OAuth error:", error);
-      const frontendUrl = process.env.CLIENT_URL || "http://localhost:5173";
+      const frontendUrl = resolveFrontendUrl(req);
       res.redirect(
-        `${frontendUrl}/auth?error=linkedin_auth_failed&message=${encodeURIComponent(
+        `${frontendUrl}/auth/login?error=linkedin_auth_failed&message=${encodeURIComponent(
           error.message
         )}`
       );

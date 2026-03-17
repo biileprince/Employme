@@ -25,13 +25,39 @@ declare global {
 
 // Generate JWT token
 export const generateToken = (userId: string): string => {
+  return generateAccessToken(userId);
+};
+
+export const generateAccessToken = (userId: string): string => {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
     throw new Error("JWT_SECRET is not configured");
   }
 
-  return jwt.sign({ userId }, secret, {
-    expiresIn: process.env.JWT_EXPIRE || "30d",
+  return jwt.sign({ userId, type: "access" }, secret, {
+    expiresIn: process.env.JWT_EXPIRE || "15m",
+  } as jwt.SignOptions);
+};
+
+export const generateRefreshToken = (userId: string): string => {
+  const secret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("JWT_REFRESH_SECRET or JWT_SECRET is not configured");
+  }
+
+  return jwt.sign({ userId, type: "refresh" }, secret, {
+    expiresIn: process.env.JWT_REFRESH_EXPIRE || "7d",
+  } as jwt.SignOptions);
+};
+
+export const generateSocketToken = (userId: string): string => {
+  const secret = process.env.JWT_SOCKET_SECRET || process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("JWT_SOCKET_SECRET or JWT_SECRET is not configured");
+  }
+
+  return jwt.sign({ userId, type: "socket" }, secret, {
+    expiresIn: process.env.JWT_SOCKET_EXPIRE || "2m",
   } as jwt.SignOptions);
 };
 
@@ -50,11 +76,51 @@ export const verifyToken = (token: string): { userId: string } => {
   }
 };
 
+export const verifyRefreshToken = (token: string): { userId: string } => {
+  const secret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("JWT_REFRESH_SECRET or JWT_SECRET is not configured");
+  }
+
+  try {
+    const decoded = jwt.verify(token, secret) as {
+      userId: string;
+      type?: string;
+    };
+    if (decoded.type && decoded.type !== "refresh") {
+      throw new AppError("Invalid refresh token", 401);
+    }
+    return { userId: decoded.userId };
+  } catch (error) {
+    throw new AppError("Invalid or expired refresh token", 401);
+  }
+};
+
+export const verifySocketToken = (token: string): { userId: string } => {
+  const secret = process.env.JWT_SOCKET_SECRET || process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("JWT_SOCKET_SECRET or JWT_SECRET is not configured");
+  }
+
+  try {
+    const decoded = jwt.verify(token, secret) as {
+      userId: string;
+      type?: string;
+    };
+    if (decoded.type && decoded.type !== "socket") {
+      throw new AppError("Invalid socket token", 401);
+    }
+    return { userId: decoded.userId };
+  } catch (error) {
+    throw new AppError("Invalid or expired socket token", 401);
+  }
+};
+
 // Authentication middleware
 export const authMiddleware = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> => {
   try {
     let token: string | undefined;
@@ -65,6 +131,10 @@ export const authMiddleware = async (
       req.headers.authorization.startsWith("Bearer ")
     ) {
       token = req.headers.authorization.split(" ")[1];
+    }
+    // Access token cookie (primary for web app)
+    else if (req.cookies?.access_token) {
+      token = req.cookies.access_token;
     }
     // Get token from cookies as fallback
     else if (req.cookies?.token) {
@@ -119,7 +189,7 @@ export const authMiddleware = async (
 export const optionalAuthMiddleware = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> => {
   try {
     let token: string | undefined;
@@ -129,6 +199,8 @@ export const optionalAuthMiddleware = async (
       req.headers.authorization.startsWith("Bearer ")
     ) {
       token = req.headers.authorization.split(" ")[1];
+    } else if (req.cookies?.access_token) {
+      token = req.cookies.access_token;
     } else if (req.cookies?.token) {
       token = req.cookies.token;
     }
@@ -177,7 +249,7 @@ export const optionalAuth = optionalAuthMiddleware;
 export const adminOnly = (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void => {
   if (!req.user || req.user.role !== "ADMIN") {
     throw new AppError("Access denied. Admin privileges required.", 403);
@@ -189,7 +261,7 @@ export const adminOnly = (
 export const employerOnly = (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void => {
   if (!req.user || req.user.role !== "EMPLOYER") {
     throw new AppError("Access denied. Employer privileges required.", 403);
@@ -201,7 +273,7 @@ export const employerOnly = (
 export const jobSeekerOnly = (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void => {
   if (!req.user || req.user.role !== "JOB_SEEKER") {
     throw new AppError("Access denied. Job seeker privileges required.", 403);

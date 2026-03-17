@@ -14,6 +14,8 @@ import {
   MdMenu,
   MdClose,
   MdMessage,
+  MdAddAlert,
+  MdNotifications,
 } from "react-icons/md";
 import { useAuth } from "@/contexts/AuthContext";
 import { ScrollToTop } from "@/components/common/ScrollToTop";
@@ -28,6 +30,12 @@ const sidebarLinks = [
     icon: MdDescription,
   },
   { to: "/job-seeker/saved-jobs", label: "Saved Jobs", icon: MdBookmark },
+  { to: "/job-seeker/job-alerts", label: "Job Alerts", icon: MdAddAlert },
+  {
+    to: "/job-seeker/notifications",
+    label: "Notifications",
+    icon: MdNotifications,
+  },
   { to: "/job-seeker/messages", label: "Messages", icon: MdMessage },
   { to: "/job-seeker/profile", label: "Profile", icon: MdPerson },
 ];

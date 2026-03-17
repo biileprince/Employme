@@ -3,6 +3,7 @@ import {
   register,
   login,
   logout,
+  refreshToken,
   getCurrentUser,
   changePassword,
   requestPasswordReset,
@@ -14,6 +15,7 @@ import {
   linkSocialAccount,
   unlinkSocialAccount,
   completeSocialAuthRegistration,
+  getSocketToken,
 } from "../controllers/authController.js";
 import {
   initiateLinkedInAuth,
@@ -31,6 +33,7 @@ const router = express.Router();
 // Public routes
 router.post("/register", validateRegistration, register);
 router.post("/login", validateLogin, login);
+router.post("/refresh", refreshToken);
 router.post(
   "/logout",
   (req, res, next) => {
@@ -38,7 +41,7 @@ router.post(
     req.logout(() => {});
     next();
   },
-  logout
+  logout,
 );
 router.post("/forgot-password", requestPasswordReset);
 router.post("/reset-password", resetPassword);
@@ -51,13 +54,38 @@ router.post("/complete-social-auth", completeSocialAuthRegistration);
 const storeRoleInSession = (
   req: express.Request,
   res: express.Response,
-  next: express.NextFunction
+  next: express.NextFunction,
 ) => {
   const role = req.query.role as string;
   if (role && (role === "JOB_SEEKER" || role === "EMPLOYER")) {
     req.session.pendingOAuthRole = role;
     console.log("Stored OAuth role in session:", role);
   }
+
+  // Persist frontend origin so callback redirects return to the same app (Next.js/Vite).
+  const referer = req.get("referer");
+  if (referer) {
+    try {
+      const refererOrigin = new URL(referer).origin;
+      const allowedOrigins = new Set(
+        [
+          process.env.NEXT_CLIENT_URL,
+          process.env.CLIENT_URL,
+          "http://localhost:3000",
+          "http://localhost:5173",
+          "http://localhost:5174",
+          "http://localhost:5175",
+        ].filter(Boolean) as string[],
+      );
+
+      if (allowedOrigins.has(refererOrigin)) {
+        (req.session as any).pendingOAuthOrigin = refererOrigin;
+      }
+    } catch {
+      // Ignore malformed referer
+    }
+  }
+
   next();
 };
 
@@ -67,14 +95,14 @@ router.get(
   storeRoleInSession,
   passport.authenticate("google", {
     scope: ["profile", "email"],
-  })
+  }),
 );
 router.get(
   "/google/callback",
   passport.authenticate("google", {
     failureRedirect: "/api/auth/failure",
   }),
-  socialAuthSuccess
+  socialAuthSuccess,
 );
 
 // LinkedIn OAuth (Manual Implementation)
@@ -87,14 +115,14 @@ router.get(
   storeRoleInSession,
   passport.authenticate("facebook", {
     scope: ["email"],
-  })
+  }),
 );
 router.get(
   "/facebook/callback",
   passport.authenticate("facebook", {
     failureRedirect: "/api/auth/failure",
   }),
-  socialAuthSuccess
+  socialAuthSuccess,
 );
 
 // Social auth failure route
@@ -106,7 +134,7 @@ router.get("/oauth-config", (req, res) => {
     return res.status(404).json({ error: "Not found" });
   }
 
-  res.json({
+  return res.json({
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID ? "Set" : "Missing",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET ? "Set" : "Missing",
@@ -124,6 +152,7 @@ router.get("/oauth-config", (req, res) => {
         }/api/auth/facebook/callback`,
     },
     clientUrl: process.env.CLIENT_URL || "http://localhost:5173",
+    nextClientUrl: process.env.NEXT_CLIENT_URL || "http://localhost:3000",
   });
 });
 
@@ -136,6 +165,8 @@ router.post("/clear-session", (req, res) => {
       }
       res.clearCookie("connect.sid"); // Default session cookie name
       res.clearCookie("token");
+      res.clearCookie("access_token");
+      res.clearCookie("refresh_token", { path: "/api/auth/refresh" });
       res.json({ success: true, message: "Session cleared" });
     });
   });
@@ -143,6 +174,7 @@ router.post("/clear-session", (req, res) => {
 
 // Protected routes
 router.get("/me", authMiddleware, getCurrentUser);
+router.get("/socket-token", authMiddleware, getSocketToken);
 router.post("/change-password", authMiddleware, changePassword);
 router.post("/link-social", authMiddleware, linkSocialAccount);
 router.post("/unlink-social", authMiddleware, unlinkSocialAccount);

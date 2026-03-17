@@ -41,6 +41,7 @@ export default function AdminMessagesPage() {
     startConversation,
     startTyping,
     stopTyping,
+    clearActiveConversation,
   } = useChat();
 
   const [messageInput, setMessageInput] = useState("");
@@ -53,6 +54,7 @@ export default function AdminMessagesPage() {
   const [editContent, setEditContent] = useState("");
   const [showMobileChat, setShowMobileChat] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const composerTextareaRef = useRef<HTMLTextAreaElement>(null);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -69,6 +71,17 @@ export default function AdminMessagesPage() {
       textarea.style.height = `${textarea.scrollHeight}px`;
     }
   }, [editContent, editingMessageId]);
+
+  // Auto-resize composer textarea
+  useEffect(() => {
+    const textarea = composerTextareaRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = "auto";
+    const nextHeight = Math.min(textarea.scrollHeight, 160);
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = textarea.scrollHeight > 160 ? "auto" : "hidden";
+  }, [messageInput]);
 
   const loadEligibleContacts = async () => {
     setLoadingContacts(true);
@@ -148,7 +161,7 @@ export default function AdminMessagesPage() {
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessageInput(e.target.value);
 
     // Start typing indicator
@@ -163,6 +176,17 @@ export default function AdminMessagesPage() {
     typingTimeoutRef.current = setTimeout(() => {
       stopTyping();
     }, 2000);
+  };
+
+  const handleComposerKeyDown = (
+    e: React.KeyboardEvent<HTMLTextAreaElement>,
+  ) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (messageInput.trim()) {
+        e.currentTarget.form?.requestSubmit();
+      }
+    }
   };
 
   const handleDeleteConversation = async (conversationId: string) => {
@@ -235,6 +259,18 @@ export default function AdminMessagesPage() {
     ? typingUsers[activeParticipant.id]
     : false;
 
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !activeConversation) return;
+      clearActiveConversation();
+      setShowOptions(null);
+      setShowMobileChat(false);
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [activeConversation, clearActiveConversation]);
+
   return (
     <div className="px-4 sm:px-6 overflow-x-hidden">
       <div className="mb-6">
@@ -256,7 +292,7 @@ export default function AdminMessagesPage() {
         </span>
       </div>
 
-      <div className="flex h-[calc(100vh-180px)] bg-card rounded-xl shadow-sm overflow-hidden overflow-x-hidden border border-border">
+      <div className="flex h-[calc(100vh-140px)] lg:h-[calc(100vh-100px)] bg-card rounded-xl shadow-sm overflow-hidden overflow-x-hidden border border-border">
         {/* Conversations Sidebar */}
         <div
           className={`w-full md:w-80 border-r border-border flex flex-col overflow-hidden overflow-x-hidden ${
@@ -399,7 +435,7 @@ export default function AdminMessagesPage() {
                     {getParticipantImage(activeParticipant) ? (
                       <img
                         src={formatImageUrl(
-                          getParticipantImage(activeParticipant)!
+                          getParticipantImage(activeParticipant)!,
                         )}
                         alt={getParticipantName(activeParticipant)}
                         className="w-full h-full object-cover"
@@ -432,7 +468,7 @@ export default function AdminMessagesPage() {
                       setShowOptions(
                         showOptions === activeConversation.id
                           ? null
-                          : activeConversation.id
+                          : activeConversation.id,
                       )
                     }
                     className="p-2 hover:bg-muted rounded-full"
@@ -603,18 +639,20 @@ export default function AdminMessagesPage() {
                 onSubmit={handleSendMessage}
                 className="p-4 border-t bg-card"
               >
-                <div className="flex gap-2">
-                  <input
-                    type="text"
+                <div className="flex items-end gap-2">
+                  <textarea
+                    ref={composerTextareaRef}
                     value={messageInput}
                     onChange={handleInputChange}
+                    onKeyDown={handleComposerKeyDown}
                     placeholder="Type a message..."
-                    className="flex-1 px-4 py-3 border border-border bg-background rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-base"
+                    rows={1}
+                    className="flex-1 min-h-14 max-h-40 resize-none px-4 py-4 border border-border bg-background rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-base leading-6"
                   />
                   <button
                     type="submit"
                     disabled={!messageInput.trim()}
-                    className="p-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                    className="h-14 px-4 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
                   >
                     <MdSend className="w-5 h-5" />
                   </button>

@@ -50,7 +50,7 @@ export const generatePasswordResetCode = (): {
 export const sendVerificationEmail = async (
   email: string,
   firstName: string,
-  verificationCode: string
+  verificationCode: string,
 ): Promise<void> => {
   const transporter = createTransporter();
 
@@ -137,7 +137,7 @@ export const sendVerificationEmail = async (
       stack: error?.stack,
     });
     throw new Error(
-      `Failed to send verification email: ${error?.message || "Unknown error"}`
+      `Failed to send verification email: ${error?.message || "Unknown error"}`,
     );
   }
 };
@@ -146,7 +146,7 @@ export const sendVerificationEmail = async (
 export const sendPasswordResetEmail = async (
   email: string,
   firstName: string,
-  resetCode: string
+  resetCode: string,
 ): Promise<void> => {
   const transporter = createTransporter();
 
@@ -225,7 +225,7 @@ export const sendPasswordResetEmail = async (
 // Send welcome email after verification
 export const sendWelcomeEmail = async (
   email: string,
-  firstName: string
+  firstName: string,
 ): Promise<void> => {
   const transporter = createTransporter();
 
@@ -303,7 +303,7 @@ export const sendJobApplicationNotification = async (
   employerName: string,
   jobTitle: string,
   applicantName: string,
-  companyName: string
+  companyName: string,
 ): Promise<void> => {
   const transporter = createTransporter();
 
@@ -386,7 +386,7 @@ export const sendJobApplicationNotification = async (
     await transporter.sendMail(mailOptions);
     console.log(
       "Job application notification sent to employer:",
-      employerEmail
+      employerEmail,
     );
   } catch (error) {
     console.error("Error sending job application notification:", error);
@@ -398,7 +398,7 @@ export const sendJobApplicationNotification = async (
 export const sendNewUserNotificationToAdmin = async (
   userEmail: string,
   userName: string,
-  userRole: string
+  userRole: string,
 ): Promise<void> => {
   const adminEmail = process.env.ADMIN_EMAIL;
 
@@ -498,7 +498,7 @@ export const sendNewJobNotificationToAdmin = async (
   jobTitle: string,
   companyName: string,
   employerName: string,
-  employerEmail: string
+  employerEmail: string,
 ): Promise<void> => {
   const adminEmail = process.env.ADMIN_EMAIL;
 
@@ -605,7 +605,7 @@ export const sendInterviewScheduleNotification = async (
   interviewDescription: string,
   location: string,
   isVirtual: boolean,
-  meetingLink?: string
+  meetingLink?: string,
 ): Promise<void> => {
   const transporter = createTransporter();
 
@@ -804,7 +804,7 @@ export const sendInterviewScheduleNotification = async (
     await transporter.sendMail(mailOptions);
     console.log(
       "Interview schedule notification sent to job seeker:",
-      jobSeekerEmail
+      jobSeekerEmail,
     );
   } catch (error) {
     console.error("Error sending interview schedule notification:", error);
@@ -824,7 +824,7 @@ export const sendInterviewUpdateNotification = async (
   interviewDescription: string,
   location: string,
   isVirtual: boolean,
-  meetingLink?: string
+  meetingLink?: string,
 ): Promise<void> => {
   const transporter = createTransporter();
 
@@ -1026,7 +1026,7 @@ export const sendInterviewUpdateNotification = async (
     await transporter.sendMail(mailOptions);
     console.log(
       "Interview update notification sent to job seeker:",
-      jobSeekerEmail
+      jobSeekerEmail,
     );
   } catch (error) {
     console.error("Error sending interview update notification:", error);
@@ -1063,7 +1063,7 @@ export const sendApplicationStatusUpdateNotification = async (
   companyName: string,
   employerEmail: string,
   newStatus: string,
-  previousStatus: string
+  previousStatus: string,
 ): Promise<void> => {
   const transporter = createTransporter();
 
@@ -1260,10 +1260,10 @@ export const sendApplicationStatusUpdateNotification = async (
               newStatus === "HIRED"
                 ? "<p>We're excited to have you join our team! Please expect further communication regarding next steps.</p>"
                 : newStatus === "SHORTLISTED"
-                ? "<p>You may be contacted soon for an interview. Please keep an eye on your email and phone.</p>"
-                : newStatus === "REJECTED"
-                ? "<p>Thank you for your interest in this position. We encourage you to apply for other opportunities that match your skills.</p>"
-                : "<p>Thank you for your continued interest. We'll keep you updated on any further developments.</p>"
+                  ? "<p>You may be contacted soon for an interview. Please keep an eye on your email and phone.</p>"
+                  : newStatus === "REJECTED"
+                    ? "<p>Thank you for your interest in this position. We encourage you to apply for other opportunities that match your skills.</p>"
+                    : "<p>Thank you for your continued interest. We'll keep you updated on any further developments.</p>"
             }
             
             <p>If you have any questions about your application status, feel free to contact the employer directly.</p>
@@ -1281,12 +1281,12 @@ export const sendApplicationStatusUpdateNotification = async (
     await transporter.sendMail(mailOptions);
     console.log(
       "Application status update notification sent to job seeker:",
-      jobSeekerEmail
+      jobSeekerEmail,
     );
   } catch (error) {
     console.error(
       "Error sending application status update notification:",
-      error
+      error,
     );
     throw error;
   }
@@ -1297,7 +1297,7 @@ export const sendAccountStatusChangeNotification = async (
   userEmail: string,
   userName: string,
   isActive: boolean,
-  adminName: string = "Administrator"
+  adminName: string = "Administrator",
 ): Promise<void> => {
   const transporter = createTransporter();
   const status = isActive ? "activated" : "deactivated";
@@ -1385,7 +1385,7 @@ export const sendAccountStatusChangeNotification = async (
                         day: "numeric",
                         hour: "2-digit",
                         minute: "2-digit",
-                      }
+                      },
                     )}</p>
                 </div>
                 
@@ -1470,7 +1470,7 @@ export const sendJobDeactivationNotification = async (
   jobTitle: string,
   jobId: string,
   isActive: boolean,
-  adminName: string = "Administrator"
+  adminName: string = "Administrator",
 ): Promise<void> => {
   const transporter = createTransporter();
   const status = isActive ? "reactivated" : "deactivated";
@@ -1568,7 +1568,7 @@ export const sendJobDeactivationNotification = async (
                         day: "numeric",
                         hour: "2-digit",
                         minute: "2-digit",
-                      }
+                      },
                     )}</p>
                 </div>
                 
@@ -1650,7 +1650,7 @@ For assistance, contact us at support@employme.com
     await transporter.sendMail(mailOptions);
     console.log(
       "Job deactivation notification sent to employer:",
-      employerEmail
+      employerEmail,
     );
   } catch (error) {
     console.error("Error sending job deactivation notification:", error);
@@ -1666,7 +1666,7 @@ export const sendEmployerVerificationNotification = async (
     firstName: string;
     isVerified: boolean;
     rejectionReason?: string;
-  }
+  },
 ): Promise<void> => {
   const transporter = createTransporter();
 
@@ -1871,10 +1871,103 @@ For assistance, contact us at support@employme.com
       `Employer verification notification (${
         isVerified ? "approved" : "rejected"
       }) sent to:`,
-      employerEmail
+      employerEmail,
     );
   } catch (error) {
     console.error("Error sending employer verification notification:", error);
+    throw error;
+  }
+};
+
+// Send job alert match email (single job, deduplicated per user/channel)
+export const sendJobAlertMatchEmail = async (
+  recipientEmail: string,
+  details: {
+    recipientName: string;
+    jobTitle: string;
+    companyName: string;
+    location: string;
+    jobType: string;
+    category: string;
+    jobId: string;
+  },
+): Promise<void> => {
+  const transporter = createTransporter();
+
+  const {
+    recipientName,
+    jobTitle,
+    companyName,
+    location,
+    jobType,
+    category,
+    jobId,
+  } = details;
+
+  const jobUrl = `${process.env.CLIENT_URL}/jobs/${jobId}`;
+
+  const mailOptions = {
+    from: {
+      name: "EmployMe",
+      address:
+        process.env.MAIL_FROM ||
+        process.env.SMTP_USER ||
+        "noreply@employme.com",
+    },
+    to: recipientEmail,
+    subject: `New job match: ${jobTitle} at ${companyName}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>New Job Match</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #16a34a; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f9fafb; padding: 24px; border-radius: 0 0 8px 8px; }
+          .job-card { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 16px 0; }
+          .row { margin: 8px 0; }
+          .label { color: #4b5563; font-weight: bold; }
+          .button { display: inline-block; background: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 16px; }
+          .footer { text-align: center; margin-top: 24px; color: #6b7280; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h2>New Job Match</h2>
+          </div>
+          <div class="content">
+            <p>Hello ${recipientName},</p>
+            <p>We found a job that matches one of your alerts:</p>
+
+            <div class="job-card">
+              <div class="row"><span class="label">Title:</span> ${jobTitle}</div>
+              <div class="row"><span class="label">Company:</span> ${companyName}</div>
+              <div class="row"><span class="label">Location:</span> ${location}</div>
+              <div class="row"><span class="label">Type:</span> ${jobType.replace("_", " ")}</div>
+              <div class="row"><span class="label">Category:</span> ${category.replace("_", " ")}</div>
+            </div>
+
+            <a class="button" href="${jobUrl}">View Job</a>
+          </div>
+          <div class="footer">
+            <p>EmployMe - Job alerts based on your preferences.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log("Job alert email sent:", recipientEmail, jobId);
+  } catch (error) {
+    console.error("Error sending job alert email:", error);
     throw error;
   }
 };

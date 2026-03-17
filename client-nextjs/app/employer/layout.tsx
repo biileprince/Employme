@@ -7,7 +7,7 @@ export default function EmployerLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ProtectedRoute requireRole="EMPLOYER">
+    <ProtectedRoute requiredRole="EMPLOYER">
       <EmployerDashboardLayout>{children}</EmployerDashboardLayout>
     </ProtectedRoute>
   );

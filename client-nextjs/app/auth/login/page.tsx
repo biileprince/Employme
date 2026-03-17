@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { LoginForm } from "@/components/auth/LoginForm";
@@ -18,7 +18,7 @@ type LoginStep =
   | "forgot-password"
   | "reset-password";
 
-export default function LoginPage() {
+function LoginContent() {
   const [currentStep, setCurrentStep] = useState<LoginStep>("login");
   const [pendingEmail, setPendingEmail] = useState<string>("");
   const [resetEmail, setResetEmail] = useState<string>("");
@@ -246,3 +246,18 @@ export default function LoginPage() {
     </>
   );
 }
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
+  );
+}
+
