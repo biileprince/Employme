@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { Header } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
@@ -77,6 +77,8 @@ export default function JobsPageContent({
   initialTotalJobs,
 }: JobsPageContentProps) {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const { user } = useAuth();
   const isAuthenticated = !!user;
   const [jobs, setJobs] = useState<Job[]>(initialJobs);
@@ -130,10 +132,37 @@ export default function JobsPageContent({
 
   // Initialize filters from URL params
   useEffect(() => {
+    const searchParam =
+      searchParams?.get("search") || searchParams?.get("q") || "";
     const categoryParam = searchParams?.get("category");
-    if (categoryParam) {
-      setFilter((prev) => ({ ...prev, categories: [categoryParam] }));
-    }
+    const locationParam = searchParams?.get("location") || "";
+    const jobTypeParam = searchParams?.get("jobType") || "";
+    const experienceParam = searchParams?.get("experience") || "";
+
+    const normalizedJobType = jobTypeParam
+      ? jobTypeParam.toUpperCase().replace("-", "_")
+      : "";
+
+    const normalizedExperience = experienceParam
+      .toUpperCase()
+      .replace("-", "_");
+
+    const experienceLabelMap: Record<string, string> = {
+      ENTRY_LEVEL: "Entry Level",
+      MID_LEVEL: "Mid Level",
+      SENIOR_LEVEL: "Senior Level",
+      EXECUTIVE: "Executive",
+    };
+
+    setSearchTerm(searchParam);
+    setLocationSearch(locationParam);
+    setFilter((prev) => ({
+      ...prev,
+      categories: categoryParam ? [categoryParam] : [],
+      location: locationParam,
+      jobType: normalizedJobType,
+      experience: experienceLabelMap[normalizedExperience] || "",
+    }));
   }, [searchParams]);
 
   // Location search functionality
@@ -198,7 +227,14 @@ export default function JobsPageContent({
       if (filter.location && filter.location.trim())
         params.location = filter.location.trim();
       if (filter.jobType && filter.jobType.trim()) {
-        params.jobType = filter.jobType.toUpperCase().replace("-", "_");
+        const normalizedJobType = filter.jobType
+          .toUpperCase()
+          .replace("-", "_");
+        if (normalizedJobType === "REMOTE") {
+          params.isRemote = "true";
+        } else {
+          params.jobType = normalizedJobType;
+        }
       }
       if (filter.experience && filter.experience.trim()) {
         const expMap: Record<string, string> = {
@@ -210,6 +246,20 @@ export default function JobsPageContent({
         const mappedExp = expMap[filter.experience];
         if (mappedExp) {
           params.experience = mappedExp;
+        }
+      }
+
+      if (filter.salaryRange) {
+        if (filter.salaryRange === "Under GHS 2,000") {
+          params.salaryMax = 2000;
+        } else if (filter.salaryRange === "GHS 2,000 - 5,000") {
+          params.salaryMin = 2000;
+          params.salaryMax = 5000;
+        } else if (filter.salaryRange === "GHS 5,000 - 10,000") {
+          params.salaryMin = 5000;
+          params.salaryMax = 10000;
+        } else if (filter.salaryRange === "Above GHS 10,000") {
+          params.salaryMin = 10000;
         }
       }
 
@@ -380,6 +430,7 @@ export default function JobsPageContent({
     });
     setLocationSearch("");
     setCurrentPage(1);
+    router.replace(pathname, { scroll: false });
   };
 
   // Format salary

@@ -16,6 +16,7 @@ import {
   chatMessageRateLimiter,
   chatMutationRateLimiter,
 } from "../middleware/rateLimiter.js";
+import { validateConversationMessagesQuery } from "../middleware/validation.js";
 
 const router = express.Router();
 
@@ -35,7 +36,11 @@ router.get("/unread-count", getUnreadCount);
 router.get("/conversations/:participantId", getOrCreateConversation);
 
 // Get messages in a conversation (with pagination)
-router.get("/conversations/:conversationId/messages", getMessages);
+router.get(
+  "/conversations/:conversationId/messages",
+  validateConversationMessagesQuery,
+  getMessages,
+);
 
 // Send a message in a conversation
 router.post(

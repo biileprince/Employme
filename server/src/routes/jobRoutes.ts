@@ -13,14 +13,24 @@ import {
   optionalAuth,
 } from "../middleware/auth.js";
 import { jobMutationRateLimiter } from "../middleware/rateLimiter.js";
+import {
+  validateJobSearchQuery,
+  validatePaginationQuery,
+} from "../middleware/validation.js";
 
 const router = Router();
 
 // Public routes (with optional auth for enhanced features)
-router.get("/", optionalAuth, getJobs);
+router.get("/", optionalAuth, validateJobSearchQuery, getJobs);
 
 // Protected routes (require authentication and employer role)
-router.get("/my-jobs", requireAuth, requireEmployer, getMyJobs);
+router.get(
+  "/my-jobs",
+  requireAuth,
+  requireEmployer,
+  validatePaginationQuery,
+  getMyJobs,
+);
 
 // Public route with dynamic parameter (must come after specific routes)
 router.get("/:id", optionalAuth, getJobById);

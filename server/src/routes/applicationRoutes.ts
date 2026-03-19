@@ -11,6 +11,7 @@ import {
 } from "../controllers/applicationController.js";
 import { authMiddleware, employerOnly } from "../middleware/auth.js";
 import { applicationSubmissionRateLimiter } from "../middleware/rateLimiter.js";
+import { validateApplicationListQuery } from "../middleware/validation.js";
 
 const router = Router();
 
@@ -19,16 +20,26 @@ router.use(authMiddleware);
 
 // IMPORTANT: Specific routes MUST come before dynamic parameter routes
 // Job seeker routes - specific paths first
-router.get("/my-applications", getMyApplications);
+router.get("/my-applications", validateApplicationListQuery, getMyApplications);
 router.post("/apply", applicationSubmissionRateLimiter, applyForJob); // Accept jobId in request body
 
 // Employer routes - specific paths first
-router.get("/employer", employerOnly, getEmployerApplications);
+router.get(
+  "/employer",
+  employerOnly,
+  validateApplicationListQuery,
+  getEmployerApplications,
+);
 
 // Dynamic parameter routes - must come after specific routes
 router.post("/:id/apply", applicationSubmissionRateLimiter, applyForJob); // Legacy route - accept jobId as URL param
 router.get("/:id", getApplicationById);
-router.get("/job/:jobId", employerOnly, getJobApplications);
+router.get(
+  "/job/:jobId",
+  employerOnly,
+  validateApplicationListQuery,
+  getJobApplications,
+);
 router.patch("/:id/status", employerOnly, updateApplicationStatus);
 
 // Interview scheduling routes

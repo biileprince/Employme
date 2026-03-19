@@ -1054,7 +1054,7 @@ export default function Home() {
               {categoryJobs.map((cat) => (
                 <Link
                   key={cat.category}
-                  href={`/jobs?category=${encodeURIComponent(cat.category)}`}
+                  href={`/jobs?category=${encodeURIComponent(cat.backendKey)}`}
                 >
                   <Card className="group h-full transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
                     <CardContent className="p-6">

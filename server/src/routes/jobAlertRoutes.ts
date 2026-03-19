@@ -9,6 +9,7 @@ import {
   updateJobAlert,
 } from "../controllers/jobAlertController.js";
 import { jobAlertMutationRateLimiter } from "../middleware/rateLimiter.js";
+import { validateNotificationQuery } from "../middleware/validation.js";
 
 const router = Router();
 
@@ -17,7 +18,7 @@ router.post("/", jobAlertMutationRateLimiter, createJobAlert);
 router.patch("/:id", jobAlertMutationRateLimiter, updateJobAlert);
 router.delete("/:id", jobAlertMutationRateLimiter, deleteJobAlert);
 
-router.get("/notifications", getMyNotifications);
+router.get("/notifications", validateNotificationQuery, getMyNotifications);
 router.patch(
   "/notifications/read-all",
   jobAlertMutationRateLimiter,

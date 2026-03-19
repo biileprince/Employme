@@ -14,18 +14,28 @@ export default async function JobsPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const params = await searchParams;
-  
+
   // Format searchParams to pass to the backend
   const queryParams = new URLSearchParams();
   queryParams.append("limit", "15");
   queryParams.append("page", "1");
-  
-  if (params.search) queryParams.append("search", params.search as string);
-  if (params.category) queryParams.append("category", params.category as string);
-  if (params.location) queryParams.append("location", params.location as string);
-  
+
+  const searchTerm = (params.search || params.q) as string | undefined;
+  if (searchTerm) queryParams.append("search", searchTerm);
+  if (params.category)
+    queryParams.append("category", params.category as string);
+  if (params.location)
+    queryParams.append("location", params.location as string);
+
   if (params.jobType && typeof params.jobType === "string") {
-    queryParams.append("jobType", params.jobType.toUpperCase().replace("-", "_"));
+    if (params.jobType.toLowerCase() === "remote") {
+      queryParams.append("isRemote", "true");
+    } else {
+      queryParams.append(
+        "jobType",
+        params.jobType.toUpperCase().replace("-", "_"),
+      );
+    }
   }
 
   // Use next-level cache tags or revalidate timings
@@ -35,7 +45,7 @@ export default async function JobsPage({
       `/jobs?${queryParams.toString()}`,
       {
         next: { tags: ["jobs"], revalidate: 60 },
-      }
+      },
     );
     if (response.success && response.data) {
       initialJobsResponse = response.data;
@@ -55,8 +65,8 @@ export default async function JobsPage({
         </div>
       }
     >
-      <JobsPageContent 
-        initialJobs={initialJobsResponse?.jobs || []} 
+      <JobsPageContent
+        initialJobs={initialJobsResponse?.jobs || []}
         initialTotalPages={initialJobsResponse?.pagination.totalPages || 1}
         initialTotalJobs={initialJobsResponse?.pagination.total || 0}
       />

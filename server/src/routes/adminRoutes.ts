@@ -20,6 +20,12 @@ import {
 } from "../controllers/adminController.js";
 import { authMiddleware, adminOnly } from "../middleware/auth.js";
 import { adminMutationRateLimiter } from "../middleware/rateLimiter.js";
+import {
+  validateAdminApplicationsQuery,
+  validateAdminEmployersQuery,
+  validateAdminJobsQuery,
+  validateAdminUsersQuery,
+} from "../middleware/validation.js";
 
 const router = Router();
 
@@ -31,7 +37,7 @@ router.use(adminOnly);
 router.get("/stats", getSystemStats);
 
 // User management
-router.get("/users", getAllUsers);
+router.get("/users", validateAdminUsersQuery, getAllUsers);
 router.patch(
   "/users/:id/toggle-status",
   adminMutationRateLimiter,
@@ -45,7 +51,7 @@ router.patch(
 router.delete("/users/:id", adminMutationRateLimiter, deleteUser);
 
 // Employer verification management
-router.get("/employers", getAllEmployers);
+router.get("/employers", validateAdminEmployersQuery, getAllEmployers);
 router.get("/employers/pending", getPendingEmployers);
 router.patch(
   "/employers/:employerId/verification",
@@ -54,13 +60,13 @@ router.patch(
 );
 
 // Job management routes
-router.get("/jobs", getAllJobs);
+router.get("/jobs", validateAdminJobsQuery, getAllJobs);
 router.get("/jobs/pending", getPendingJobs);
 router.patch("/jobs/:id", adminMutationRateLimiter, manageJob);
 router.delete("/jobs/:id", adminMutationRateLimiter, deleteJob);
 
 // Application management routes
-router.get("/applications", getAllApplications);
+router.get("/applications", validateAdminApplicationsQuery, getAllApplications);
 router.delete("/applications/:id", adminMutationRateLimiter, deleteApplication);
 router.patch(
   "/applications/:id/status",

@@ -7,12 +7,14 @@ interface SocialLoginProps {
   className?: string;
   text?: string;
   selectedRole?: string;
+  disabled?: boolean;
 }
 
 export const SocialLogin: React.FC<SocialLoginProps> = ({
   className = "",
   text = "Continue with",
   selectedRole,
+  disabled = false,
 }) => {
   const baseUrl =
     process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api";
@@ -67,10 +69,11 @@ export const SocialLogin: React.FC<SocialLoginProps> = ({
         <div className="space-y-3 sm:hidden">
           {/* Google Login */}
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={disabled ? {} : { scale: 1.02 }}
+            whileTap={disabled ? {} : { scale: 0.98 }}
             onClick={() => handleSocialLogin("google")}
-            className="flex w-full items-center justify-center gap-3 rounded-xl border border-border bg-card px-4 py-3 font-medium text-foreground transition-colors duration-200 hover:bg-muted/50"
+            disabled={disabled}
+            className={`flex w-full items-center justify-center gap-3 rounded-xl border border-border bg-card px-4 py-3 font-medium text-foreground transition-colors duration-200 hover:bg-muted/50 ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
           >
             <FaGoogle className="h-5 w-5 text-red-500" />
             {text} Google
@@ -78,10 +81,11 @@ export const SocialLogin: React.FC<SocialLoginProps> = ({
 
           {/* LinkedIn Login */}
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={disabled ? {} : { scale: 1.02 }}
+            whileTap={disabled ? {} : { scale: 0.98 }}
             onClick={() => handleSocialLogin("linkedin")}
-            className="flex w-full items-center justify-center gap-3 rounded-xl border border-border bg-card px-4 py-3 font-medium text-foreground transition-colors duration-200 hover:bg-muted/50"
+            disabled={disabled}
+            className={`flex w-full items-center justify-center gap-3 rounded-xl border border-border bg-card px-4 py-3 font-medium text-foreground transition-colors duration-200 hover:bg-muted/50 ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
           >
             <FaLinkedin className="h-5 w-5 text-blue-600" />
             {text} LinkedIn
@@ -89,10 +93,11 @@ export const SocialLogin: React.FC<SocialLoginProps> = ({
 
           {/* Facebook Login */}
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={disabled ? {} : { scale: 1.02 }}
+            whileTap={disabled ? {} : { scale: 0.98 }}
             onClick={() => handleSocialLogin("facebook")}
-            className="flex w-full items-center justify-center gap-3 rounded-xl border border-border bg-card px-4 py-3 font-medium text-foreground transition-colors duration-200 hover:bg-muted/50"
+            disabled={disabled}
+            className={`flex w-full items-center justify-center gap-3 rounded-xl border border-border bg-card px-4 py-3 font-medium text-foreground transition-colors duration-200 hover:bg-muted/50 ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
           >
             <FaFacebook className="h-5 w-5 text-blue-700" />
             {text} Facebook
@@ -103,10 +108,11 @@ export const SocialLogin: React.FC<SocialLoginProps> = ({
         <div className="hidden gap-2 sm:grid sm:grid-cols-3 md:gap-3">
           {/* Google Login */}
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={disabled ? {} : { scale: 1.02 }}
+            whileTap={disabled ? {} : { scale: 0.98 }}
             onClick={() => handleSocialLogin("google")}
-            className="group flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 py-3 text-sm font-medium text-foreground shadow-sm transition-all duration-200 hover:border-red-300 hover:bg-red-50 hover:shadow-md dark:hover:bg-red-950/20 md:py-4"
+            disabled={disabled}
+            className={`group flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 py-3 text-sm font-medium text-foreground shadow-sm transition-all duration-200 hover:border-red-300 hover:bg-red-50 hover:shadow-md dark:hover:bg-red-950/20 md:py-4 ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
           >
             <FaGoogle className="h-5 w-5 shrink-0 text-red-500 transition-colors group-hover:text-red-600" />
             <span className="hidden whitespace-nowrap md:inline">Google</span>
@@ -114,10 +120,11 @@ export const SocialLogin: React.FC<SocialLoginProps> = ({
 
           {/* LinkedIn Login */}
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={disabled ? {} : { scale: 1.02 }}
+            whileTap={disabled ? {} : { scale: 0.98 }}
             onClick={() => handleSocialLogin("linkedin")}
-            className="group flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 py-3 text-sm font-medium text-foreground shadow-sm transition-all duration-200 hover:border-blue-300 hover:bg-blue-50 hover:shadow-md dark:hover:bg-blue-950/20 md:py-4"
+            disabled={disabled}
+            className={`group flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 py-3 text-sm font-medium text-foreground shadow-sm transition-all duration-200 hover:border-blue-300 hover:bg-blue-50 hover:shadow-md dark:hover:bg-blue-950/20 md:py-4 ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
           >
             <FaLinkedin className="h-5 w-5 shrink-0 text-blue-600 transition-colors group-hover:text-blue-700" />
             <span className="hidden whitespace-nowrap md:inline">LinkedIn</span>
@@ -125,10 +132,11 @@ export const SocialLogin: React.FC<SocialLoginProps> = ({
 
           {/* Facebook Login */}
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={disabled ? {} : { scale: 1.02 }}
+            whileTap={disabled ? {} : { scale: 0.98 }}
             onClick={() => handleSocialLogin("facebook")}
-            className="group flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 py-3 text-sm font-medium text-foreground shadow-sm transition-all duration-200 hover:border-blue-300 hover:bg-blue-50 hover:shadow-md dark:hover:bg-blue-950/20 md:py-4"
+            disabled={disabled}
+            className={`group flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 py-3 text-sm font-medium text-foreground shadow-sm transition-all duration-200 hover:border-blue-300 hover:bg-blue-50 hover:shadow-md dark:hover:bg-blue-950/20 md:py-4 ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
           >
             <FaFacebook className="h-5 w-5 shrink-0 text-blue-700 transition-colors group-hover:text-blue-800" />
             <span className="hidden whitespace-nowrap md:inline">Facebook</span>

@@ -38,9 +38,11 @@ export const getJobs = catchAsync(
       experience,
       location,
       jobType,
+      isRemote,
       salaryMin,
       salaryMax,
       search,
+      q,
     } = req.query;
 
     const paginationInput = parsePagination(
@@ -73,8 +75,17 @@ export const getJobs = catchAsync(
       };
     }
 
+    if (typeof isRemote === "string") {
+      where.isRemote = isRemote.toLowerCase() === "true";
+    }
+
     if (jobType) {
-      where.jobType = jobType;
+      const normalizedJobType = String(jobType).toUpperCase();
+      if (normalizedJobType === "REMOTE") {
+        where.isRemote = true;
+      } else {
+        where.jobType = normalizedJobType;
+      }
     }
 
     if (salaryMin) {
@@ -89,18 +100,28 @@ export const getJobs = catchAsync(
       };
     }
 
-    if (search) {
+    const searchTerm = (search || q) as string | undefined;
+
+    if (searchTerm) {
       where.OR = [
         {
           title: {
-            contains: search as string,
+            contains: searchTerm,
             mode: "insensitive",
           },
         },
         {
           description: {
-            contains: search as string,
+            contains: searchTerm,
             mode: "insensitive",
+          },
+        },
+        {
+          employer: {
+            companyName: {
+              contains: searchTerm,
+              mode: "insensitive",
+            },
           },
         },
       ];
