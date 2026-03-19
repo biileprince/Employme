@@ -313,6 +313,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
             });
 
             // Update conversation in the list with the new message and unread count
+            let shouldIncrementGlobalUnread = false;
             setConversations((prev) => {
               const target = prev.find(
                 (conv) => conv.id === data.conversationId,
@@ -321,6 +322,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
 
               const isActive =
                 activeConversationRef.current?.id === data.conversationId;
+              shouldIncrementGlobalUnread = !isActive;
               const updatedConversation: Conversation = {
                 ...target,
                 messages: [
@@ -339,8 +341,9 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
               ];
             });
 
-            // Update global unread count if not viewing this conversation
-            if (activeConversationRef.current?.id !== data.conversationId) {
+            // Update global unread only when this message belongs to an existing sidebar conversation.
+            // Fresh conversations after deletion are counted via the new_conversation_started event.
+            if (shouldIncrementGlobalUnread) {
               setUnreadCount((prev) => prev + 1);
             }
           },

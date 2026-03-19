@@ -22,6 +22,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ScrollToTop } from "@/components/common/ScrollToTop";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Button } from "@/components/ui/button";
+import { MessageCountBadge } from "@/components/common/MessageCountBadge";
 
 interface NavItem {
   path: string;
@@ -132,6 +133,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = isActiveRoute(item.path);
+              const isMessages = item.path === "/admin/messages";
 
               return (
                 <Link
@@ -145,6 +147,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                 >
                   <Icon className="w-5 h-5 flex-shrink-0" />
                   <span className="font-medium">{item.label}</span>
+                  {isMessages && <MessageCountBadge className="ml-auto" />}
                 </Link>
               );
             })}
@@ -220,6 +223,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = isActiveRoute(item.path);
+              const isMessages = item.path === "/admin/messages";
 
               return (
                 <Link
@@ -234,6 +238,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                 >
                   <Icon className="w-5 h-5 flex-shrink-0" />
                   <span className="font-medium">{item.label}</span>
+                  {isMessages && <MessageCountBadge className="ml-auto" />}
                 </Link>
               );
             })}

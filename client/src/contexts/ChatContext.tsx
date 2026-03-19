@@ -218,15 +218,16 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
             // Mark as read since we're viewing the conversation
             return current;
           }
-          // Not viewing this conversation, increment unread
-          setUnreadCount((prev) => prev + 1);
           return current;
         });
 
         // Update conversation in the list with the new message
+        let shouldIncrementGlobalUnread = false;
         setConversations((prev) =>
           prev.map((conv) => {
             if (conv.id === data.conversationId) {
+              const isActive = activeConversation?.id === data.conversationId;
+              shouldIncrementGlobalUnread = !isActive;
               return {
                 ...conv,
                 messages: [data.message, ...(conv.messages || [])],
@@ -236,6 +237,12 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
             return conv;
           })
         );
+
+        // Only increment global unread when conversation already exists in sidebar.
+        // Fresh conversations after deletion are counted by conversation_restored/new_conversation_started.
+        if (shouldIncrementGlobalUnread) {
+          setUnreadCount((prev) => prev + 1);
+        }
       }
     );
 
