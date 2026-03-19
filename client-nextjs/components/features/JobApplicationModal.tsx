@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { X, Upload, FileText, Trash2, AlertCircle } from "lucide-react";
-import { apiClient } from "@/lib/api";
+import { submitApplication } from "@/app/actions/application-submit";
 import { Button } from "@/components/ui/button";
 
 interface JobApplicationModalProps {
@@ -90,38 +90,18 @@ export default function JobApplicationModal({
     setIsSubmitting(true);
 
     try {
-      let attachmentIds: string[] = [];
-
-      // Upload files
-      if (uploadedFiles.length > 0) {
-        const formData = new FormData();
-        uploadedFiles.forEach((upload) => {
-          formData.append("files", upload.file);
-        });
-        formData.append("type", "APPLICATION");
-
-        const uploadResponse = await apiClient.post<{
-          attachments: Array<{ id: string }>;
-        }>("/attachments/upload", formData);
-
-        if (!uploadResponse.data) {
-          throw new Error("Failed to upload files");
-        }
-
-        attachmentIds = uploadResponse.data.attachments.map((att) => att.id);
-      }
-
-      // Submit application with attachment IDs
-      const applicationResponse = await apiClient.post("/applications/apply", {
-        jobId: job.id,
-        coverLetter: "",
-        attachmentIds,
+      // Create FormData with job ID and files
+      const formData = new FormData();
+      formData.append("jobId", job.id);
+      uploadedFiles.forEach((upload) => {
+        formData.append("files", upload.file);
       });
 
-      if (!applicationResponse.success) {
-        throw new Error(
-          applicationResponse.message || "Failed to submit application"
-        );
+      // Submit via server action (handles upload + application in one call)
+      const result = await submitApplication(formData);
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to submit application");
       }
 
       alert("Application submitted successfully!");

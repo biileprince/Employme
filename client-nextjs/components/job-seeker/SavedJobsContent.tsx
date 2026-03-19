@@ -11,12 +11,19 @@ import {
   MdWork,
 } from "react-icons/md";
 import { apiClient } from "@/lib/api";
+import { toggleSaveJob } from "@/app/actions/job";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 
-const AuthModal = dynamic(() => import("@/components/features").then(mod => mod.AuthModal), { ssr: false });
-const JobApplicationModal = dynamic(() => import("@/components/features").then(mod => mod.JobApplicationModal), { ssr: false });
+const AuthModal = dynamic(
+  () => import("@/components/features").then((mod) => mod.AuthModal),
+  { ssr: false },
+);
+const JobApplicationModal = dynamic(
+  () => import("@/components/features").then((mod) => mod.JobApplicationModal),
+  { ssr: false },
+);
 
 interface SavedJob {
   id: string;
@@ -58,14 +65,19 @@ export default function SavedJobsContent({ initialJobs }: SavedJobsProps) {
       return;
     }
 
-    try {
-      await apiClient.post(`/saved-jobs/remove`, { jobId });
-      setSavedJobs((prev) =>
-        prev.filter((savedJob) => savedJob.job.id !== jobId)
-      );
-    } catch (err) {
-      console.error("Failed to unsave job:", err);
-      alert("Failed to remove job from saved jobs. Please try again.");
+    // Store previous state for potential rollback
+    const previousJobs = [...savedJobs];
+
+    // Optimistic update - remove from list immediately
+    setSavedJobs((prev) =>
+      prev.filter((savedJob) => savedJob.job.id !== jobId),
+    );
+
+    const result = await toggleSaveJob(jobId, true); // isSaved=true means remove
+    if (!result.success) {
+      // Rollback on failure
+      setSavedJobs(previousJobs);
+      console.error("Failed to unsave job:", result.error);
     }
   };
 
@@ -92,8 +104,6 @@ export default function SavedJobsContent({ initialJobs }: SavedJobsProps) {
     if (max) return `Up to GHS ${max.toLocaleString()}`;
     return "Salary not specified";
   };
-
-
 
   if (savedJobs.length === 0) {
     return (
@@ -180,7 +190,7 @@ export default function SavedJobsContent({ initialJobs }: SavedJobsProps) {
                       <span className="truncate">
                         {formatSalary(
                           savedJob.job.salaryMin,
-                          savedJob.job.salaryMax
+                          savedJob.job.salaryMax,
                         )}
                       </span>
                     </div>

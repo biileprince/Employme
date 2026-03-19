@@ -19,16 +19,23 @@ import {
   HiBookmark,
 } from "react-icons/hi";
 import { apiClient, formatImageUrl } from "@/lib/api";
+import { toggleSaveJob } from "@/app/actions/job";
 import type { Job, JobsResponse } from "@/types/job";
 import { useAuth } from "@/contexts/AuthContext";
 import dynamic from "next/dynamic";
 
-const AuthModal = dynamic(() => import("@/components/features").then(mod => mod.AuthModal), {
-  ssr: false,
-});
-const JobApplicationModal = dynamic(() => import("@/components/features").then(mod => mod.JobApplicationModal), {
-  ssr: false,
-});
+const AuthModal = dynamic(
+  () => import("@/components/features").then((mod) => mod.AuthModal),
+  {
+    ssr: false,
+  },
+);
+const JobApplicationModal = dynamic(
+  () => import("@/components/features").then((mod) => mod.JobApplicationModal),
+  {
+    ssr: false,
+  },
+);
 
 const INDUSTRIES = [
   { value: "TECHNOLOGY", label: "Technology" },
@@ -80,7 +87,7 @@ export default function JobsPageContent({
   // Auth and action modals
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authModalAction, setAuthModalAction] = useState<"save" | "apply">(
-    "save"
+    "save",
   );
   const [showApplicationModal, setShowApplicationModal] = useState(false);
   const [selectedJobForApplication, setSelectedJobForApplication] =
@@ -141,8 +148,8 @@ export default function JobsPageContent({
     try {
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          query
-        )}&limit=5&countrycodes=gh`
+          query,
+        )}&limit=5&countrycodes=gh`,
       );
       const data = await response.json();
       setLocationResults(data);
@@ -224,7 +231,7 @@ export default function JobsPageContent({
         });
 
         const response = await apiClient.get<JobsResponse>(
-          `/jobs?${queryParams.toString()}`
+          `/jobs?${queryParams.toString()}`,
         );
 
         if (response.success && response.data) {
@@ -255,7 +262,7 @@ export default function JobsPageContent({
         }>("/saved-jobs");
         if (savedResponse.success && savedResponse.data?.savedJobs) {
           const savedIds = new Set(
-            savedResponse.data.savedJobs.map((saved) => saved.job.id)
+            savedResponse.data.savedJobs.map((saved) => saved.job.id),
           );
           setSavedJobIds(savedIds);
         }
@@ -266,7 +273,7 @@ export default function JobsPageContent({
         }>("/applications/my-applications");
         if (applicationsResponse.success && applicationsResponse.data) {
           const appliedIds = new Set(
-            applicationsResponse.data.applications.map((app) => app.job.id)
+            applicationsResponse.data.applications.map((app) => app.job.id),
           );
           setAppliedJobIds(appliedIds);
         }
@@ -405,7 +412,7 @@ export default function JobsPageContent({
       return formatImageUrl(job.employer.logoUrl);
     }
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(
-      job.employer.companyName
+      job.employer.companyName,
     )}&background=random&size=80`;
   };
 
@@ -441,7 +448,7 @@ export default function JobsPageContent({
     }
   };
 
-  // Handle save job
+  // Handle save job using server action with optimistic update
   const handleSaveJob = async (jobId: string) => {
     if (!isAuthenticated) {
       setAuthModalAction("save");
@@ -450,53 +457,47 @@ export default function JobsPageContent({
     }
 
     setSavingJobId(jobId);
-    try {
-      const response = await apiClient.post(`/saved-jobs/save`, { jobId });
-      if (response.success || response.data) {
-        setSavedJobIds((prev) => {
-          const newSet = new Set(prev);
-          newSet.add(jobId);
-          return newSet;
-        });
-      }
-    } catch (error: unknown) {
-      console.error("Failed to save job:", error);
-      // Even if API returns error, check if it's a duplicate (already saved)
-      const errorMessage = error instanceof Error ? error.message : "";
-      const errorStatus = (error as { response?: { status?: number } })?.response?.status;
-      if (errorStatus === 400 || errorMessage.includes("already")) {
-        // Job is already saved, update state
-        setSavedJobIds((prev) => {
-          const newSet = new Set(prev);
-          newSet.add(jobId);
-          return newSet;
-        });
-      } else {
-        alert("Failed to save job. Please try again.");
-      }
-    } finally {
-      setSavingJobId(null);
+    // Optimistic update - add to saved immediately
+    setSavedJobIds((prev) => {
+      const newSet = new Set(prev);
+      newSet.add(jobId);
+      return newSet;
+    });
+
+    const result = await toggleSaveJob(jobId, false); // isSaved=false means save
+    if (!result.success) {
+      // Rollback on failure
+      setSavedJobIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(jobId);
+        return newSet;
+      });
+      console.error("Failed to save job:", result.error);
     }
+    setSavingJobId(null);
   };
 
-  // Handle unsave job
+  // Handle unsave job using server action with optimistic update
   const handleUnsaveJob = async (jobId: string) => {
     setSavingJobId(jobId);
-    try {
-      const response = await apiClient.post(`/saved-jobs/remove`, { jobId });
-      if (response.success || response.data) {
-        setSavedJobIds((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(jobId);
-          return newSet;
-        });
-      }
-    } catch (error) {
-      console.error("Failed to unsave job:", error);
-      alert("Failed to unsave job. Please try again.");
-    } finally {
-      setSavingJobId(null);
+    // Optimistic update - remove from saved immediately
+    setSavedJobIds((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(jobId);
+      return newSet;
+    });
+
+    const result = await toggleSaveJob(jobId, true); // isSaved=true means remove
+    if (!result.success) {
+      // Rollback on failure
+      setSavedJobIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.add(jobId);
+        return newSet;
+      });
+      console.error("Failed to unsave job:", result.error);
     }
+    setSavingJobId(null);
   };
 
   // Handle apply to job
@@ -973,8 +974,8 @@ export default function JobsPageContent({
                                 job.attachments && job.attachments.length > 0
                                   ? formatImageUrl(
                                       job.attachments.find(
-                                        (att) => att.fileType === "IMAGE"
-                                      )?.url || ""
+                                        (att) => att.fileType === "IMAGE",
+                                      )?.url || "",
                                     ) || getCompanyLogo(job)
                                   : getCompanyLogo(job)
                               }
@@ -1139,8 +1140,8 @@ export default function JobsPageContent({
                                   {savingJobId === job.id
                                     ? "..."
                                     : savedJobIds.has(job.id)
-                                    ? "Saved"
-                                    : "Save"}
+                                      ? "Saved"
+                                      : "Save"}
                                 </span>
                               </Button>
                               <Button
@@ -1257,7 +1258,4 @@ export default function JobsPageContent({
       )}
     </div>
   );
-};
-
-
-
+}
