@@ -454,6 +454,68 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
           },
         );
 
+        // Listen for new conversation started (when a message arrives after deletion)
+        // This indicates a fresh conversation, not just restoration
+        newSocket.on(
+          "new_conversation_started",
+          (data: { conversation: Conversation }) => {
+            console.log("[Socket] New conversation started:", data.conversation);
+            setConversations((prev) => {
+              // Check if conversation already exists
+              const exists = prev.some((c) => c.id === data.conversation.id);
+              if (exists) {
+                // Update the conversation with fresh data
+                return prev.map((c) =>
+                  c.id === data.conversation.id
+                    ? {
+                        ...data.conversation,
+                        messages: [], // Fresh conversation has no message history
+                      }
+                    : c,
+                );
+              } else {
+                // Add the new conversation at the top
+                return [
+                  {
+                    ...data.conversation,
+                    messages: [],
+                  },
+                  ...prev,
+                ];
+              }
+            });
+            // Update unread count
+            setUnreadCount(
+              (prev) => prev + (data.conversation.unreadCount || 1),
+            );
+          },
+        );
+
+        // Keep backward compatibility with conversation_restored event
+        newSocket.on(
+          "conversation_restored",
+          (data: { conversation: Conversation }) => {
+            console.log("[Socket] Conversation restored:", data.conversation);
+            setConversations((prev) => {
+              // Check if conversation already exists
+              const exists = prev.some((c) => c.id === data.conversation.id);
+              if (exists) {
+                // Update the conversation
+                return prev.map((c) =>
+                  c.id === data.conversation.id ? data.conversation : c,
+                );
+              } else {
+                // Add the restored conversation at the top
+                return [data.conversation, ...prev];
+              }
+            });
+            // Update unread count
+            setUnreadCount(
+              (prev) => prev + (data.conversation.unreadCount || 1),
+            );
+          },
+        );
+
         setSocket(newSocket);
         newSocket.connect();
       } catch (error) {

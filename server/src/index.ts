@@ -255,7 +255,66 @@ io.on("connection", (socket) => {
       try {
         const conversation = await prisma.conversation.findUnique({
           where: { id: data.conversationId },
-          select: { participant1Id: true, participant2Id: true },
+          include: {
+            participant1: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                imageUrl: true,
+                role: true,
+                employer: {
+                  select: {
+                    companyName: true,
+                    logoUrl: true,
+                  },
+                },
+                jobSeeker: {
+                  select: {
+                    firstName: true,
+                    lastName: true,
+                    profileImageUrl: true,
+                  },
+                },
+              },
+            },
+            participant2: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                imageUrl: true,
+                role: true,
+                employer: {
+                  select: {
+                    companyName: true,
+                    logoUrl: true,
+                  },
+                },
+                jobSeeker: {
+                  select: {
+                    firstName: true,
+                    lastName: true,
+                    profileImageUrl: true,
+                  },
+                },
+              },
+            },
+            messages: {
+              orderBy: { createdAt: "desc" },
+              take: 1,
+              select: {
+                id: true,
+                content: true,
+                createdAt: true,
+                isRead: true,
+                senderId: true,
+                isDeleted: true,
+              },
+            },
+          },
         });
 
         if (!conversation) return;
@@ -290,10 +349,96 @@ io.on("connection", (socket) => {
             ? conversation.participant2Id
             : conversation.participant1Id;
 
+        const isReceiverParticipant1 = conversation.participant1Id === receiverId;
+        const wasDeletedByReceiver = isReceiverParticipant1
+          ? conversation.deletedByParticipant1
+          : conversation.deletedByParticipant2;
+
+        let updatedConversation = conversation;
+
+        // If receiver deleted the conversation, start a fresh conversation
+        // by deleting all old messages for this conversation
+        if (wasDeletedByReceiver) {
+          // Delete all messages from this conversation to make it fresh
+          await prisma.message.deleteMany({
+            where: { conversationId: data.conversationId },
+          });
+
+          // Undelete the conversation
+          updatedConversation = await prisma.conversation.update({
+            where: { id: conversationId },
+            data: {
+              deletedByParticipant1: false,
+              deletedByParticipant2: false,
+              createdAt: new Date(), // Reset creation time for fresh start
+            },
+            include: {
+              participant1: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                  imageUrl: true,
+                  role: true,
+                  employer: {
+                    select: {
+                      companyName: true,
+                      logoUrl: true,
+                    },
+                  },
+                  jobSeeker: {
+                    select: {
+                      firstName: true,
+                      lastName: true,
+                      profileImageUrl: true,
+                    },
+                  },
+                },
+              },
+              participant2: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                  imageUrl: true,
+                  role: true,
+                  employer: {
+                    select: {
+                      companyName: true,
+                      logoUrl: true,
+                    },
+                  },
+                  jobSeeker: {
+                    select: {
+                      firstName: true,
+                      lastName: true,
+                      profileImageUrl: true,
+                    },
+                  },
+                },
+              },
+            },
+          });
+        }
+
+        // Send new message notification
         io.to(`user_${receiverId}`).emit("new_message", {
           conversationId: data.conversationId,
           message,
         });
+
+        // If receiver deleted the conversation, emit new conversation event
+        // to indicate this is a fresh start, not just a restoration
+        if (wasDeletedByReceiver) {
+          io.to(`user_${receiverId}`).emit("new_conversation_started", {
+            conversation: {
+              ...updatedConversation,
+              unreadCount: 1, // At least one unread message
+            },
+          });
+        }
       } catch (error) {
         console.error("Failed to handle message_sent event");
       }

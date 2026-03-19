@@ -157,7 +157,7 @@ export const getEligibleContacts = catchAsync(
         count: eligibleContacts.length,
       },
     });
-  }
+  },
 );
 
 /**
@@ -267,7 +267,7 @@ export const getConversations = catchAsync(
           ...conv,
           unreadCount,
         };
-      })
+      }),
     );
 
     res.status(200).json({
@@ -277,7 +277,7 @@ export const getConversations = catchAsync(
         count: conversationsWithUnread.length,
       },
     });
-  }
+  },
 );
 
 /**
@@ -491,7 +491,7 @@ export const getOrCreateConversation = catchAsync(
       success: true,
       data: { conversation },
     });
-  }
+  },
 );
 
 /**
@@ -587,6 +587,28 @@ export const sendMessage = catchAsync(async (req: Request, res: Response) => {
     conversation.participant2Id !== userId
   ) {
     throw new AppError("You are not part of this conversation", 403);
+  }
+
+  // If conversation was deleted by either participant, start a fresh conversation
+  // by deleting all old messages and resetting the conversation
+  if (
+    conversation.deletedByParticipant1 ||
+    conversation.deletedByParticipant2
+  ) {
+    // Delete all old messages to make it a fresh conversation
+    await prisma.message.deleteMany({
+      where: { conversationId },
+    });
+
+    // Undelete and reset the conversation
+    await prisma.conversation.update({
+      where: { id: conversationId },
+      data: {
+        deletedByParticipant1: false,
+        deletedByParticipant2: false,
+        createdAt: new Date(), // Reset creation time for fresh start
+      },
+    });
   }
 
   // Create message and update conversation
@@ -711,7 +733,7 @@ export const deleteConversation = catchAsync(
       success: true,
       message: "Conversation deleted successfully",
     });
-  }
+  },
 );
 
 /**
@@ -721,17 +743,26 @@ export const getUnreadCount = catchAsync(
   async (req: Request, res: Response) => {
     const userId = req.user!.id;
 
-    // Get all conversations for the user
+    // Get all active conversations for the user (not deleted by them)
     const conversations = await prisma.conversation.findMany({
       where: {
-        OR: [{ participant1Id: userId }, { participant2Id: userId }],
+        OR: [
+          {
+            participant1Id: userId,
+            deletedByParticipant1: false,
+          },
+          {
+            participant2Id: userId,
+            deletedByParticipant2: false,
+          },
+        ],
       },
       select: { id: true },
     });
 
     const conversationIds = conversations.map((conv) => conv.id);
 
-    // Count unread messages across all conversations
+    // Count unread messages across all active conversations
     const unreadCount = await prisma.message.count({
       where: {
         conversationId: { in: conversationIds },
@@ -744,7 +775,7 @@ export const getUnreadCount = catchAsync(
       success: true,
       data: { unreadCount },
     });
-  }
+  },
 );
 
 /**
