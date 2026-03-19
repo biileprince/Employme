@@ -27,6 +27,7 @@ import {
   HiCalendar,
 } from "react-icons/hi";
 import { apiClient, formatImageUrl } from "@/lib/api";
+import { toggleSaveJob } from "@/app/actions/job";
 import type { Job, JobResponse, Pagination } from "@/types/job";
 import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
@@ -183,33 +184,21 @@ export default function JobDetailsContent({ initialJob, initialRelatedJobs }: Jo
     }
 
     setIsSaving(true);
+    // Optimistic UI
+    const previousSaveState = isSaved;
+    setIsSaved(!isSaved);
+    
     try {
-      if (isSaved) {
-        // Unsave job
-        const response = await apiClient.post(`/saved-jobs/remove`, { jobId });
-        if (response.success || response.data) {
-          setIsSaved(false);
-        }
-      } else {
-        // Save job
-        const response = await apiClient.post(`/saved-jobs/save`, { jobId });
-        if (response.success || response.data) {
-          setIsSaved(true);
-        }
+      const response = await toggleSaveJob(jobId, previousSaveState);
+      if (!response.success && !response.error?.includes("already")) {
+        // Revert on failure unless it was just already saved realistically
+        setIsSaved(previousSaveState);
+        alert("An error occurred. Please try again.");
       }
     } catch (error: unknown) {
       console.error("Failed to save/unsave job:", error);
-      // Handle duplicate save attempt
-      const errorMessage = error instanceof Error ? error.message : "";
-      const errorStatus = (error as { response?: { status?: number } })?.response?.status;
-      if (
-        !isSaved &&
-        (errorStatus === 400 || errorMessage.includes("already"))
-      ) {
-        setIsSaved(true);
-      } else {
-        alert("An error occurred. Please try again.");
-      }
+      setIsSaved(previousSaveState);
+      alert("An error occurred. Please try again.");
     } finally {
       setIsSaving(false);
     }

@@ -19,7 +19,13 @@ import {
   MdClose,
 } from "react-icons/md";
 import { Button } from "@/components/ui/button";
-import { apiClient, formatImageUrl } from "@/lib/api";
+import { formatImageUrl } from "@/lib/api";
+import { 
+  updateApplicationStatus, 
+  scheduleInterview, 
+  updateInterview, 
+  deleteInterview 
+} from "@/app/actions/application";
 
 interface Interview {
   id: string;
@@ -73,9 +79,12 @@ interface Application {
   interviews?: Interview[];
 }
 
-export default function ApplicationsPage() {
-  const [applications, setApplications] = useState<Application[]>([]);
-  const [loading, setLoading] = useState(true);
+export interface ApplicationsContentProps {
+  initialApplications: Application[];
+}
+
+export default function ApplicationsContent({ initialApplications }: ApplicationsContentProps) {
+  const [applications, setApplications] = useState<Application[]>(initialApplications);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<
     "ALL" | "PENDING" | "REVIEWED" | "SHORTLISTED" | "REJECTED" | "HIRED"
@@ -114,57 +123,7 @@ export default function ApplicationsPage() {
   const [isScheduling, setIsScheduling] = useState(false);
   const [scheduleError, setScheduleError] = useState("");
 
-  useEffect(() => {
-    loadApplications();
-  }, []);
 
-  const loadApplications = async () => {
-    try {
-      setLoading(true);
-      const response = await apiClient.get<{ applications: Application[] }>(
-        "/applications/employer"
-      );
-
-      if (response.success && response.data) {
-        const applicationsData = response.data.applications || [];
-
-        // Fetch interviews for each application
-        const applicationsWithInterviews = await Promise.all(
-          applicationsData.map(async (app) => {
-            try {
-              const interviewResponse = await apiClient.get<{
-                interviews?: Interview[];
-              }>(`/applications/${app.id}/interviews`);
-
-              if (interviewResponse.data) {
-                const interviews = Array.isArray(interviewResponse.data)
-                  ? interviewResponse.data
-                  : interviewResponse.data?.interviews || [];
-                return { ...app, interviews };
-              }
-              return app;
-            } catch (error) {
-              console.warn(
-                `Failed to fetch interviews for application ${app.id}:`,
-                error
-              );
-              return app;
-            }
-          })
-        );
-
-        setApplications(applicationsWithInterviews);
-      } else {
-        setApplications([]);
-      }
-    } catch (err) {
-      console.error("Failed to load applications:", err);
-      setError("Failed to load applications");
-      setApplications([]);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -217,25 +176,27 @@ export default function ApplicationsPage() {
     setShowStatusConfirm(true);
   };
 
-  const updateApplicationStatus = async (
+  const handleUpdateApplicationStatus = async (
     applicationId: string,
     newStatus: string
   ) => {
-    try {
-      await apiClient.patch(`/applications/${applicationId}/status`, {
-        status: newStatus,
-      });
-      // Reload applications
-      await loadApplications();
-    } catch (err) {
-      console.error("Failed to update application status:", err);
-      setError("Failed to update application status");
+    // Optimistic Update
+    setApplications((prev) =>
+      prev.map((app) =>
+        app.id === applicationId ? { ...app, status: newStatus as any } : app
+      )
+    );
+
+    const result = await updateApplicationStatus(applicationId, newStatus);
+    if (!result.success) {
+      setError(result.error || "Failed to update application status");
+      // Could revert the optimistic update here if we stored the previous state
     }
   };
 
   const confirmStatusChange = async () => {
     if (pendingStatusChange) {
-      await updateApplicationStatus(
+      await handleUpdateApplicationStatus(
         pendingStatusChange.applicationId,
         pendingStatusChange.newStatus
       );
@@ -265,19 +226,19 @@ export default function ApplicationsPage() {
     setIsScheduling(true);
     setScheduleError("");
 
-    try {
-      await apiClient.post(
-        `/applications/${selectedApplication.id}/schedule-interview`,
-        scheduleFormData
-      );
+    const result = await scheduleInterview(selectedApplication.id, scheduleFormData);
+    if (result.success) {
       setShowScheduleModal(false);
-      await loadApplications();
-    } catch (err) {
-      console.error("Failed to schedule interview:", err);
-      setScheduleError("Failed to schedule interview. Please try again.");
-    } finally {
-      setIsScheduling(false);
+      // Data automatically revalidated on server, but we need router.refresh() or initial data update to see changes immediately.
+      // Easiest is to let Server Action revalidation handle next fetch and visually rely on page refresh. 
+      // Actually, since this is a Client Component with duplicated state `applications`, we should update local state manually or let next router handle it.
+      // Assuming parent server-component will push new `initialApplications`.
+      window.location.reload(); 
+    } else {
+      setScheduleError(result.error || "Failed to schedule interview. Please try again.");
     }
+    
+    setIsScheduling(false);
   };
 
   const handleEditInterview = (
@@ -303,27 +264,25 @@ export default function ApplicationsPage() {
     setIsScheduling(true);
     setScheduleError("");
 
-    try {
-      await apiClient.put(`/interviews/${selectedInterview.id}`, editFormData);
+    const result = await updateInterview(selectedInterview.id, editFormData);
+    if (result.success) {
       setShowEditModal(false);
-      await loadApplications();
-    } catch (err) {
-      console.error("Failed to update interview:", err);
-      setScheduleError("Failed to update interview. Please try again.");
-    } finally {
-      setIsScheduling(false);
+      window.location.reload();
+    } else {
+      setScheduleError(result.error || "Failed to update interview. Please try again.");
     }
+    
+    setIsScheduling(false);
   };
 
   const handleDeleteInterview = async (interviewId: string) => {
     if (!confirm("Are you sure you want to delete this interview?")) return;
 
-    try {
-      await apiClient.delete(`/interviews/${interviewId}`);
-      await loadApplications();
-    } catch (err) {
-      console.error("Failed to delete interview:", err);
-      setError("Failed to delete interview");
+    const result = await deleteInterview(interviewId);
+    if (result.success) {
+      window.location.reload();
+    } else {
+      setError(result.error || "Failed to delete interview");
     }
   };
 
@@ -335,22 +294,7 @@ export default function ApplicationsPage() {
     return `${displayHour}:${minutes} ${period}`;
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-center min-h-64">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-              <p className="text-muted-foreground mt-4">
-                Loading applications...
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+
 
   if (error && applications.length === 0) {
     return (
@@ -358,7 +302,7 @@ export default function ApplicationsPage() {
         <div className="container mx-auto px-4 py-8">
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 rounded-lg">
             <p className="text-red-600 dark:text-red-400">{error}</p>
-            <Button onClick={loadApplications} className="mt-4">
+            <Button onClick={() => window.location.reload()} className="mt-4">
               Try Again
             </Button>
           </div>

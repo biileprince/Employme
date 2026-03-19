@@ -21,6 +21,7 @@ import { apiClient, formatImageUrl } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { PhoneInput } from "@/components/ui/PhoneInput";
+import { updateJobSeekerProfile } from "@/app/actions/profile";
 
 interface LocationResult {
   place_id: number;
@@ -273,9 +274,6 @@ export default function JobSeekerProfilePage() {
     }));
   };
 
-  const handlePhoneChange = (phone: string, countryCode: string) => {
-    setFormData((prev) => ({ ...prev, phone, countryCode }));
-  };
 
   const addSkill = () => {
     if (skillInput.trim() && !formData.skills.includes(skillInput.trim())) {
@@ -300,17 +298,17 @@ export default function JobSeekerProfilePage() {
     setSuccess("");
 
     try {
-      const response = await apiClient.put("/users/profile/job-seeker", {
+      const result = await updateJobSeekerProfile({
         ...formData,
         dateOfBirth: formData.dateOfBirth || null,
       });
 
-      if (response.success) {
+      if (result.success) {
         await refreshUser();
         setSuccess("Profile updated successfully!");
         setIsEditing(false);
       } else {
-        throw new Error(response.message || "Failed to update profile");
+        throw new Error(result.error || "Failed to update profile");
       }
     } catch (error) {
       console.error("Failed to update profile:", error);

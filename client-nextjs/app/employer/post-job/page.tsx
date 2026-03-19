@@ -7,6 +7,7 @@ import { MdLocationOn, MdSearch, MdAdd, MdClose } from "react-icons/md";
 import PhoneInput from "@/components/ui/PhoneInput";
 import ImageUpload from "@/components/ui/ImageUpload";
 import { apiClient } from "@/lib/api";
+import { createJob } from "@/app/actions/job";
 import { INDUSTRIES, LOCATION_API_CONFIG } from "@/lib/constants";
 import { useRouteGuard } from "@/hooks/useRouteGuard";
 
@@ -227,10 +228,10 @@ export default function PostJobPage() {
 
       console.log("Submitting job data:", jobData);
 
-      const response = await apiClient.post("/jobs", jobData);
+      const response = await createJob(jobData);
 
       if (!response.success) {
-        throw new Error(response.message || "Failed to create job");
+        throw new Error(response.error || "Failed to create job");
       }
 
       console.log("Job created successfully:", response);

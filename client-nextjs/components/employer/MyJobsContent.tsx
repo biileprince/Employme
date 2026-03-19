@@ -14,8 +14,7 @@ import {
   MdAdd,
   MdAccessTime,
 } from "react-icons/md";
-import { apiClient } from "@/lib/api";
-import { useRouteGuard } from "@/hooks/useRouteGuard";
+import { toggleJobStatus, deleteJob } from "@/app/actions/job";
 
 interface Job {
   id: string;
@@ -31,55 +30,46 @@ interface Job {
   deadline?: string;
 }
 
-export default function MyJobsPage() {
-  useRouteGuard({
-    requireAuth: true,
-    requireOnboarding: false,
-    requireRole: "EMPLOYER",
-  });
+export interface MyJobsContentProps {
+  initialJobs: Job[];
+}
 
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+export default function MyJobsContent({ initialJobs }: MyJobsContentProps) {
+  const [jobs, setJobs] = useState<Job[]>(initialJobs);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
 
-  useEffect(() => {
-    fetchJobs();
-  }, []);
+  // Keep jobs in sync with server changes if we want local optimistic updates.
+  // We'll rely on Server Action revalidation to refresh the whole page instead of syncing manually.
 
-  const fetchJobs = async () => {
-    try {
-      const response = await apiClient.get<{
-        jobs: Job[];
-      }>("/jobs/my-jobs");
-      setJobs(response.data?.jobs || []);
-    } catch (err) {
-      console.error("Failed to fetch jobs:", err);
-      setError("Failed to fetch jobs");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleStatusChange = async (jobId: string, newStatus: string) => {
-    try {
-      const isActive = newStatus === "ACTIVE";
-      await apiClient.patch(`/jobs/${jobId}`, { isActive });
-      await fetchJobs(); // Refresh the list
-    } catch (err) {
-      console.error("Failed to update job status:", err);
-      setError("Failed to update job status");
+    const isActive = newStatus === "ACTIVE";
+    // Optimistically update
+    setJobs((prev) =>
+      prev.map((j) => (j.id === jobId ? { ...j, isActive } : j))
+    );
+
+    const result = await toggleJobStatus(jobId, isActive);
+    if (!result.success) {
+      setError(result.error || "Failed to update job status");
+      // Revert optimistic update
+      setJobs((prev) =>
+        prev.map((j) => (j.id === jobId ? { ...j, isActive: !isActive } : j))
+      );
     }
   };
 
   const handleDeleteJob = async (jobId: string) => {
     if (window.confirm("Are you sure you want to delete this job posting?")) {
-      try {
-        await apiClient.delete(`/jobs/${jobId}`);
-        await fetchJobs(); // Refresh the list
-      } catch (err) {
-        console.error("Failed to delete job:", err);
-        setError("Failed to delete job");
+      // Optimistically update
+      const previousJobs = [...jobs];
+      setJobs((prev) => prev.filter((j) => j.id !== jobId));
+
+      const result = await deleteJob(jobId);
+      if (!result.success) {
+        setError(result.error || "Failed to delete job");
+        setJobs(previousJobs); // Revert
       }
     }
   };
@@ -97,13 +87,7 @@ export default function MyJobsPage() {
       : "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-700";
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="space-y-4 sm:space-y-6 px-3 sm:px-4 lg:px-6">
