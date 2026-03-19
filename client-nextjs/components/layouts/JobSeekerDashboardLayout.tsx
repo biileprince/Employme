@@ -20,6 +20,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { ScrollToTop } from "@/components/common/ScrollToTop";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { MessageCountBadge } from "@/components/common/MessageCountBadge";
 
 const sidebarLinks = [
   { to: "/job-seeker/dashboard", label: "Dashboard", icon: MdDashboard },
@@ -115,6 +116,8 @@ export function JobSeekerDashboardLayout({
           {sidebarLinks.map((link) => {
             const IconComponent = link.icon;
             const isActive = pathname === link.to;
+            const isMessages = link.to === "/job-seeker/messages";
+
             return (
               <Link
                 key={link.to}
@@ -128,6 +131,7 @@ export function JobSeekerDashboardLayout({
               >
                 <IconComponent className="w-5 h-5" />
                 <span className="font-medium">{link.label}</span>
+                {isMessages && <MessageCountBadge className="ml-auto" />}
               </Link>
             );
           })}
