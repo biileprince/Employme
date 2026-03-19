@@ -4,6 +4,7 @@ import { body } from "express-validator";
 import { catchAsync, AppError } from "../middleware/errorHandler.js";
 import { handleValidationErrors } from "../middleware/validation.js";
 import { sendNewJobNotificationToAdmin } from "../services/emailService.js";
+import { parsePagination, buildPaginationMeta } from "../utils/pagination.js";
 
 const prisma = new PrismaClient();
 
@@ -42,8 +43,14 @@ export const getJobs = catchAsync(
       search,
     } = req.query;
 
-    const skip = (Number(page) - 1) * Number(limit);
-    const take = Number(limit);
+    const paginationInput = parsePagination(
+      req.query as Record<string, unknown>,
+      {
+        defaultLimit: 10,
+        maxLimit: 50,
+      },
+    );
+    const { page: currentPage, limit: pageSize, skip, take } = paginationInput;
 
     // Build filter conditions
     const where: any = {
@@ -129,23 +136,20 @@ export const getJobs = catchAsync(
       prisma.job.count({ where }),
     ]);
 
-    const totalPages = Math.ceil(total / take);
+    const pagination = buildPaginationMeta({
+      page: currentPage,
+      limit: pageSize,
+      total,
+    });
 
     res.status(200).json({
       success: true,
       data: {
         jobs,
-        pagination: {
-          page: Number(page),
-          limit: take,
-          total,
-          totalPages,
-          hasNext: Number(page) < totalPages,
-          hasPrev: Number(page) > 1,
-        },
+        pagination,
       },
     });
-  }
+  },
 );
 
 // Get job by ID
@@ -196,7 +200,7 @@ export const getJobById = catchAsync(
       success: true,
       data: { job },
     });
-  }
+  },
 );
 
 // Get current user's jobs (employers only)
@@ -222,28 +226,43 @@ export const getMyJobs = catchAsync(
       throw new AppError("Employer profile not found", 404);
     }
 
-    const jobs = await prisma.job.findMany({
-      where: { employerId: employer.id },
-      include: {
-        _count: {
-          select: {
-            applications: true,
+    const { page, limit, skip, take } = parsePagination(
+      req.query as Record<string, unknown>,
+      {
+        defaultLimit: 10,
+        maxLimit: 50,
+      },
+    );
+
+    const where = { employerId: employer.id };
+
+    const [jobs, total] = await Promise.all([
+      prisma.job.findMany({
+        where,
+        skip,
+        take,
+        include: {
+          _count: {
+            select: {
+              applications: true,
+            },
+          },
+          attachments: {
+            select: {
+              id: true,
+              filename: true,
+              url: true,
+              fileType: true,
+              fileSize: true,
+            },
           },
         },
-        attachments: {
-          select: {
-            id: true,
-            filename: true,
-            url: true,
-            fileType: true,
-            fileSize: true,
-          },
+        orderBy: {
+          createdAt: "desc",
         },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+      }),
+      prisma.job.count({ where }),
+    ]);
 
     const formattedJobs = jobs.map((job) => ({
       id: job.id,
@@ -258,9 +277,12 @@ export const getMyJobs = catchAsync(
 
     res.status(200).json({
       success: true,
-      data: { jobs: formattedJobs },
+      data: {
+        jobs: formattedJobs,
+        pagination: buildPaginationMeta({ page, limit, total }),
+      },
     });
-  }
+  },
 );
 
 // Create a new job (employers only)
@@ -361,7 +383,7 @@ export const createJob = [
     if (salaryMin && salaryMax && Number(salaryMin) > Number(salaryMax)) {
       throw new AppError(
         "Minimum salary cannot be greater than maximum salary",
-        400
+        400,
       );
     }
 
@@ -377,7 +399,7 @@ export const createJob = [
     if (!employer) {
       throw new AppError(
         "Employer profile not found. Please complete your employer profile first.",
-        404
+        404,
       );
     }
 
@@ -462,7 +484,7 @@ export const createJob = [
           job.title,
           employer.companyName,
           employerName,
-          employerUser.email
+          employerUser.email,
         );
       }
     } catch (error) {
@@ -638,5 +660,5 @@ export const deleteJob = catchAsync(
       success: true,
       message: "Job deleted successfully",
     });
-  }
+  },
 );

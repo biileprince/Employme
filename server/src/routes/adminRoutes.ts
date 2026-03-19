@@ -19,6 +19,7 @@ import {
   updateEmployerVerification,
 } from "../controllers/adminController.js";
 import { authMiddleware, adminOnly } from "../middleware/auth.js";
+import { adminMutationRateLimiter } from "../middleware/rateLimiter.js";
 
 const router = Router();
 
@@ -31,28 +32,44 @@ router.get("/stats", getSystemStats);
 
 // User management
 router.get("/users", getAllUsers);
-router.patch("/users/:id/toggle-status", toggleUserStatus);
-router.patch("/users/:id/toggle-verification", toggleUserVerification);
-router.delete("/users/:id", deleteUser);
+router.patch(
+  "/users/:id/toggle-status",
+  adminMutationRateLimiter,
+  toggleUserStatus,
+);
+router.patch(
+  "/users/:id/toggle-verification",
+  adminMutationRateLimiter,
+  toggleUserVerification,
+);
+router.delete("/users/:id", adminMutationRateLimiter, deleteUser);
 
 // Employer verification management
 router.get("/employers", getAllEmployers);
 router.get("/employers/pending", getPendingEmployers);
-router.patch("/employers/:employerId/verification", updateEmployerVerification);
+router.patch(
+  "/employers/:employerId/verification",
+  adminMutationRateLimiter,
+  updateEmployerVerification,
+);
 
 // Job management routes
 router.get("/jobs", getAllJobs);
 router.get("/jobs/pending", getPendingJobs);
-router.patch("/jobs/:id", manageJob);
-router.delete("/jobs/:id", deleteJob);
+router.patch("/jobs/:id", adminMutationRateLimiter, manageJob);
+router.delete("/jobs/:id", adminMutationRateLimiter, deleteJob);
 
 // Application management routes
 router.get("/applications", getAllApplications);
-router.delete("/applications/:id", deleteApplication);
-router.patch("/applications/:id/status", updateApplicationStatus);
+router.delete("/applications/:id", adminMutationRateLimiter, deleteApplication);
+router.patch(
+  "/applications/:id/status",
+  adminMutationRateLimiter,
+  updateApplicationStatus,
+);
 
 // Admin creation route
-router.post("/create-admin", createAdminUser);
+router.post("/create-admin", adminMutationRateLimiter, createAdminUser);
 
 // Admin profile
 router.get("/profile", getAdminProfile);

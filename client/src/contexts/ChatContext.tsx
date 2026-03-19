@@ -126,7 +126,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
 
     if (!user || !token) {
       console.log(
-        "[ChatContext] Missing user or token, skipping socket connection"
+        "[ChatContext] Missing user or token, skipping socket connection",
       );
       return;
     }
@@ -181,7 +181,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
           "[Socket] Message sender ID:",
           data.message.senderId,
           "Current user ID:",
-          currentUserId
+          currentUserId,
         );
 
         // Skip if this is our own message (we already added it when sending)
@@ -196,14 +196,14 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
             "[Socket] Active conversation ID:",
             current?.id,
             "Message conversation ID:",
-            data.conversationId
+            data.conversationId,
           );
 
           if (current?.id === data.conversationId) {
             setMessages((prev) => {
               // Check if message already exists to prevent duplicates
               const messageExists = prev.some(
-                (msg) => msg.id === data.message.id
+                (msg) => msg.id === data.message.id,
               );
               if (messageExists) {
                 console.log("[Socket] Message already exists, skipping");
@@ -211,7 +211,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
               }
               console.log(
                 "[Socket] Adding message to active conversation. Previous count:",
-                prev.length
+                prev.length,
               );
               return [...prev, data.message];
             });
@@ -235,7 +235,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
               };
             }
             return conv;
-          })
+          }),
         );
 
         // Only increment global unread when conversation already exists in sidebar.
@@ -243,7 +243,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
         if (shouldIncrementGlobalUnread) {
           setUnreadCount((prev) => prev + 1);
         }
-      }
+      },
     );
 
     // Listen for typing indicators
@@ -252,7 +252,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
       (data: { conversationId: string; userId: string }) => {
         console.log("[Socket] User typing:", data);
         setTypingUsers((prev) => ({ ...prev, [data.userId]: true }));
-      }
+      },
     );
 
     newSocket.on(
@@ -264,7 +264,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
           delete updated[data.userId];
           return updated;
         });
-      }
+      },
     );
 
     // Listen for read receipts
@@ -274,11 +274,11 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
         if (activeConversation?.id === data.conversationId) {
           setMessages((prev) =>
             prev.map((msg) =>
-              msg.senderId === user.id ? { ...msg, isRead: true } : msg
-            )
+              msg.senderId === user.id ? { ...msg, isRead: true } : msg,
+            ),
           );
         }
-      }
+      },
     );
 
     // Listen for message edits
@@ -287,10 +287,12 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
       (data: { conversationId: string; message: Message }) => {
         if (activeConversation?.id === data.conversationId) {
           setMessages((prev) =>
-            prev.map((msg) => (msg.id === data.message.id ? data.message : msg))
+            prev.map((msg) =>
+              msg.id === data.message.id ? data.message : msg,
+            ),
           );
         }
-      }
+      },
     );
 
     // Listen for message deletes
@@ -299,10 +301,12 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
       (data: { conversationId: string; message: Message }) => {
         if (activeConversation?.id === data.conversationId) {
           setMessages((prev) =>
-            prev.map((msg) => (msg.id === data.message.id ? data.message : msg))
+            prev.map((msg) =>
+              msg.id === data.message.id ? data.message : msg,
+            ),
           );
         }
-      }
+      },
     );
 
     // Listen for new conversation started (when a message arrives after deletion)
@@ -322,7 +326,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
                     ...data.conversation,
                     messages: [], // Fresh conversation has no message history
                   }
-                : c
+                : c,
             );
           } else {
             // Add the new conversation at the top
@@ -336,10 +340,8 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
           }
         });
         // Update unread count
-        setUnreadCount(
-          (prev) => prev + (data.conversation.unreadCount || 1)
-        );
-      }
+        setUnreadCount((prev) => prev + (data.conversation.unreadCount || 1));
+      },
     );
 
     // Keep backward compatibility with conversation_restored event
@@ -353,7 +355,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
           if (exists) {
             // Update the conversation
             return prev.map((c) =>
-              c.id === data.conversation.id ? data.conversation : c
+              c.id === data.conversation.id ? data.conversation : c,
             );
           } else {
             // Add the restored conversation at the top
@@ -361,10 +363,8 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
           }
         });
         // Update unread count
-        setUnreadCount(
-          (prev) => prev + (data.conversation.unreadCount || 1)
-        );
-      }
+        setUnreadCount((prev) => prev + (data.conversation.unreadCount || 1));
+      },
     );
 
     setSocket(newSocket);
@@ -430,7 +430,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
         console.error("Failed to select conversation:", error);
       }
     },
-    [conversations, socket]
+    [conversations, socket],
   );
 
   // Send a message
@@ -441,12 +441,12 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
       try {
         console.log(
           "[ChatContext] Sending message to conversation:",
-          activeConversation.id
+          activeConversation.id,
         );
         const response = await chatAPI.sendMessage(
           activeConversation.id,
           content,
-          attachmentUrl
+          attachmentUrl,
         );
 
         if (response.success && response.data) {
@@ -457,7 +457,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
           setMessages((prev) => {
             console.log(
               "[ChatContext] Adding sent message. Previous count:",
-              prev.length
+              prev.length,
             );
             return [...prev, newMessage];
           });
@@ -473,7 +473,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
                 };
               }
               return conv;
-            })
+            }),
           );
 
           // Get receiver ID
@@ -493,7 +493,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
         console.error("Failed to send message:", error);
       }
     },
-    [activeConversation, socket, user]
+    [activeConversation, socket, user],
   );
 
   // Edit a message
@@ -505,7 +505,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
         const response = await chatAPI.editMessage(
           activeConversation.id,
           messageId,
-          content
+          content,
         );
 
         if (response.success && response.data) {
@@ -514,7 +514,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
 
           // Update message in local state
           setMessages((prev) =>
-            prev.map((msg) => (msg.id === messageId ? updatedMessage : msg))
+            prev.map((msg) => (msg.id === messageId ? updatedMessage : msg)),
           );
 
           // Emit socket event for real-time update
@@ -536,7 +536,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
         throw error;
       }
     },
-    [activeConversation, socket, user]
+    [activeConversation, socket, user],
   );
 
   // Delete a message
@@ -547,7 +547,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
       try {
         const response = await chatAPI.deleteMessage(
           activeConversation.id,
-          messageId
+          messageId,
         );
 
         if (response.success && response.data) {
@@ -556,7 +556,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
 
           // Update message in local state
           setMessages((prev) =>
-            prev.map((msg) => (msg.id === messageId ? deletedMessage : msg))
+            prev.map((msg) => (msg.id === messageId ? deletedMessage : msg)),
           );
 
           // Emit socket event for real-time update
@@ -578,7 +578,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
         throw error;
       }
     },
-    [activeConversation, socket, user]
+    [activeConversation, socket, user],
   );
 
   // Mark conversation as read
@@ -593,8 +593,8 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
         // Update conversation unread count
         setConversations((prev) =>
           prev.map((conv) =>
-            conv.id === conversationId ? { ...conv, unreadCount: 0 } : conv
-          )
+            conv.id === conversationId ? { ...conv, unreadCount: 0 } : conv,
+          ),
         );
 
         // Emit socket event
@@ -614,7 +614,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
         console.error("Failed to mark as read:", error);
       }
     },
-    [conversations, socket, user, loadUnreadCount]
+    [conversations, socket, user, loadUnreadCount],
   );
 
   // Delete conversation
@@ -637,7 +637,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
         console.error("Failed to delete conversation:", error);
       }
     },
-    [activeConversation, socket]
+    [activeConversation, socket],
   );
 
   // Start a new conversation
@@ -661,7 +661,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
         console.error("Failed to start conversation:", error);
       }
     },
-    [selectConversation]
+    [selectConversation],
   );
 
   // Typing indicators

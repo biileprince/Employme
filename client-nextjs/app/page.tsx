@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Header } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Card,
   CardContent,
@@ -26,6 +28,8 @@ import {
   MdHowToReg,
 } from "react-icons/md";
 import Image from "next/image";
+import { apiClient, formatImageUrl } from "@/lib/api";
+import type { Job, JobsResponse } from "@/types/job";
 
 const fadeInUp: Variants = {
   hidden: { opacity: 0, y: 20 },
@@ -64,36 +68,121 @@ const slideInFromRight: Variants = {
   },
 };
 
+const categoryConfig = [
+  {
+    category: "Technology",
+    backendKey: "TECHNOLOGY",
+    description: "Software development, IT support, data science, and more",
+  },
+  {
+    category: "Healthcare",
+    backendKey: "HEALTHCARE",
+    description: "Medical professionals, healthcare administration, nursing",
+  },
+  {
+    category: "Finance",
+    backendKey: "FINANCE",
+    description: "Banking, accounting, financial planning, investment",
+  },
+  {
+    category: "Education",
+    backendKey: "EDUCATION",
+    description: "Teaching positions, educational administration, tutoring",
+  },
+  {
+    category: "Marketing",
+    backendKey: "MARKETING",
+    description: "Digital marketing, brand management, content creation",
+  },
+  {
+    category: "Sales",
+    backendKey: "SALES",
+    description:
+      "Sales representatives, business development, account management",
+  },
+] as const;
+
 export default function Home() {
-  const featuredJobs = [
-    {
-      id: 1,
-      title: "Software Developer",
-      company: "Ghana Tech Hub",
-      location: "Accra, Ghana",
-      type: "Full-time",
-      salary: "GHS 8,000 - 15,000",
-      logo: "https://images.unsplash.com/photo-1549923746-c502d488b3ea?w=64&h=64&fit=crop&crop=center",
-    },
-    {
-      id: 2,
-      title: "Digital Marketing Specialist",
-      company: "Kumasi Digital",
-      location: "Kumasi, Ghana",
-      type: "Full-time",
-      salary: "GHS 5,000 - 9,000",
-      logo: "https://images.unsplash.com/photo-1572021335469-31706a17aaef?w=64&h=64&fit=crop&crop=center",
-    },
-    {
-      id: 3,
-      title: "Customer Service Rep",
-      company: "Call Center Plus",
-      location: "Remote Ghana",
-      type: "Part-time",
-      salary: "GHS 2,500 - 4,000",
-      logo: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=64&h=64&fit=crop&crop=center",
-    },
-  ];
+  const [featuredJobs, setFeaturedJobs] = useState<Job[]>([]);
+  const [isJobsLoading, setIsJobsLoading] = useState(true);
+
+  const [categoryJobs, setCategoryJobs] = useState<
+    Array<{
+      category: string;
+      backendKey: string;
+      description: string;
+      count: number;
+    }>
+  >(categoryConfig.map((category) => ({ ...category, count: 0 })));
+
+  useEffect(() => {
+    const fetchHomeData = async () => {
+      setIsJobsLoading(true);
+
+      try {
+        const featuredResponse = await apiClient.get<JobsResponse>(
+          "/jobs?limit=6&page=1",
+        );
+
+        if (featuredResponse.success && featuredResponse.data?.jobs) {
+          setFeaturedJobs(featuredResponse.data.jobs);
+        } else {
+          setFeaturedJobs([]);
+        }
+
+        const categoryResults = await Promise.all(
+          categoryConfig.map(async (category) => {
+            const response = await apiClient.get<JobsResponse>(
+              `/jobs?limit=1&page=1&category=${encodeURIComponent(category.backendKey)}`,
+            );
+
+            return {
+              ...category,
+              count:
+                response.success && response.data
+                  ? response.data.pagination.total
+                  : 0,
+            };
+          }),
+        );
+
+        setCategoryJobs(categoryResults);
+      } catch (error) {
+        console.error("Failed to load homepage jobs:", error);
+        setFeaturedJobs([]);
+        setCategoryJobs(
+          categoryConfig.map((category) => ({ ...category, count: 0 })),
+        );
+      } finally {
+        setIsJobsLoading(false);
+      }
+    };
+
+    fetchHomeData();
+  }, []);
+
+  const formatSalary = (job: Job) => {
+    if (job.salaryMin && job.salaryMax) {
+      return `GHS ${job.salaryMin.toLocaleString()} - ${job.salaryMax.toLocaleString()}`;
+    }
+
+    if (job.salaryMin) {
+      return `From GHS ${job.salaryMin.toLocaleString()}`;
+    }
+
+    if (job.salaryMax) {
+      return `Up to GHS ${job.salaryMax.toLocaleString()}`;
+    }
+
+    return "Negotiable";
+  };
+
+  const formatJobType = (jobType: Job["jobType"]) =>
+    jobType
+      .toLowerCase()
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
 
   const testimonials = [
     {
@@ -119,48 +208,77 @@ export default function Home() {
     },
   ];
 
+  const popularSearches = ["Software", "Accounting", "Marketing", "Remote"];
+
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
 
       <main className="flex-1">
-        {/* Hero Section with Background Video */}
-        <div className="relative flex min-h-[700px] items-center overflow-hidden bg-gradient-to-br from-primary-50 via-background to-secondary-50">
-          {/* Video Background - Hidden on light mode for better clarity */}
-          <video
-            autoPlay
-            muted
-            loop
-            playsInline
-            className="absolute left-0 top-0 z-0 h-full w-full object-cover opacity-0 dark:opacity-30"
-          >
-            <source
-              src="https://assets.mixkit.co/videos/preview/mixkit-business-people-working-in-an-office-4900-large.mp4"
-              type="video/mp4"
-            />
-          </video>
+        {/* Hero Section */}
+        <div className="relative flex min-h-[680px] items-center overflow-hidden bg-gradient-to-br from-primary-50 via-background to-secondary-50">
+          <div className="pointer-events-none absolute -left-24 top-16 h-64 w-64 rounded-full bg-primary-200/45 blur-3xl" />
+          <div className="pointer-events-none absolute right-10 top-10 h-36 w-36 rounded-full border border-primary-300/40" />
+          <div className="pointer-events-none absolute -bottom-20 right-1/4 h-72 w-72 rounded-full bg-secondary-200/40 blur-3xl" />
 
           <div className="container relative z-20 mx-auto px-4">
-            <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-12 lg:grid-cols-2 lg:items-stretch">
               <motion.div
                 initial="hidden"
                 animate="visible"
                 variants={fadeInUp}
+                className="h-full"
               >
-                <Card className="border-2 shadow-2xl">
-                  <CardContent className="p-8 md:p-10">
-                    <h1 className="mb-6 text-4xl font-bold leading-tight text-foreground md:text-5xl lg:text-6xl">
-                      Find Your Next Job in
+                <Card className="h-full border-2 shadow-2xl lg:min-h-[620px]">
+                  <CardContent className="flex h-full flex-col p-8 md:p-10">
+                    <h1 className="mb-4 text-3xl font-bold leading-tight text-foreground md:text-4xl lg:text-5xl">
+                      Find the Right Job in
                       <span className="block text-secondary-600">
-                        Ghana & Beyond
+                        Ghana & Beyond with Confidence
                       </span>
                     </h1>
-                    <p className="mb-8 text-xl leading-relaxed text-muted-foreground md:text-2xl">
-                      Ghana&apos;s leading job platform connecting talented
-                      professionals with great employers. Whether you&apos;re in
-                      Accra, Kumasi, or anywhere else, find opportunities that
-                      fit your skills and dreams.
+                    <p className="mb-8 text-lg leading-relaxed text-muted-foreground md:text-xl">
+                      A professional and trusted platform connecting skilled
+                      candidates to verified employers across Accra, Kumasi,
+                      Takoradi, and beyond.
                     </p>
+
+                    <form
+                      action="/jobs"
+                      method="get"
+                      className="mb-6 rounded-xl border bg-card p-3 shadow-sm"
+                    >
+                      <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+                        <label className="flex items-center rounded-lg border bg-background px-3">
+                          <MdSearch className="mr-2 h-5 w-5 text-muted-foreground" />
+                          <span className="sr-only">
+                            Search role or company
+                          </span>
+                          <Input
+                            name="q"
+                            placeholder="Job title, skill, or company"
+                            className="h-11 border-0 px-0 shadow-none focus-visible:ring-0"
+                          />
+                        </label>
+                        <label className="flex items-center rounded-lg border bg-background px-3">
+                          <MdLocationOn className="mr-2 h-5 w-5 text-muted-foreground" />
+                          <span className="sr-only">Search by location</span>
+                          <Input
+                            name="location"
+                            placeholder="City or region"
+                            className="h-11 border-0 px-0 shadow-none focus-visible:ring-0"
+                          />
+                        </label>
+                        <Button
+                          type="submit"
+                          size="lg"
+                          className="h-11 px-6 font-semibold"
+                        >
+                          Search
+                        </Button>
+                      </div>
+                    </form>
+
                     <div className="flex flex-col gap-4 sm:flex-row">
                       <Link href="/jobs">
                         <Button
@@ -180,6 +298,19 @@ export default function Home() {
                         </Button>
                       </Link>
                     </div>
+
+                    <div className="mt-5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                      <span>Popular:</span>
+                      {popularSearches.map((term) => (
+                        <Link
+                          key={term}
+                          href={`/jobs?q=${encodeURIComponent(term)}`}
+                          className="rounded-full border px-3 py-1 font-medium text-primary transition-colors hover:bg-primary/10"
+                        >
+                          {term}
+                        </Link>
+                      ))}
+                    </div>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -188,16 +319,20 @@ export default function Home() {
                 initial="hidden"
                 animate="visible"
                 variants={fadeInUp}
-                className="relative hidden lg:block"
+                className="relative hidden h-full lg:block"
               >
-                <Card className="overflow-hidden border-2 shadow-2xl">
-                  <Image
-                    src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=600&h=800&fit=crop"
-                    alt="Professional woman working on laptop"
-                    width={600}
-                    height={800}
-                    className="h-auto w-full object-cover"
-                  />
+                <Card className="h-full overflow-hidden border-2 shadow-2xl lg:min-h-[620px]">
+                  <div className="relative h-full min-h-[420px] lg:min-h-[620px]">
+                    <Image
+                      src="/images/Ladywithlaptop.jpg"
+                      alt="Professional woman using a laptop at work"
+                      fill
+                      className="object-cover"
+                    />
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-primary-900/45 via-primary-800/15 to-transparent" />
+                    <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-secondary-300/30 blur-2xl" />
+                    <div className="pointer-events-none absolute -left-8 bottom-8 h-28 w-28 rounded-full bg-primary-200/40 blur-xl" />
+                  </div>
                 </Card>
               </motion.div>
             </div>
@@ -230,55 +365,97 @@ export default function Home() {
               variants={staggerChildren}
               className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3"
             >
-              {featuredJobs.map((job) => (
-                <motion.div key={job.id} variants={fadeInUp}>
-                  <Card className="h-full transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
-                    <CardHeader>
-                      <div className="flex items-start gap-4">
-                        <Avatar className="h-16 w-16">
-                          <AvatarImage
-                            src={job.logo}
-                            alt={`${job.company} logo`}
-                          />
-                          <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                            {job.company.substring(0, 2).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <CardTitle className="text-xl mb-2">
-                            {job.title}
-                          </CardTitle>
-                          <CardDescription className="text-base font-medium">
-                            {job.company}
-                          </CardDescription>
+              {isJobsLoading ? (
+                [...Array(3)].map((_, idx) => (
+                  <motion.div key={`skeleton-${idx}`} variants={fadeInUp}>
+                    <Card className="h-full animate-pulse">
+                      <CardHeader>
+                        <div className="h-6 w-2/3 rounded bg-muted" />
+                        <div className="h-4 w-1/2 rounded bg-muted" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          <div className="h-4 w-3/4 rounded bg-muted" />
+                          <div className="h-4 w-2/3 rounded bg-muted" />
                         </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-3">
-                        <p className="flex items-center text-muted-foreground">
-                          <MdLocationOn className="mr-2 h-5 w-5 flex-shrink-0" />
-                          <span>{job.location}</span>
-                        </p>
-                        <p className="flex items-center text-muted-foreground">
-                          <MdAttachMoney className="mr-2 h-5 w-5 flex-shrink-0" />
-                          <span>{job.salary}/year</span>
-                        </p>
-                      </div>
-                    </CardContent>
-                    <CardFooter className="flex items-center justify-between">
-                      <Badge variant="secondary" className="text-sm">
-                        {job.type}
-                      </Badge>
-                      <Link href="/jobs">
-                        <Button size="sm" className="font-semibold">
-                          View Details
-                        </Button>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))
+              ) : featuredJobs.length > 0 ? (
+                featuredJobs.map((job) => (
+                  <motion.div key={job.id} variants={fadeInUp}>
+                    <Card className="h-full transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+                      <CardHeader>
+                        <div className="flex items-start gap-4">
+                          <Avatar className="h-16 w-16">
+                            <AvatarImage
+                              src={
+                                job.employer.logoUrl
+                                  ? formatImageUrl(job.employer.logoUrl)
+                                  : undefined
+                              }
+                              alt={`${job.employer.companyName} logo`}
+                            />
+                            <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                              {job.employer.companyName
+                                .substring(0, 2)
+                                .toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <CardTitle className="text-xl mb-2">
+                              {job.title}
+                            </CardTitle>
+                            <CardDescription className="text-base font-medium">
+                              {job.employer.companyName}
+                            </CardDescription>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="space-y-3">
+                          <p className="flex items-center text-muted-foreground">
+                            <MdLocationOn className="mr-2 h-5 w-5 flex-shrink-0" />
+                            <span>{job.location || "Ghana"}</span>
+                          </p>
+                          <p className="flex items-center text-muted-foreground">
+                            <MdAttachMoney className="mr-2 h-5 w-5 flex-shrink-0" />
+                            <span>{formatSalary(job)}</span>
+                          </p>
+                        </div>
+                      </CardContent>
+                      <CardFooter className="flex items-center justify-between">
+                        <Badge variant="secondary" className="text-sm">
+                          {formatJobType(job.jobType)}
+                        </Badge>
+                        <Link href="/jobs">
+                          <Button size="sm" className="font-semibold">
+                            View Jobs
+                          </Button>
+                        </Link>
+                      </CardFooter>
+                    </Card>
+                  </motion.div>
+                ))
+              ) : (
+                <motion.div variants={fadeInUp} className="lg:col-span-3">
+                  <Card className="border-dashed">
+                    <CardContent className="py-10 text-center">
+                      <h3 className="text-xl font-semibold text-foreground">
+                        No jobs available right now
+                      </h3>
+                      <p className="mt-2 text-muted-foreground">
+                        New opportunities are added frequently. Check back soon
+                        or browse all jobs.
+                      </p>
+                      <Link href="/jobs" className="mt-5 inline-block">
+                        <Button>View Jobs</Button>
                       </Link>
-                    </CardFooter>
+                    </CardContent>
                   </Card>
                 </motion.div>
-              ))}
+              )}
             </motion.div>
 
             <motion.div
@@ -521,42 +698,6 @@ export default function Home() {
                 </div>
               </motion.div>
             </div>
-
-            {/* Success Stats */}
-            <div className="mt-20 grid grid-cols-2 gap-8 text-center md:grid-cols-4">
-              <div>
-                <div className="mb-2 text-3xl font-bold text-primary md:text-4xl">
-                  50K+
-                </div>
-                <div className="font-medium text-muted-foreground">
-                  Global Opportunities
-                </div>
-              </div>
-              <div>
-                <div className="mb-2 text-3xl font-bold text-primary md:text-4xl">
-                  250K+
-                </div>
-                <div className="font-medium text-muted-foreground">
-                  Professionals Worldwide
-                </div>
-              </div>
-              <div>
-                <div className="mb-2 text-3xl font-bold text-primary md:text-4xl">
-                  10K+
-                </div>
-                <div className="font-medium text-muted-foreground">
-                  Leading Companies
-                </div>
-              </div>
-              <div>
-                <div className="mb-2 text-3xl font-bold text-primary md:text-4xl">
-                  98%
-                </div>
-                <div className="font-medium text-muted-foreground">
-                  Satisfaction Rate
-                </div>
-              </div>
-            </div>
           </div>
         </section>
 
@@ -585,8 +726,8 @@ export default function Home() {
               variants={staggerChildren}
               className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3"
             >
-              {testimonials.map((testimonial, index) => (
-                <motion.div key={index} variants={fadeInUp}>
+              {testimonials.map((testimonial) => (
+                <motion.div key={testimonial.name} variants={fadeInUp}>
                   <Card className="h-full transition-all duration-300 hover:shadow-xl">
                     <CardHeader>
                       <div className="flex items-center gap-4">
@@ -783,6 +924,9 @@ export default function Home() {
                     fill
                     className="object-cover"
                   />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-primary-900/55 via-primary-900/20 to-transparent" />
+                  <div className="pointer-events-none absolute left-8 top-8 h-20 w-20 rounded-full border border-white/35" />
+                  <div className="pointer-events-none absolute bottom-8 right-10 h-12 w-24 rounded-full bg-secondary-300/40 blur-sm" />
                 </div>
               </div>
             </Card>
@@ -818,23 +962,31 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="max-w-2xl mx-auto">
+              <form
+                className="max-w-2xl mx-auto"
+                action="/newsletter/subscribe"
+                method="post"
+              >
                 <div className="flex flex-col md:flex-row gap-3 items-stretch">
                   <div className="flex-1 relative">
                     <input
                       type="email"
+                      name="email"
+                      aria-label="Email address"
+                      autoComplete="email"
                       placeholder="Enter your email address"
                       className="w-full h-14 pl-4 pr-4 border border-border rounded-xl bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200 text-base"
                     />
                   </div>
                   <Button
+                    type="submit"
                     size="lg"
                     className="h-14 px-8 flex items-center justify-center gap-2 text-base font-semibold whitespace-nowrap md:min-w-[140px]"
                   >
                     <span>Subscribe</span>
                   </Button>
                 </div>
-              </div>
+              </form>
 
               <div className="mt-8 text-xs text-muted-foreground">
                 <p>We respect your privacy. Unsubscribe at any time.</p>
@@ -899,44 +1051,7 @@ export default function Home() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[
-                {
-                  category: "Technology",
-                  count: 45,
-                  description:
-                    "Software development, IT support, data science, and more",
-                },
-                {
-                  category: "Healthcare",
-                  count: 23,
-                  description:
-                    "Medical professionals, healthcare administration, nursing",
-                },
-                {
-                  category: "Finance",
-                  count: 18,
-                  description:
-                    "Banking, accounting, financial planning, investment",
-                },
-                {
-                  category: "Education",
-                  count: 31,
-                  description:
-                    "Teaching positions, educational administration, tutoring",
-                },
-                {
-                  category: "Marketing",
-                  count: 27,
-                  description:
-                    "Digital marketing, brand management, content creation",
-                },
-                {
-                  category: "Sales",
-                  count: 19,
-                  description:
-                    "Sales representatives, business development, account management",
-                },
-              ].map((cat) => (
+              {categoryJobs.map((cat) => (
                 <Link
                   key={cat.category}
                   href={`/jobs?category=${encodeURIComponent(cat.category)}`}
@@ -952,7 +1067,9 @@ export default function Home() {
                             {cat.category}
                           </h3>
                           <p className="text-sm text-muted-foreground">
-                            {cat.count} open positions
+                            {isJobsLoading
+                              ? "Loading positions..."
+                              : `${cat.count.toLocaleString()} open positions`}
                           </p>
                         </div>
                       </div>

@@ -5,6 +5,7 @@ import {
   deleteInterview,
 } from "../controllers/interviewController.js";
 import { authMiddleware, employerOnly } from "../middleware/auth.js";
+import { interviewMutationRateLimiter } from "../middleware/rateLimiter.js";
 
 const router = Router();
 
@@ -13,7 +14,12 @@ router.use(authMiddleware);
 
 // Interview management routes
 router.get("/:id", getInterview);
-router.put("/:id", employerOnly, updateInterview);
-router.delete("/:id", employerOnly, deleteInterview);
+router.put("/:id", employerOnly, interviewMutationRateLimiter, updateInterview);
+router.delete(
+  "/:id",
+  employerOnly,
+  interviewMutationRateLimiter,
+  deleteInterview,
+);
 
 export default router;

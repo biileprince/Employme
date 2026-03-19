@@ -8,19 +8,20 @@ import {
   deleteNewsletterSubscription,
   exportNewsletterEmails,
 } from "../controllers/newsletterController.js";
+import { newsletterRateLimiter } from "../middleware/rateLimiter.js";
 
 const router = Router();
 
 // Public routes
-router.post("/subscribe", subscribeNewsletter);
-router.post("/unsubscribe", unsubscribeNewsletter);
+router.post("/subscribe", newsletterRateLimiter, subscribeNewsletter);
+router.post("/unsubscribe", newsletterRateLimiter, unsubscribeNewsletter);
 
 // Admin-only routes
 router.get(
   "/subscriptions",
   authMiddleware,
   requireAdmin,
-  getNewsletterSubscriptions
+  getNewsletterSubscriptions,
 );
 
 router.get("/analytics", authMiddleware, requireAdmin, getNewsletterAnalytics);
@@ -29,7 +30,7 @@ router.delete(
   "/subscriptions/:id",
   authMiddleware,
   requireAdmin,
-  deleteNewsletterSubscription
+  deleteNewsletterSubscription,
 );
 
 router.get("/export", authMiddleware, requireAdmin, exportNewsletterEmails);

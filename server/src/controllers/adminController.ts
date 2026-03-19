@@ -6,6 +6,7 @@ import {
   sendJobDeactivationNotification,
 } from "../services/emailService.js";
 import { processPublishedJobAlerts } from "../services/jobAlertService.js";
+import { buildPaginationMeta, parsePagination } from "../utils/pagination.js";
 
 const prisma = new PrismaClient();
 
@@ -136,9 +137,12 @@ export const getAllUsers = catchAsync(
       throw new AppError("Access denied. Admin privileges required.", 403);
     }
 
-    const { page = 1, limit = 20, role, search } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
-    const take = Number(limit);
+    const { role, search } = req.query;
+    const { page, limit, skip, take } = parsePagination(req.query, {
+      defaultPage: 1,
+      defaultLimit: 20,
+      maxLimit: 100,
+    });
 
     const where: any = {};
 
@@ -154,7 +158,7 @@ export const getAllUsers = catchAsync(
       ];
     }
 
-    const [users, total] = await Promise.all([
+    const [users, totalCount] = await Promise.all([
       prisma.user.findMany({
         where,
         skip,
@@ -240,20 +244,17 @@ export const getAllUsers = catchAsync(
       prisma.user.count({ where }),
     ]);
 
-    const totalPages = Math.ceil(total / take);
+    const pagination = buildPaginationMeta({
+      page,
+      limit,
+      total: totalCount,
+    });
 
     res.status(200).json({
       success: true,
       data: {
         users,
-        pagination: {
-          page: Number(page),
-          limit: take,
-          total,
-          totalPages,
-          hasNext: Number(page) < totalPages,
-          hasPrev: Number(page) > 1,
-        },
+        pagination,
       },
     });
   },
@@ -461,11 +462,12 @@ export const getAllJobs = catchAsync(
       throw new AppError("Access denied. Admin privileges required.", 403);
     }
 
-    const { page = "1", limit = "10", isActive, search } = req.query;
-
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
-    const skip = (pageNum - 1) * limitNum;
+    const { isActive, search } = req.query;
+    const { page, limit, skip, take } = parsePagination(req.query, {
+      defaultPage: 1,
+      defaultLimit: 10,
+      maxLimit: 100,
+    });
 
     const where: any = {};
 
@@ -481,11 +483,11 @@ export const getAllJobs = catchAsync(
       ];
     }
 
-    const [jobs, totalJobs] = await Promise.all([
+    const [jobs, totalCount] = await Promise.all([
       prisma.job.findMany({
         where,
         skip,
-        take: limitNum,
+        take,
         orderBy: { createdAt: "desc" },
         include: {
           employer: {
@@ -499,18 +501,17 @@ export const getAllJobs = catchAsync(
       prisma.job.count({ where }),
     ]);
 
-    const totalPages = Math.ceil(totalJobs / limitNum);
+    const pagination = buildPaginationMeta({
+      page,
+      limit,
+      total: totalCount,
+    });
 
     res.status(200).json({
       success: true,
       data: {
         jobs,
-        pagination: {
-          page: pageNum,
-          limit: limitNum,
-          total: totalJobs,
-          pages: totalPages,
-        },
+        pagination,
       },
     });
   },
@@ -752,11 +753,12 @@ export const getAllApplications = catchAsync(
       throw new AppError("Access denied. Admin privileges required.", 403);
     }
 
-    const { page = "1", limit = "10", status, search } = req.query;
-
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
-    const skip = (pageNum - 1) * limitNum;
+    const { status, search } = req.query;
+    const { page, limit, skip, take } = parsePagination(req.query, {
+      defaultPage: 1,
+      defaultLimit: 10,
+      maxLimit: 100,
+    });
 
     const where: any = {};
 
@@ -784,11 +786,11 @@ export const getAllApplications = catchAsync(
       ];
     }
 
-    const [applications, totalApplications] = await Promise.all([
+    const [applications, totalCount] = await Promise.all([
       prisma.application.findMany({
         where,
         skip,
-        take: limitNum,
+        take,
         orderBy: { updatedAt: "desc" },
         include: {
           job: {
@@ -806,18 +808,17 @@ export const getAllApplications = catchAsync(
       prisma.application.count({ where }),
     ]);
 
-    const totalPages = Math.ceil(totalApplications / limitNum);
+    const pagination = buildPaginationMeta({
+      page,
+      limit,
+      total: totalCount,
+    });
 
     res.status(200).json({
       success: true,
       data: {
         applications,
-        pagination: {
-          page: pageNum,
-          limit: limitNum,
-          total: totalApplications,
-          pages: totalPages,
-        },
+        pagination,
       },
     });
   },
@@ -1036,11 +1037,12 @@ export const getAllEmployers = catchAsync(
       throw new AppError("Access denied. Admin privileges required.", 403);
     }
 
-    const { page = "1", limit = "10", verificationStatus = "all" } = req.query;
-
-    const pageNum = parseInt(page as string, 10);
-    const limitNum = parseInt(limit as string, 10);
-    const skip = (pageNum - 1) * limitNum;
+    const { verificationStatus = "all" } = req.query;
+    const { page, limit, skip } = parsePagination(req.query, {
+      defaultPage: 1,
+      defaultLimit: 10,
+      maxLimit: 100,
+    });
 
     // Build filter based on verification status
     const whereClause: any = {};
@@ -1055,7 +1057,7 @@ export const getAllEmployers = catchAsync(
       prisma.employer.findMany({
         where: whereClause,
         skip,
-        take: limitNum,
+        take: limit,
         include: {
           user: {
             select: {
@@ -1080,16 +1082,17 @@ export const getAllEmployers = catchAsync(
       prisma.employer.count({ where: whereClause }),
     ]);
 
+    const pagination = buildPaginationMeta({
+      page,
+      limit,
+      total,
+    });
+
     res.status(200).json({
       success: true,
       data: {
         employers,
-        pagination: {
-          total,
-          page: pageNum,
-          pages: Math.ceil(total / limitNum),
-          limit: limitNum,
-        },
+        pagination,
       },
     });
   },

@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { catchAsync, AppError } from "../middleware/errorHandler.js";
+import { buildPaginationMeta, parsePagination } from "../utils/pagination.js";
 
 const prisma = new PrismaClient();
 
@@ -289,9 +290,13 @@ export const getMyNotifications = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const userId = ensureJobSeeker(req);
 
-    const page = Number(req.query.page || 1);
-    const limit = Number(req.query.limit || 20);
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = parsePagination(
+      req.query as Record<string, unknown>,
+      {
+        defaultLimit: 20,
+        maxLimit: 100,
+      },
+    );
 
     const [notifications, total] = await Promise.all([
       prisma.notification.findMany({
@@ -308,12 +313,7 @@ export const getMyNotifications = catchAsync(
       data: {
         notifications,
         unreadCount: notifications.filter((item) => !item.isRead).length,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-        },
+        pagination: buildPaginationMeta({ page, limit, total }),
       },
     });
   },

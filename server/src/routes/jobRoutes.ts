@@ -12,6 +12,7 @@ import {
   requireEmployer,
   optionalAuth,
 } from "../middleware/auth.js";
+import { jobMutationRateLimiter } from "../middleware/rateLimiter.js";
 
 const router = Router();
 
@@ -25,8 +26,26 @@ router.get("/my-jobs", requireAuth, requireEmployer, getMyJobs);
 router.get("/:id", optionalAuth, getJobById);
 
 // More protected routes
-router.post("/", requireAuth, requireEmployer, createJob);
-router.put("/:id", requireAuth, requireEmployer, updateJob);
-router.delete("/:id", requireAuth, requireEmployer, deleteJob);
+router.post(
+  "/",
+  requireAuth,
+  requireEmployer,
+  jobMutationRateLimiter,
+  createJob,
+);
+router.put(
+  "/:id",
+  requireAuth,
+  requireEmployer,
+  jobMutationRateLimiter,
+  updateJob,
+);
+router.delete(
+  "/:id",
+  requireAuth,
+  requireEmployer,
+  jobMutationRateLimiter,
+  deleteJob,
+);
 
 export default router;

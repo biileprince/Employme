@@ -462,7 +462,10 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({
         newSocket.on(
           "new_conversation_started",
           (data: { conversation: Conversation }) => {
-            console.log("[Socket] New conversation started:", data.conversation);
+            console.log(
+              "[Socket] New conversation started:",
+              data.conversation,
+            );
             setConversations((prev) => {
               // Check if conversation already exists
               const exists = prev.some((c) => c.id === data.conversation.id);

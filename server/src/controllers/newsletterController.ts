@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { catchAsync, AppError } from "../middleware/errorHandler.js";
 import prisma from "../utils/database.js";
+import { parsePagination, buildPaginationMeta } from "../utils/pagination.js";
 
 // Subscribe to newsletter
 export const subscribeNewsletter = catchAsync(
@@ -118,12 +119,15 @@ export const unsubscribeNewsletter = catchAsync(
 // Get all newsletter subscriptions (Admin only)
 export const getNewsletterSubscriptions = catchAsync(
   async (req: Request, res: Response) => {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
+    const { page, limit, skip } = parsePagination(
+      req.query as Record<string, unknown>,
+      {
+        defaultLimit: 20,
+        maxLimit: 100,
+      },
+    );
     const status = req.query.status as string; // 'active', 'inactive', or 'all'
     const search = req.query.search as string;
-
-    const skip = (page - 1) * limit;
 
     // Build filter conditions
     const whereClause: any = {};
@@ -165,15 +169,16 @@ export const getNewsletterSubscriptions = catchAsync(
     const inactiveCount =
       stats.find((stat: any) => !stat.isActive)?._count.id || 0;
 
+    const pagination = buildPaginationMeta({ page, limit, total });
+
     res.status(200).json({
       success: true,
       data: {
         subscriptions,
         pagination: {
-          currentPage: page,
-          totalPages: Math.ceil(total / limit),
-          totalItems: total,
-          itemsPerPage: limit,
+          ...pagination,
+          currentPage: pagination.current,
+          itemsPerPage: pagination.limit,
         },
         stats: {
           active: activeCount,

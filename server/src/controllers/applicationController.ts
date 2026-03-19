@@ -8,6 +8,7 @@ import {
   sendInterviewScheduleNotification,
   sendApplicationStatusUpdateNotification,
 } from "../services/emailService.js";
+import { parsePagination, buildPaginationMeta } from "../utils/pagination.js";
 
 const prisma = new PrismaClient();
 
@@ -155,7 +156,7 @@ export const applyForJob = [
           employerName,
           job.title,
           applicantName,
-          job.employer.companyName
+          job.employer.companyName,
         );
       }
     } catch (error) {
@@ -179,7 +180,14 @@ export const getEmployerApplications = catchAsync(
       throw new AppError("User not authenticated", 401);
     }
 
-    const { status, page = 1, limit = 10 } = req.query;
+    const { status } = req.query;
+    const { page, limit, skip, take } = parsePagination(
+      req.query as Record<string, unknown>,
+      {
+        defaultLimit: 10,
+        maxLimit: 50,
+      },
+    );
 
     // Get employer profile
     const employer = await prisma.employer.findUnique({
@@ -192,20 +200,11 @@ export const getEmployerApplications = catchAsync(
         success: true,
         data: {
           applications: [],
-          pagination: {
-            current: 1,
-            total: 0,
-            totalItems: 0,
-            hasNext: false,
-            hasPrev: false,
-          },
+          pagination: buildPaginationMeta({ page, limit, total: 0 }),
         },
       });
       return;
     }
-
-    const skip = (Number(page) - 1) * Number(limit);
-    const take = Number(limit);
 
     // Build where clause
     const where: any = {
@@ -288,28 +287,29 @@ export const getEmployerApplications = catchAsync(
       prisma.application.count({ where }),
     ]);
 
-    const totalPages = Math.ceil(total / take);
+    const pagination = buildPaginationMeta({ page, limit, total });
 
     res.status(200).json({
       success: true,
       data: {
         applications,
-        pagination: {
-          current: Number(page),
-          total: totalPages,
-          totalItems: total,
-          hasNext: Number(page) < totalPages,
-          hasPrev: Number(page) > 1,
-        },
+        pagination,
       },
     });
-  }
+  },
 );
 
 export const getJobApplications = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const { jobId } = req.params;
-    const { status, page = 1, limit = 10 } = req.query;
+    const { status } = req.query;
+    const { page, limit, skip, take } = parsePagination(
+      req.query as Record<string, unknown>,
+      {
+        defaultLimit: 10,
+        maxLimit: 50,
+      },
+    );
 
     if (!jobId) {
       throw new AppError("Job ID is required", 400);
@@ -324,9 +324,6 @@ export const getJobApplications = catchAsync(
     if (!job) {
       throw new AppError("Job not found", 404);
     }
-
-    const skip = (Number(page) - 1) * Number(limit);
-    const take = Number(limit);
 
     const where: any = { jobId };
     if (status) {
@@ -397,7 +394,7 @@ export const getJobApplications = catchAsync(
         prisma.application.count({ where }),
       ]);
 
-      const totalPages = Math.ceil(total / take);
+      const pagination = buildPaginationMeta({ page, limit, total });
 
       res.status(200).json({
         success: true,
@@ -408,14 +405,7 @@ export const getJobApplications = catchAsync(
             title: job.title,
             applicationsCount: total,
           },
-          pagination: {
-            page: Number(page),
-            limit: take,
-            total,
-            totalPages,
-            hasNext: Number(page) < totalPages,
-            hasPrev: Number(page) > 1,
-          },
+          pagination,
         },
       });
     } catch (error) {
@@ -430,24 +420,24 @@ export const getJobApplications = catchAsync(
             title: job.title,
             applicationsCount: 0,
           },
-          pagination: {
-            page: Number(page),
-            limit: take,
-            total: 0,
-            totalPages: 0,
-            hasNext: false,
-            hasPrev: false,
-          },
+          pagination: buildPaginationMeta({ page, limit, total: 0 }),
         },
       });
     }
-  }
+  },
 );
 
 // Get job seeker's own applications
 export const getMyApplications = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
-    const { status, page = 1, limit = 10 } = req.query;
+    const { status } = req.query;
+    const { page, limit, skip, take } = parsePagination(
+      req.query as Record<string, unknown>,
+      {
+        defaultLimit: 10,
+        maxLimit: 50,
+      },
+    );
 
     const jobSeekerId = req.user?.profile?.id;
 
@@ -456,22 +446,12 @@ export const getMyApplications = catchAsync(
         success: true,
         data: {
           applications: [],
-          pagination: {
-            page: Number(page),
-            limit: Number(limit),
-            total: 0,
-            totalPages: 0,
-            hasNext: false,
-            hasPrev: false,
-          },
+          pagination: buildPaginationMeta({ page, limit, total: 0 }),
         },
         message: "Please complete your profile setup to view applications",
       });
       return;
     }
-
-    const skip = (Number(page) - 1) * Number(limit);
-    const take = Number(limit);
 
     const where: any = { jobSeekerId };
     if (status) {
@@ -513,23 +493,16 @@ export const getMyApplications = catchAsync(
       prisma.application.count({ where }),
     ]);
 
-    const totalPages = Math.ceil(total / take);
+    const pagination = buildPaginationMeta({ page, limit, total });
 
     res.status(200).json({
       success: true,
       data: {
         applications,
-        pagination: {
-          page: Number(page),
-          limit: take,
-          total,
-          totalPages,
-          hasNext: Number(page) < totalPages,
-          hasPrev: Number(page) > 1,
-        },
+        pagination,
       },
     });
-  }
+  },
 );
 
 // Update application status (employers only)
@@ -537,7 +510,7 @@ export const updateApplicationStatus = [
   body("status")
     .isIn(["PENDING", "REVIEWED", "SHORTLISTED", "HIRED", "REJECTED"])
     .withMessage(
-      "Invalid status value. Must be one of: PENDING, REVIEWED, SHORTLISTED, HIRED, REJECTED"
+      "Invalid status value. Must be one of: PENDING, REVIEWED, SHORTLISTED, HIRED, REJECTED",
     ),
   handleValidationErrors,
 
@@ -633,13 +606,13 @@ export const updateApplicationStatus = [
           application.job.employer.companyName,
           application.job.employer.user.email,
           status,
-          previousStatus
+          previousStatus,
         );
       }
     } catch (error) {
       console.error(
         "Failed to send application status update notification:",
-        error
+        error,
       );
       // Don't fail the status update if email sending fails
     }
@@ -710,7 +683,7 @@ export const getApplicationById = catchAsync(
       success: true,
       data: { application },
     });
-  }
+  },
 );
 
 // Schedule an interview for an application
@@ -823,7 +796,7 @@ export const scheduleInterview = [
           description || `Interview for ${application.job.title}`,
           location || (isVirtual ? "Virtual Meeting" : ""),
           isVirtual ?? true,
-          meetingLink
+          meetingLink,
         );
       }
     } catch (error) {
@@ -873,5 +846,5 @@ export const getApplicationInterviews = catchAsync(
       success: true,
       data: { interviews },
     });
-  }
+  },
 );

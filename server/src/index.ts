@@ -87,8 +87,7 @@ const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 500, // Increased from 100 to 500 for chat functionality
   message: "Too many requests from this IP, please try again later.",
-  skip: (req) =>
-    req.path.startsWith("/api/chat") || req.path === "/api/auth/socket-token", // Skip chat and socket token endpoint
+  skip: (req) => req.path === "/api/auth/socket-token", // Socket token can be requested during reconnects
 });
 app.use(limiter);
 
@@ -349,7 +348,8 @@ io.on("connection", (socket) => {
             ? conversation.participant2Id
             : conversation.participant1Id;
 
-        const isReceiverParticipant1 = conversation.participant1Id === receiverId;
+        const isReceiverParticipant1 =
+          conversation.participant1Id === receiverId;
         const wasDeletedByReceiver = isReceiverParticipant1
           ? conversation.deletedByParticipant1
           : conversation.deletedByParticipant2;
@@ -366,7 +366,7 @@ io.on("connection", (socket) => {
 
           // Undelete the conversation
           updatedConversation = await prisma.conversation.update({
-            where: { id: conversationId },
+            where: { id: data.conversationId },
             data: {
               deletedByParticipant1: false,
               deletedByParticipant2: false,
@@ -417,6 +417,18 @@ io.on("connection", (socket) => {
                       profileImageUrl: true,
                     },
                   },
+                },
+              },
+              messages: {
+                orderBy: { createdAt: "desc" },
+                take: 1,
+                select: {
+                  id: true,
+                  content: true,
+                  createdAt: true,
+                  isRead: true,
+                  senderId: true,
+                  isDeleted: true,
                 },
               },
             },

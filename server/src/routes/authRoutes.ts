@@ -26,13 +26,19 @@ import {
   validateRegistration,
   validateLogin,
 } from "../middleware/validation.js";
+import {
+  signupRateLimiter,
+  loginRateLimiter,
+  passwordResetRateLimiter,
+  emailVerificationRateLimiter,
+} from "../middleware/rateLimiter.js";
 import passport from "../middleware/passport.js";
 
 const router = express.Router();
 
 // Public routes
-router.post("/register", validateRegistration, register);
-router.post("/login", validateLogin, login);
+router.post("/register", signupRateLimiter, validateRegistration, register);
+router.post("/login", loginRateLimiter, validateLogin, login);
 router.post("/refresh", refreshToken);
 router.post(
   "/logout",
@@ -43,10 +49,14 @@ router.post(
   },
   logout,
 );
-router.post("/forgot-password", requestPasswordReset);
-router.post("/reset-password", resetPassword);
-router.post("/verify-email", verifyEmail);
-router.post("/resend-verification", resendVerificationEmail);
+router.post("/forgot-password", passwordResetRateLimiter, requestPasswordReset);
+router.post("/reset-password", passwordResetRateLimiter, resetPassword);
+router.post("/verify-email", emailVerificationRateLimiter, verifyEmail);
+router.post(
+  "/resend-verification",
+  emailVerificationRateLimiter,
+  resendVerificationEmail,
+);
 router.post("/complete-social-auth", completeSocialAuthRegistration);
 
 // Social Authentication Routes

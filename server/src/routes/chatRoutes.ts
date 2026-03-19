@@ -12,6 +12,10 @@ import {
   deleteMessage,
 } from "../controllers/chatController.js";
 import { authMiddleware } from "../middleware/auth.js";
+import {
+  chatMessageRateLimiter,
+  chatMutationRateLimiter,
+} from "../middleware/rateLimiter.js";
 
 const router = express.Router();
 
@@ -34,21 +38,38 @@ router.get("/conversations/:participantId", getOrCreateConversation);
 router.get("/conversations/:conversationId/messages", getMessages);
 
 // Send a message in a conversation
-router.post("/conversations/:conversationId/messages", sendMessage);
+router.post(
+  "/conversations/:conversationId/messages",
+  chatMessageRateLimiter,
+  sendMessage,
+);
 
 // Edit a message
-router.patch("/conversations/:conversationId/messages/:messageId", editMessage);
+router.patch(
+  "/conversations/:conversationId/messages/:messageId",
+  chatMutationRateLimiter,
+  editMessage,
+);
 
 // Delete a message
 router.delete(
   "/conversations/:conversationId/messages/:messageId",
-  deleteMessage
+  chatMutationRateLimiter,
+  deleteMessage,
 );
 
 // Mark messages as read in a conversation
-router.patch("/conversations/:conversationId/read", markAsRead);
+router.patch(
+  "/conversations/:conversationId/read",
+  chatMutationRateLimiter,
+  markAsRead,
+);
 
 // Delete a conversation
-router.delete("/conversations/:conversationId", deleteConversation);
+router.delete(
+  "/conversations/:conversationId",
+  chatMutationRateLimiter,
+  deleteConversation,
+);
 
 export default router;
