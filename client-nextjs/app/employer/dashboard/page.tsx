@@ -1,4 +1,6 @@
-import DashboardContent, { DashboardProps } from "@/components/employer/DashboardContent";
+import DashboardContent, {
+  DashboardProps,
+} from "@/components/employer/DashboardContent";
 import { serverFetch } from "@/lib/server-api";
 import { redirect } from "next/navigation";
 
@@ -28,8 +30,20 @@ export default async function EmployerDashboardPage() {
   let recentJobs: RecentJob[] = [];
   let recentApplications: DashboardProps["recentApplications"] = [];
 
+  // Check authentication first
+  const authResponse = await serverFetch<{
+    user: { firstName: string; role: string };
+  }>("/auth/me", {
+    next: { revalidate: 0 },
+  });
+
+  // Redirect on auth failure or wrong role
+  if (!authResponse.success || authResponse.data?.user?.role !== "EMPLOYER") {
+    redirect("/auth/login");
+  }
+
   try {
-    // Both fetches can run concurrently
+    // Both fetches can run concurrently after confirming authentication
     const [jobsResponse, applicationsResponse] = await Promise.all([
       serverFetch<{ jobs: RecentJob[] }>("/jobs/my-jobs", {
         next: { tags: ["employer-jobs"], revalidate: 0 }, // no cache or short cache for dashboard
@@ -42,29 +56,40 @@ export default async function EmployerDashboardPage() {
     // Handle Jobs
     if (jobsResponse.success && jobsResponse.data?.jobs) {
       const jobs = jobsResponse.data.jobs;
-      
+
       stats.totalJobs = jobs.length;
       stats.activeJobs = jobs.filter((job) => job.isActive).length;
-      
+
       recentJobs = [...jobs]
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        )
         .slice(0, 5);
-        
+
       stats.totalApplications = jobs.reduce(
-        (sum, job) => sum + (job._count?.applications || job.applicationsCount || 0),
-        0
+        (sum, job) =>
+          sum + (job._count?.applications || job.applicationsCount || 0),
+        0,
       );
     }
 
     // Handle Applications
-    if (applicationsResponse.success && applicationsResponse.data?.applications) {
+    if (
+      applicationsResponse.success &&
+      applicationsResponse.data?.applications
+    ) {
       const applications = applicationsResponse.data.applications;
-      
-      stats.pendingApplications = applications.filter((app) => app.status === "PENDING").length;
-      
+
+      stats.pendingApplications = applications.filter(
+        (app) => app.status === "PENDING",
+      ).length;
+
       recentApplications = applications.slice(0, 5).map((app) => {
-        const firstName = app.jobSeeker?.firstName || app.jobSeeker?.user?.firstName || "";
-        const lastName = app.jobSeeker?.lastName || app.jobSeeker?.user?.lastName || "";
+        const firstName =
+          app.jobSeeker?.firstName || app.jobSeeker?.user?.firstName || "";
+        const lastName =
+          app.jobSeeker?.lastName || app.jobSeeker?.user?.lastName || "";
         const fullName = `${firstName} ${lastName}`.trim();
 
         return {
@@ -76,19 +101,16 @@ export default async function EmployerDashboardPage() {
         };
       });
     }
-
   } catch (error: any) {
-    if (error.message?.includes("401") || error.message?.includes("403")) {
-      redirect("/auth/login");
-    }
     console.error("Failed to fetch dashboard data:", error);
+    // Don't throw, just log - the dashboard will render with default values
   }
 
   return (
-    <DashboardContent 
-      stats={stats} 
-      recentJobs={recentJobs} 
-      recentApplications={recentApplications} 
+    <DashboardContent
+      stats={stats}
+      recentJobs={recentJobs}
+      recentApplications={recentApplications}
     />
   );
 }
