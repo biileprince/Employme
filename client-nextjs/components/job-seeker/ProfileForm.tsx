@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import {
@@ -23,6 +25,10 @@ import { uploadProfileImage, uploadResume } from "@/app/actions/upload";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { PhoneInput } from "@/components/ui/PhoneInput";
+import {
+  jobSeekerProfileSchema,
+  type JobSeekerProfileInput,
+} from "@/lib/validations";
 
 interface LocationResult {
   place_id: number;
@@ -73,11 +79,8 @@ export default function JobSeekerProfileForm({
   userImageUrl,
 }: JobSeekerProfileFormProps) {
   const { refreshUser } = useAuth();
-  const [profile, setProfile] = useState<JobSeekerProfile | null>(
-    initialProfile,
-  );
+  const [profile, setProfile] = useState<JobSeekerProfile | null>(initialProfile);
   const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [skillInput, setSkillInput] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -92,24 +95,41 @@ export default function JobSeekerProfileForm({
   const profileImageInputRef = useRef<HTMLInputElement>(null);
   const resumeInputRef = useRef<HTMLInputElement>(null);
 
-  // Form state
-  const [formData, setFormData] = useState({
-    firstName: initialProfile?.firstName || "",
-    lastName: initialProfile?.lastName || "",
-    dateOfBirth: initialProfile?.dateOfBirth
-      ? new Date(initialProfile.dateOfBirth).toISOString().split("T")[0]
-      : "",
-    location: initialProfile?.location || "",
-    bio: initialProfile?.bio || "",
-    skills: initialProfile?.skills || [],
-    experience: initialProfile?.experience || "",
-    education: initialProfile?.education || "",
-    phone: initialProfile?.phone || "",
-    countryCode: initialProfile?.countryCode || "+233",
-    isProfilePublic: initialProfile?.isProfilePublic ?? true,
-    cvUrl: initialProfile?.cvUrl || "",
-    profileImageUrl: initialProfile?.profileImageUrl || userImageUrl || "",
+  // React Hook Form setup with Zod validation
+  const form = useForm<JobSeekerProfileInput>({
+    resolver: zodResolver(jobSeekerProfileSchema),
+    defaultValues: {
+      firstName: initialProfile?.firstName || "",
+      lastName: initialProfile?.lastName || "",
+      dateOfBirth: initialProfile?.dateOfBirth
+        ? new Date(initialProfile.dateOfBirth).toISOString().split("T")[0]
+        : "",
+      location: initialProfile?.location || "",
+      bio: initialProfile?.bio || "",
+      skills: initialProfile?.skills || [],
+      experience: (initialProfile?.experience as any) || "",
+      education: (initialProfile?.education as any) || "",
+      phone: initialProfile?.phone || "",
+      countryCode: initialProfile?.countryCode || "+233",
+      isProfilePublic: initialProfile?.isProfilePublic ?? true,
+      cvUrl: initialProfile?.cvUrl || "",
+      profileImageUrl: initialProfile?.profileImageUrl || userImageUrl || "",
+    },
+    mode: "onChange", // Validate on change for better UX
   });
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setValue,
+    watch,
+    reset,
+    control,
+  } = form;
+
+  // Watch values for dynamic updates
+  const watchedFields = watch();
 
   // Location search functionality
   const searchLocations = async (query: string) => {
@@ -117,11 +137,7 @@ export default function JobSeekerProfileForm({
 
     setIsSearchingLocation(true);
     try {
-      const url = `${
-        LOCATION_API_CONFIG.baseUrl
-      }?format=json&q=${encodeURIComponent(query)}&countrycodes=${
-        LOCATION_API_CONFIG.countryCodes
-      }&limit=${LOCATION_API_CONFIG.limit}&addressdetails=1`;
+      const url = `${LOCATION_API_CONFIG.baseUrl}?format=json&q=${encodeURIComponent(query)}&countrycodes=${LOCATION_API_CONFIG.countryCodes}&limit=${LOCATION_API_CONFIG.limit}&addressdetails=1`;
 
       const response = await fetch(url);
       const data: LocationResult[] = await response.json();
@@ -146,15 +162,9 @@ export default function JobSeekerProfileForm({
     return () => clearTimeout(timeoutId);
   }, [locationSearch]);
 
-  const handleLocationSearchChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    setLocationSearch(e.target.value);
-  };
-
   const selectLocation = (location: LocationResult) => {
     const cityName = location.display_name.split(",")[0].trim();
-    setFormData((prev) => ({ ...prev, location: cityName }));
+    setValue("location", cityName);
     setLocationSearch(cityName);
     setShowLocationDropdown(false);
   };
@@ -173,7 +183,7 @@ export default function JobSeekerProfileForm({
 
       if (result.success && result.imageUrl) {
         const imageUrl = formatImageUrl(result.imageUrl);
-        setFormData((prev) => ({ ...prev, profileImageUrl: imageUrl }));
+        setValue("profileImageUrl", imageUrl);
         setProfile((prev) =>
           prev ? { ...prev, profileImageUrl: imageUrl } : prev,
         );
@@ -197,7 +207,7 @@ export default function JobSeekerProfileForm({
       const result = await uploadResume(uploadFormData);
 
       if (result.success && result.attachment) {
-        setFormData((prev) => ({ ...prev, cvUrl: result.attachment!.url }));
+        setValue("cvUrl", result.attachment.url);
         setProfile((prev) =>
           prev
             ? {
@@ -224,73 +234,53 @@ export default function JobSeekerProfileForm({
     }
   };
 
-  const handleInputChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >,
-  ) => {
-    const { name, value, type } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]:
-        type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
-    }));
-  };
-
-  const handlePhoneChange = (phone: string, countryCode: string) => {
-    setFormData((prev) => ({ ...prev, phone, countryCode }));
-  };
-
   const addSkill = () => {
-    if (skillInput.trim() && !formData.skills.includes(skillInput.trim())) {
-      setFormData((prev) => ({
-        ...prev,
-        skills: [...prev.skills, skillInput.trim()],
-      }));
+    const currentSkills = watchedFields.skills || [];
+    if (skillInput.trim() && !currentSkills.includes(skillInput.trim())) {
+      setValue("skills", [...currentSkills, skillInput.trim()]);
       setSkillInput("");
     }
   };
 
   const removeSkill = (skill: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      skills: prev.skills.filter((s) => s !== skill),
-    }));
+    const currentSkills = watchedFields.skills || [];
+    setValue("skills", currentSkills.filter((s) => s !== skill));
   };
 
-  const handleSave = async () => {
-    setIsSaving(true);
+  const onSubmit = async (data: JobSeekerProfileInput) => {
     setError("");
     setSuccess("");
 
     try {
-      const result = await updateJobSeekerProfile({
-        ...formData,
-        dateOfBirth: formData.dateOfBirth || null,
-      });
+      const result = await updateJobSeekerProfile(data);
 
       if (result.success) {
         await refreshUser();
         setSuccess("Profile updated successfully!");
         setIsEditing(false);
+        // Update local profile state
+        setProfile(prev => prev ? { ...prev, ...data } : null);
       } else {
-        throw new Error(result.error || "Failed to update profile");
+        if (result.fieldErrors) {
+          // Set field errors in the form
+          Object.entries(result.fieldErrors).forEach(([field, message]) => {
+            form.setError(field as keyof JobSeekerProfileInput, {
+              type: "server",
+              message,
+            });
+          });
+        }
+        setError(result.error || "Failed to update profile");
       }
     } catch (error) {
       console.error("Failed to update profile:", error);
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Failed to update profile. Please try again.",
-      );
-    } finally {
-      setIsSaving(false);
+      setError("Failed to update profile. Please try again.");
     }
   };
 
   const handleCancel = () => {
     if (profile) {
-      setFormData({
+      reset({
         firstName: profile.firstName || "",
         lastName: profile.lastName || "",
         dateOfBirth: profile.dateOfBirth
@@ -299,8 +289,8 @@ export default function JobSeekerProfileForm({
         location: profile.location || "",
         bio: profile.bio || "",
         skills: profile.skills || [],
-        experience: profile.experience || "",
-        education: profile.education || "",
+        experience: (profile.experience as any) || "",
+        education: (profile.education as any) || "",
         phone: profile.phone || "",
         countryCode: profile.countryCode || "+233",
         isProfilePublic: profile.isProfilePublic ?? true,
@@ -363,29 +353,64 @@ export default function JobSeekerProfileForm({
         </div>
       )}
 
-      {/* Basic Information */}
-      <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
-        <h3 className="text-xl font-semibold text-foreground mb-6">
-          Basic Information
-        </h3>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        {/* Basic Information */}
+        <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
+          <h3 className="text-xl font-semibold text-foreground mb-6">
+            Basic Information
+          </h3>
 
-        {/* Profile Image Upload */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-foreground mb-2">
-            Profile Image
-          </label>
-          {isEditing ? (
-            <div className="space-y-3">
+          {/* Profile Image Upload */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Profile Image
+            </label>
+            {isEditing ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-4">
+                  {(watchedFields.profileImageUrl ||
+                    profile?.profileImageUrl ||
+                    userImageUrl) && (
+                    <Image
+                      src={formatImageUrl(
+                        watchedFields.profileImageUrl ||
+                          profile?.profileImageUrl ||
+                          userImageUrl ||
+                          "",
+                      )}
+                      alt="Profile"
+                      width={80}
+                      height={80}
+                      className="w-20 h-20 object-cover rounded-full border border-border"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                  )}
+                </div>
+                <input
+                  ref={profileImageInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleProfileImageUpload}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => profileImageInputRef.current?.click()}
+                  className="gap-2"
+                >
+                  <MdUpload className="w-4 h-4" />
+                  Upload Profile Image
+                </Button>
+              </div>
+            ) : (
               <div className="flex items-center gap-4">
-                {(formData.profileImageUrl ||
-                  profile?.profileImageUrl ||
-                  userImageUrl) && (
+                {profile?.profileImageUrl || userImageUrl ? (
                   <Image
                     src={formatImageUrl(
-                      formData.profileImageUrl ||
-                        profile?.profileImageUrl ||
-                        userImageUrl ||
-                        "",
+                      profile?.profileImageUrl || userImageUrl || "",
                     )}
                     alt="Profile"
                     width={80}
@@ -395,262 +420,277 @@ export default function JobSeekerProfileForm({
                       (e.target as HTMLImageElement).style.display = "none";
                     }}
                   />
+                ) : (
+                  <p className="text-muted-foreground">No profile image</p>
                 )}
               </div>
-              <input
-                ref={profileImageInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleProfileImageUpload}
-                className="hidden"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => profileImageInputRef.current?.click()}
-                className="gap-2"
-              >
-                <MdUpload className="w-4 h-4" />
-                Upload Profile Image
-              </Button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-4">
-              {profile?.profileImageUrl || userImageUrl ? (
-                <Image
-                  src={formatImageUrl(
-                    profile?.profileImageUrl || userImageUrl || "",
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                First Name <span className="text-red-500">*</span>
+              </label>
+              {isEditing ? (
+                <>
+                  <input
+                    {...register("firstName")}
+                    type="text"
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-background text-foreground ${
+                      errors.firstName ? "border-red-500" : "border-border"
+                    }`}
+                  />
+                  {errors.firstName && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.firstName.message}
+                    </p>
                   )}
-                  alt="Profile"
-                  width={80}
-                  height={80}
-                  className="w-20 h-20 object-cover rounded-full border border-border"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = "none";
-                  }}
-                />
+                </>
               ) : (
-                <p className="text-muted-foreground">No profile image</p>
+                <p className="text-muted-foreground">{profile?.firstName}</p>
               )}
             </div>
-          )}
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1">
-              First Name <span className="text-red-500">*</span>
-            </label>
-            {isEditing ? (
-              <input
-                type="text"
-                name="firstName"
-                value={formData.firstName}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-background text-foreground"
-                required
-              />
-            ) : (
-              <p className="text-muted-foreground">{profile?.firstName}</p>
-            )}
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1">
-              Last Name <span className="text-red-500">*</span>
-            </label>
-            {isEditing ? (
-              <input
-                type="text"
-                name="lastName"
-                value={formData.lastName}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-background text-foreground"
-                required
-              />
-            ) : (
-              <p className="text-muted-foreground">{profile?.lastName}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-foreground mb-1 flex items-center gap-2">
-              <MdEmail className="w-4 h-4" />
-              Email
-            </label>
-            <p className="text-muted-foreground">{userEmail}</p>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-foreground mb-1 flex items-center gap-2">
-              <MdPhone className="w-4 h-4" />
-              Phone Number
-            </label>
-            {isEditing ? (
-              <PhoneInput
-                phoneNumber={formData.phone}
-                countryCode={formData.countryCode}
-                onPhoneNumberChange={(phone) =>
-                  setFormData((prev) => ({ ...prev, phone }))
-                }
-                onCountryCodeChange={(countryCode) =>
-                  setFormData((prev) => ({ ...prev, countryCode }))
-                }
-              />
-            ) : (
-              <p className="text-muted-foreground">
-                {profile?.countryCode} {profile?.phone || "Not provided"}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1">
-              Date of Birth
-            </label>
-            {isEditing ? (
-              <input
-                type="date"
-                name="dateOfBirth"
-                value={formData.dateOfBirth}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-background text-foreground"
-              />
-            ) : (
-              <p className="text-muted-foreground">
-                {profile?.dateOfBirth
-                  ? new Date(profile.dateOfBirth).toLocaleDateString()
-                  : "Not provided"}
-              </p>
-            )}
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="text-sm font-medium text-foreground mb-1 flex items-center gap-2">
-              <MdLocationOn className="w-4 h-4" />
-              Location
-            </label>
-            {isEditing ? (
-              <div className="relative">
-                <div className="relative">
-                  <MdLocationOn className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                Last Name <span className="text-red-500">*</span>
+              </label>
+              {isEditing ? (
+                <>
                   <input
+                    {...register("lastName")}
                     type="text"
-                    value={locationSearch}
-                    onChange={handleLocationSearchChange}
-                    onFocus={() => {
-                      if (!locationSearch) {
-                        setLocationSearch(formData.location);
-                      }
-                    }}
-                    onBlur={() => {
-                      if (!locationSearch) {
-                        setFormData({ ...formData, location: "" });
-                      }
-                    }}
-                    placeholder="Type to search for city or location..."
-                    className="w-full pl-10 pr-12 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-background text-foreground"
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-background text-foreground ${
+                      errors.lastName ? "border-red-500" : "border-border"
+                    }`}
                   />
-                  {locationSearch && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLocationSearch("");
-                        setFormData({ ...formData, location: "" });
-                        setShowLocationDropdown(false);
-                      }}
-                      className="absolute right-8 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      ✕
-                    </button>
+                  {errors.lastName && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.lastName.message}
+                    </p>
                   )}
-                  {isSearchingLocation && (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                </>
+              ) : (
+                <p className="text-muted-foreground">{profile?.lastName}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1 flex items-center gap-2">
+                <MdEmail className="w-4 h-4" />
+                Email
+              </label>
+              <p className="text-muted-foreground">{userEmail}</p>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1 flex items-center gap-2">
+                <MdPhone className="w-4 h-4" />
+                Phone Number
+              </label>
+              {isEditing ? (
+                <Controller
+                  name="phone"
+                  control={control}
+                  render={({ field: { value, onChange } }) => (
+                    <>
+                      <PhoneInput
+                        phoneNumber={value || ""}
+                        countryCode={watchedFields.countryCode || "+233"}
+                        onPhoneNumberChange={onChange}
+                        onCountryCodeChange={(countryCode) =>
+                          setValue("countryCode", countryCode)
+                        }
+                      />
+                      {errors.phone && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.phone.message}
+                        </p>
+                      )}
+                    </>
+                  )}
+                />
+              ) : (
+                <p className="text-muted-foreground">
+                  {profile?.countryCode} {profile?.phone || "Not provided"}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                Date of Birth
+              </label>
+              {isEditing ? (
+                <>
+                  <input
+                    {...register("dateOfBirth")}
+                    type="date"
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-background text-foreground ${
+                      errors.dateOfBirth ? "border-red-500" : "border-border"
+                    }`}
+                  />
+                  {errors.dateOfBirth && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.dateOfBirth.message}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-muted-foreground">
+                  {profile?.dateOfBirth
+                    ? new Date(profile.dateOfBirth).toLocaleDateString()
+                    : "Not provided"}
+                </p>
+              )}
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="text-sm font-medium text-foreground mb-1 flex items-center gap-2">
+                <MdLocationOn className="w-4 h-4" />
+                Location
+              </label>
+              {isEditing ? (
+                <div className="relative">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={locationSearch}
+                      onChange={(e) => setLocationSearch(e.target.value)}
+                      onFocus={() => {
+                        if (!locationSearch) {
+                          setLocationSearch(watchedFields.location || "");
+                        }
+                      }}
+                      placeholder="Type to search for city or location..."
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-background text-foreground ${
+                        errors.location ? "border-red-500" : "border-border"
+                      }`}
+                    />
+                    {isSearchingLocation && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Location Dropdown */}
+                  {showLocationDropdown && locationResults.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {locationResults.map((location) => (
+                        <button
+                          key={location.place_id}
+                          type="button"
+                          onClick={() => selectLocation(location)}
+                          className="w-full text-left px-4 py-3 hover:bg-muted focus:bg-muted focus:outline-none border-b border-border last:border-b-0"
+                        >
+                          <div className="flex items-center">
+                            <MdLocationOn className="w-4 h-4 text-primary mr-2 shrink-0" />
+                            <span className="text-foreground text-sm truncate">
+                              {location.display_name.split(",")[0].trim()}
+                            </span>
+                          </div>
+                        </button>
+                      ))}
                     </div>
                   )}
+                  {errors.location && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.location.message}
+                    </p>
+                  )}
                 </div>
-
-                {/* Location Dropdown */}
-                {showLocationDropdown && locationResults.length > 0 && (
-                  <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {locationResults.map((location) => (
-                      <button
-                        key={location.place_id}
-                        onClick={() => selectLocation(location)}
-                        className="w-full text-left px-4 py-3 hover:bg-muted focus:bg-muted focus:outline-none border-b border-border last:border-b-0"
-                      >
-                        <div className="flex items-center">
-                          <MdLocationOn className="w-4 h-4 text-primary mr-2 shrink-0" />
-                          <span className="text-foreground text-sm truncate">
-                            {location.display_name.split(",")[0].trim()}
-                          </span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-muted-foreground py-3">
-                {profile?.location || "Not provided"}
-              </p>
-            )}
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-foreground mb-2">
-              CV/Resume
-            </label>
-            {isEditing ? (
-              <div className="space-y-3">
-                <input
-                  ref={resumeInputRef}
-                  type="file"
-                  accept=".pdf,.doc,.docx"
-                  onChange={handleResumeUpload}
-                  className="hidden"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => resumeInputRef.current?.click()}
-                  className="gap-2"
-                >
-                  <MdUpload className="w-4 h-4" />
-                  Upload CV/Resume
-                </Button>
-                <p className="text-xs text-muted-foreground">
-                  Upload your CV or Resume (.pdf, .doc, .docx, max 10MB)
+              ) : (
+                <p className="text-muted-foreground py-3">
+                  {profile?.location || "Not provided"}
                 </p>
-              </div>
-            ) : (
-              <div className="text-foreground">
-                {profile?.resumeAttachments &&
-                profile.resumeAttachments.length > 0 ? (
-                  profile.resumeAttachments.map((attachment) => (
-                    <div
-                      key={attachment.id}
-                      className="border border-border rounded-lg p-4 bg-background hover:bg-muted transition-colors"
-                    >
+              )}
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
+                CV/Resume
+              </label>
+              {isEditing ? (
+                <div className="space-y-3">
+                  <input
+                    ref={resumeInputRef}
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    onChange={handleResumeUpload}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => resumeInputRef.current?.click()}
+                    className="gap-2"
+                  >
+                    <MdUpload className="w-4 h-4" />
+                    Upload CV/Resume
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    Upload your CV or Resume (.pdf, .doc, .docx, max 10MB)
+                  </p>
+                </div>
+              ) : (
+                <div className="text-foreground">
+                  {profile?.resumeAttachments &&
+                  profile.resumeAttachments.length > 0 ? (
+                    profile.resumeAttachments.map((attachment) => (
+                      <div
+                        key={attachment.id}
+                        className="border border-border rounded-lg p-4 bg-background hover:bg-muted transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            {attachment.fileType.includes("pdf") ? (
+                              <MdPictureAsPdf className="w-8 h-8 text-red-600" />
+                            ) : (
+                              <MdDescription className="w-8 h-8 text-blue-600" />
+                            )}
+                            <div>
+                              <p className="font-medium text-foreground">
+                                {attachment.filename}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {(attachment.fileSize / 1024 / 1024).toFixed(2)} MB
+                              </p>
+                            </div>
+                          </div>
+                          <a
+                            href={formatImageUrl(attachment.url)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center space-x-1 text-primary hover:text-primary/80 font-medium"
+                          >
+                            <span>View</span>
+                            <MdOpenInNew className="w-4 h-4" />
+                          </a>
+                        </div>
+                      </div>
+                    ))
+                  ) : profile?.cvUrl ? (
+                    <div className="border border-border rounded-lg p-4 bg-background hover:bg-muted transition-colors">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
-                          {attachment.fileType.includes("pdf") ? (
+                          {profile.cvUrl.toLowerCase().includes(".pdf") ? (
                             <MdPictureAsPdf className="w-8 h-8 text-red-600" />
                           ) : (
                             <MdDescription className="w-8 h-8 text-blue-600" />
                           )}
                           <div>
-                            <p className="font-medium text-foreground">
-                              {attachment.filename}
-                            </p>
+                            <p className="font-medium text-foreground">CV/Resume</p>
                             <p className="text-sm text-muted-foreground">
-                              {(attachment.fileSize / 1024 / 1024).toFixed(2)}{" "}
-                              MB
+                              {profile.cvUrl.toLowerCase().includes(".pdf")
+                                ? "PDF Document"
+                                : "Document"}
                             </p>
                           </div>
                         </div>
                         <a
-                          href={formatImageUrl(attachment.url)}
+                          href={formatImageUrl(profile.cvUrl)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center space-x-1 text-primary hover:text-primary/80 font-medium"
@@ -660,314 +700,277 @@ export default function JobSeekerProfileForm({
                         </a>
                       </div>
                     </div>
-                  ))
-                ) : profile?.cvUrl ? (
-                  <div className="border border-border rounded-lg p-4 bg-background hover:bg-muted transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        {profile.cvUrl.toLowerCase().includes(".pdf") ? (
-                          <MdPictureAsPdf className="w-8 h-8 text-red-600" />
-                        ) : (
-                          <MdDescription className="w-8 h-8 text-blue-600" />
-                        )}
-                        <div>
-                          <p className="font-medium text-foreground">
-                            CV/Resume
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {profile.cvUrl.toLowerCase().includes(".pdf")
-                              ? "PDF Document"
-                              : "Document"}
-                          </p>
-                        </div>
-                      </div>
-                      <a
-                        href={formatImageUrl(profile.cvUrl)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center space-x-1 text-primary hover:text-primary/80 font-medium"
-                      >
-                        <span>View</span>
-                        <MdOpenInNew className="w-4 h-4" />
-                      </a>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground italic py-3">
-                    No resume uploaded
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Professional Information */}
-      <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
-        <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-          <MdWork className="w-5 h-5 text-primary" />
-          Professional Information
-        </h3>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
-              Experience Level
-            </label>
-            {isEditing ? (
-              <select
-                name="experience"
-                value={formData.experience}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-background text-foreground"
-              >
-                <option value="">Select experience level</option>
-                <option value="ENTRY_LEVEL">Entry Level (0-2 years)</option>
-                <option value="MID_LEVEL">Mid Level (2-5 years)</option>
-                <option value="SENIOR_LEVEL">Senior Level (5+ years)</option>
-                <option value="EXECUTIVE">Executive (Leadership)</option>
-              </select>
-            ) : (
-              <p className="text-foreground py-3">
-                {profile?.experience || "Not provided"}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
-              Education
-            </label>
-            {isEditing ? (
-              <select
-                name="education"
-                value={formData.education}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-background text-foreground"
-              >
-                <option value="">Select Education Level</option>
-                <option value="HIGH_SCHOOL">High School</option>
-                <option value="DIPLOMA">Diploma</option>
-                <option value="BACHELOR">Bachelor&apos;s Degree</option>
-                <option value="MASTER">Master&apos;s Degree</option>
-                <option value="PHD">PhD/Doctorate</option>
-                <option value="PROFESSIONAL">Professional Certificate</option>
-                <option value="OTHER">Other</option>
-              </select>
-            ) : (
-              <p className="text-foreground py-3">
-                {formData.education
-                  ? formData.education
-                      .replace("_", " ")
-                      .replace(/\b\w/g, (l) => l.toUpperCase())
-                  : profile?.education || "Not provided"}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-foreground mb-1 flex items-center gap-2">
-              <MdDescription className="w-4 h-4" />
-              Bio
-            </label>
-            {isEditing ? (
-              <textarea
-                name="bio"
-                value={formData.bio}
-                onChange={handleInputChange}
-                rows={4}
-                placeholder="Tell employers about yourself..."
-                className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-background text-foreground resize-none"
-              />
-            ) : (
-              <div className="bg-muted rounded-lg p-4 min-h-[100px]">
-                <p className="text-foreground whitespace-pre-wrap">
-                  {profile?.bio || "No bio provided"}
-                </p>
-              </div>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1">
-              Skills
-            </label>
-            {isEditing ? (
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={skillInput}
-                    onChange={(e) => setSkillInput(e.target.value)}
-                    onKeyPress={(e) =>
-                      e.key === "Enter" && (e.preventDefault(), addSkill())
-                    }
-                    placeholder="Add a skill..."
-                    className="flex-1 px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-background text-foreground"
-                  />
-                  <Button type="button" onClick={addSkill}>
-                    Add
-                  </Button>
+                  ) : (
+                    <p className="text-muted-foreground italic py-3">
+                      No resume uploaded
+                    </p>
+                  )}
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {formData.skills.map((skill, index) => (
-                    <span
-                      key={index}
-                      className="inline-flex items-center gap-1 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm"
-                    >
-                      {skill}
-                      <button
-                        type="button"
-                        onClick={() => removeSkill(skill)}
-                        className="hover:text-red-500"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {profile?.skills && profile.skills.length > 0 ? (
-                  profile.skills.map((skill, index) => (
-                    <span
-                      key={index}
-                      className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm"
-                    >
-                      {skill}
-                    </span>
-                  ))
-                ) : (
-                  <p className="text-muted-foreground">No skills added</p>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Education */}
-      <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
-        <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-          <MdSchool className="w-5 h-5 text-primary" />
-          Education
-        </h3>
-        {isEditing ? (
-          <textarea
-            name="education"
-            value={formData.education}
-            onChange={handleInputChange}
-            rows={3}
-            placeholder="e.g., BSc Computer Science - University of Ghana"
-            className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-background text-foreground resize-none"
-          />
-        ) : (
-          <p className="text-muted-foreground whitespace-pre-wrap">
-            {profile?.education || "Not provided"}
-          </p>
-        )}
-      </div>
-
-      {/* Privacy Settings */}
-      <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
-        <h3 className="text-lg font-semibold text-foreground mb-4">
-          Privacy Settings
-        </h3>
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <p className="text-sm font-medium text-foreground mb-1">
-              Public Profile
-            </p>
-            <p className="text-sm text-muted-foreground">
-              When enabled, employers can find and view your profile through
-              candidate searches. This increases your visibility and job
-              opportunities.
-            </p>
-            <div className="mt-2 text-xs text-muted-foreground space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="w-1 h-1 bg-muted-foreground rounded-full"></span>
-                <span>Visible information: Name, skills, experience, bio</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-1 h-1 bg-muted-foreground rounded-full"></span>
-                <span>
-                  Contact details are only shared after you apply to jobs
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-1 h-1 bg-muted-foreground rounded-full"></span>
-                <span>You can change this setting anytime</span>
-              </div>
+              )}
             </div>
           </div>
-          <div className="ml-4 shrink-0">
-            {isEditing ? (
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="isProfilePublic"
-                  checked={formData.isProfilePublic}
-                  onChange={handleInputChange}
-                  className="sr-only peer"
-                />
-                <div className="relative w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+        </div>
+
+        {/* Professional Information */}
+        <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
+          <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+            <MdWork className="w-5 h-5 text-primary" />
+            Professional Information
+          </h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Experience Level
               </label>
-            ) : (
-              <span
-                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                  profile?.isProfilePublic
-                    ? "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400 border border-green-200 dark:border-green-800"
-                    : "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-400 border border-gray-200 dark:border-gray-600"
-                }`}
-              >
-                {profile?.isProfilePublic ? "Public" : "Private"}
-              </span>
-            )}
+              {isEditing ? (
+                <>
+                  <select
+                    {...register("experience")}
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-background text-foreground ${
+                      errors.experience ? "border-red-500" : "border-border"
+                    }`}
+                  >
+                    <option value="">Select experience level</option>
+                    <option value="ENTRY_LEVEL">Entry Level (0-2 years)</option>
+                    <option value="MID_LEVEL">Mid Level (2-5 years)</option>
+                    <option value="SENIOR_LEVEL">Senior Level (5+ years)</option>
+                    <option value="EXECUTIVE">Executive (Leadership)</option>
+                  </select>
+                  {errors.experience && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.experience.message}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-foreground py-3">
+                  {profile?.experience || "Not provided"}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Education
+              </label>
+              {isEditing ? (
+                <>
+                  <select
+                    {...register("education")}
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-background text-foreground ${
+                      errors.education ? "border-red-500" : "border-border"
+                    }`}
+                  >
+                    <option value="">Select Education Level</option>
+                    <option value="HIGH_SCHOOL">High School</option>
+                    <option value="DIPLOMA">Diploma</option>
+                    <option value="BACHELOR">Bachelor's Degree</option>
+                    <option value="MASTER">Master's Degree</option>
+                    <option value="PHD">PhD/Doctorate</option>
+                    <option value="PROFESSIONAL">Professional Certificate</option>
+                    <option value="OTHER">Other</option>
+                  </select>
+                  {errors.education && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.education.message}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-foreground py-3">
+                  {watchedFields.education
+                    ? watchedFields.education
+                        .replace("_", " ")
+                        .replace(/\b\w/g, (l) => l.toUpperCase())
+                    : profile?.education || "Not provided"}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1 flex items-center gap-2">
+                <MdDescription className="w-4 h-4" />
+                Bio
+              </label>
+              {isEditing ? (
+                <>
+                  <textarea
+                    {...register("bio")}
+                    rows={4}
+                    placeholder="Tell employers about yourself..."
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-background text-foreground resize-none ${
+                      errors.bio ? "border-red-500" : "border-border"
+                    }`}
+                  />
+                  {errors.bio && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.bio.message}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <div className="bg-muted rounded-lg p-4 min-h-[100px]">
+                  <p className="text-foreground whitespace-pre-wrap">
+                    {profile?.bio || "No bio provided"}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                Skills
+              </label>
+              {isEditing ? (
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={skillInput}
+                      onChange={(e) => setSkillInput(e.target.value)}
+                      onKeyPress={(e) =>
+                        e.key === "Enter" && (e.preventDefault(), addSkill())
+                      }
+                      placeholder="Add a skill..."
+                      className="flex-1 px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-background text-foreground"
+                    />
+                    <Button type="button" onClick={addSkill}>
+                      Add
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(watchedFields.skills || []).map((skill, index) => (
+                      <span
+                        key={index}
+                        className="inline-flex items-center gap-1 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm"
+                      >
+                        {skill}
+                        <button
+                          type="button"
+                          onClick={() => removeSkill(skill)}
+                          className="hover:text-red-500"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  {errors.skills && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.skills.message}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {profile?.skills && profile.skills.length > 0 ? (
+                    profile.skills.map((skill, index) => (
+                      <span
+                        key={index}
+                        className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm"
+                      >
+                        {skill}
+                      </span>
+                    ))
+                  ) : (
+                    <p className="text-muted-foreground">No skills added</p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Action Buttons - At the bottom */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        className="flex justify-center pt-4 pb-8"
-      >
-        {!isEditing ? (
-          <Button
-            onClick={() => setIsEditing(true)}
-            className="gap-2 min-w-[160px]"
-            size="lg"
-          >
-            <MdEdit className="w-5 h-5" />
-            Edit Profile
-          </Button>
-        ) : (
-          <div className="flex gap-4">
+        {/* Privacy Settings */}
+        <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
+          <h3 className="text-lg font-semibold text-foreground mb-4">
+            Privacy Settings
+          </h3>
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <p className="text-sm font-medium text-foreground mb-1">
+                Public Profile
+              </p>
+              <p className="text-sm text-muted-foreground">
+                When enabled, employers can find and view your profile through
+                candidate searches. This increases your visibility and job opportunities.
+              </p>
+            </div>
+            <div className="ml-4 shrink-0">
+              {isEditing ? (
+                <Controller
+                  name="isProfilePublic"
+                  control={control}
+                  render={({ field: { value, onChange } }) => (
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={value}
+                        onChange={onChange}
+                        className="sr-only peer"
+                      />
+                      <div className="relative w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  )}
+                />
+              ) : (
+                <span
+                  className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                    profile?.isProfilePublic
+                      ? "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400 border border-green-200 dark:border-green-800"
+                      : "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-400 border border-gray-200 dark:border-gray-600"
+                  }`}
+                >
+                  {profile?.isProfilePublic ? "Public" : "Private"}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="flex justify-center pt-4 pb-8"
+        >
+          {!isEditing ? (
             <Button
-              variant="outline"
-              onClick={handleCancel}
-              disabled={isSaving}
-              className="gap-2 min-w-[120px]"
-              size="lg"
-            >
-              <MdCancel className="w-5 h-5" />
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={isSaving}
+              type="button"
+              onClick={() => setIsEditing(true)}
               className="gap-2 min-w-[160px]"
               size="lg"
             >
-              <MdSave className="w-5 h-5" />
-              {isSaving ? "Saving..." : "Save Changes"}
+              <MdEdit className="w-5 h-5" />
+              Edit Profile
             </Button>
-          </div>
-        )}
-      </motion.div>
+          ) : (
+            <div className="flex gap-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCancel}
+                disabled={isSubmitting}
+                className="gap-2 min-w-[120px]"
+                size="lg"
+              >
+                <MdCancel className="w-5 h-5" />
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="gap-2 min-w-[160px]"
+                size="lg"
+              >
+                <MdSave className="w-5 h-5" />
+                {isSubmitting ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          )}
+        </motion.div>
+      </form>
     </motion.div>
   );
 }

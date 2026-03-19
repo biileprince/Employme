@@ -1,10 +1,13 @@
 "use client";
 
 import React, { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuth } from "@/contexts/AuthContext";
 import type { UserRole } from "@/types/auth";
 import { SocialLogin } from "./SocialLogin";
 import { Button } from "@/components/ui/button";
+import { signupSchema, type SignupInput } from "@/lib/validations";
 
 interface RegisterFormProps {
   role: UserRole;
@@ -17,53 +20,47 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
   onSwitchToLogin,
   onRegistrationSuccess,
 }) => {
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-    confirmPassword: "",
-    firstName: "",
-    lastName: "",
-    role: role,
-  });
   const [error, setError] = useState("");
-  const { register, isLoading } = useAuth();
+  const { register: authRegister, isLoading } = useAuth();
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
+  // React Hook Form setup with Zod validation
+  const form = useForm<SignupInput>({
+    resolver: zodResolver(signupSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+      confirmPassword: "",
+      firstName: "",
+      lastName: "",
+      role: role,
+    },
+    mode: "onChange", // Validate on change for better UX
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = form;
+
+  const onSubmit = async (data: SignupInput) => {
     setError("");
 
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters long");
-      return;
-    }
-
     try {
-      await register(
-        formData.email,
-        formData.password,
-        formData.firstName,
-        formData.lastName,
-        formData.role
+      await authRegister(
+        data.email,
+        data.password,
+        data.firstName,
+        data.lastName,
+        data.role,
       );
-      onRegistrationSuccess(formData.email);
+      onRegistrationSuccess(data.email);
     } catch (err) {
       setError((err as Error).message || "Registration failed");
     }
   };
+
+  const isFormLoading = isLoading || isSubmitting;
 
   return (
     <div className="w-full max-w-md space-y-6">
@@ -76,113 +73,188 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {/* General Error */}
         {error && (
-          <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-700">
+          <div className="rounded-md border border-red-200 bg-red-50 dark:bg-red-950/30 dark:border-red-800 px-4 py-3 text-red-700 dark:text-red-400">
             {error}
           </div>
         )}
 
+        {/* Name Fields */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label
               htmlFor="firstName"
               className="mb-1 block text-sm font-medium text-foreground"
             >
-              First Name
+              First Name <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               id="firstName"
-              name="firstName"
-              value={formData.firstName}
-              onChange={handleChange}
-              required
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+              {...register("firstName")}
+              className={`w-full rounded-md border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary ${
+                errors.firstName
+                  ? "border-red-500 focus:border-red-500"
+                  : "border-border focus:border-primary"
+              }`}
+              disabled={isFormLoading}
             />
+            {errors.firstName && (
+              <p className="mt-1 text-sm text-red-500">
+                {errors.firstName.message}
+              </p>
+            )}
           </div>
+
           <div>
             <label
               htmlFor="lastName"
               className="mb-1 block text-sm font-medium text-foreground"
             >
-              Last Name
+              Last Name <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               id="lastName"
-              name="lastName"
-              value={formData.lastName}
-              onChange={handleChange}
-              required
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+              {...register("lastName")}
+              className={`w-full rounded-md border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary ${
+                errors.lastName
+                  ? "border-red-500 focus:border-red-500"
+                  : "border-border focus:border-primary"
+              }`}
+              disabled={isFormLoading}
             />
+            {errors.lastName && (
+              <p className="mt-1 text-sm text-red-500">
+                {errors.lastName.message}
+              </p>
+            )}
           </div>
         </div>
 
+        {/* Email Field */}
         <div>
           <label
             htmlFor="email"
             className="mb-1 block text-sm font-medium text-foreground"
           >
-            Email
+            Email address <span className="text-red-500">*</span>
           </label>
           <input
             type="email"
             id="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            required
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+            {...register("email")}
+            className={`w-full rounded-md border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary ${
+              errors.email
+                ? "border-red-500 focus:border-red-500"
+                : "border-border focus:border-primary"
+            }`}
+            placeholder="Enter your email"
+            disabled={isFormLoading}
           />
+          {errors.email && (
+            <p className="mt-1 text-sm text-red-500">{errors.email.message}</p>
+          )}
         </div>
 
+        {/* Password Field */}
         <div>
           <label
             htmlFor="password"
             className="mb-1 block text-sm font-medium text-foreground"
           >
-            Password
+            Password <span className="text-red-500">*</span>
           </label>
           <input
             type="password"
             id="password"
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-            required
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
-            minLength={6}
+            {...register("password")}
+            className={`w-full rounded-md border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary ${
+              errors.password
+                ? "border-red-500 focus:border-red-500"
+                : "border-border focus:border-primary"
+            }`}
+            placeholder="Create a strong password"
+            disabled={isFormLoading}
           />
+          {errors.password && (
+            <p className="mt-1 text-sm text-red-500">
+              {errors.password.message}
+            </p>
+          )}
+          <p className="mt-1 text-xs text-muted-foreground">
+            Must be at least 8 characters with uppercase, lowercase, and numbers
+          </p>
         </div>
 
+        {/* Confirm Password Field */}
         <div>
           <label
             htmlFor="confirmPassword"
             className="mb-1 block text-sm font-medium text-foreground"
           >
-            Confirm Password
+            Confirm Password <span className="text-red-500">*</span>
           </label>
           <input
             type="password"
             id="confirmPassword"
-            name="confirmPassword"
-            value={formData.confirmPassword}
-            onChange={handleChange}
-            required
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
-            minLength={6}
+            {...register("confirmPassword")}
+            className={`w-full rounded-md border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary ${
+              errors.confirmPassword
+                ? "border-red-500 focus:border-red-500"
+                : "border-border focus:border-primary"
+            }`}
+            placeholder="Confirm your password"
+            disabled={isFormLoading}
           />
+          {errors.confirmPassword && (
+            <p className="mt-1 text-sm text-red-500">
+              {errors.confirmPassword.message}
+            </p>
+          )}
         </div>
 
-        <Button type="submit" disabled={isLoading} className="w-full" size="lg">
-          {isLoading ? "Creating Account..." : "Create Account"}
+        {/* Hidden Role Field */}
+        <input type="hidden" {...register("role")} value={role} />
+
+        {/* Submit Button */}
+        <Button
+          type="submit"
+          disabled={isFormLoading}
+          className="w-full"
+          size="lg"
+        >
+          {isFormLoading ? (
+            <div className="flex items-center gap-2">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+              <span>Creating Account...</span>
+            </div>
+          ) : (
+            "Create Account"
+          )}
         </Button>
       </form>
 
+      {/* Divider */}
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t border-border" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-background px-2 text-muted-foreground">
+            Or continue with
+          </span>
+        </div>
+      </div>
+
       {/* Social Login Options */}
-      <SocialLogin text="Sign up with" selectedRole={role} />
+      <SocialLogin
+        text="Sign up with"
+        selectedRole={role}
+        disabled={isFormLoading}
+      />
 
       <div className="text-center">
         <p className="text-sm text-muted-foreground">
@@ -190,7 +262,8 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
           <button
             type="button"
             onClick={onSwitchToLogin}
-            className="font-medium text-primary hover:text-primary/80"
+            className="font-medium text-primary hover:text-primary/80 disabled:opacity-50"
+            disabled={isFormLoading}
           >
             Sign in
           </button>
