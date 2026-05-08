@@ -11,14 +11,16 @@ import { Header } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
 import { apiClient } from "@/lib/api";
 import type { UserRole, User } from "@/types/auth";
+import type { SignupInput } from "@/lib/validations";
 import Image from "next/image";
 
 type SignupStep = "role-selection" | "register" | "verify-email";
+type SignupRole = SignupInput["role"];
 
 function SignupContent() {
   const searchParams = useSearchParams();
   const [currentStep, setCurrentStep] = useState<SignupStep>("role-selection");
-  const [selectedRole, setSelectedRole] = useState<UserRole | undefined>();
+  const [selectedRole, setSelectedRole] = useState<SignupRole | undefined>();
   const [pendingEmail, setPendingEmail] = useState<string>("");
   const [isSocialAuth, setIsSocialAuth] = useState(false);
   const [socialEmail, setSocialEmail] = useState<string>("");
@@ -26,7 +28,7 @@ function SignupContent() {
   const router = useRouter();
 
   const completeSocialRegistration = useCallback(
-    async (role: UserRole, email: string) => {
+    async (role: SignupRole, email: string) => {
       try {
         const response = await apiClient.post<{ user: User }>(
           "/auth/complete-social-auth",
@@ -58,11 +60,11 @@ function SignupContent() {
     const email = searchParams.get("email");
 
     if (step === "role-selection" && social === "true" && email) {
-      const storedRole = localStorage.getItem(
-        "pending_social_auth_role"
-      ) as UserRole;
+      const storedRole = localStorage.getItem("pending_social_auth_role");
+      const isSignupRole = (value: string | null): value is SignupRole =>
+        value === "JOB_SEEKER" || value === "EMPLOYER";
 
-      if (storedRole) {
+      if (isSignupRole(storedRole)) {
         // Use setTimeout to avoid setState during render
         setTimeout(() => {
           completeSocialRegistration(storedRole, email);
@@ -105,7 +107,7 @@ function SignupContent() {
     }
   }, [user, router]);
 
-  const handleRoleSelect = async (role: UserRole) => {
+  const handleRoleSelect = async (role: SignupRole) => {
     setSelectedRole(role);
 
     if (isSocialAuth && socialEmail) {

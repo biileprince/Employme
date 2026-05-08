@@ -4,13 +4,14 @@ import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuth } from "@/contexts/AuthContext";
-import type { UserRole } from "@/types/auth";
 import { SocialLogin } from "./SocialLogin";
 import { Button } from "@/components/ui/button";
 import { signupSchema, type SignupInput } from "@/lib/validations";
 
+type SignupRole = SignupInput["role"];
+
 interface RegisterFormProps {
-  role: UserRole;
+  role: SignupRole;
   onSwitchToLogin: () => void;
   onRegistrationSuccess: (email: string) => void;
 }

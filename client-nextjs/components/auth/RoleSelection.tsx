@@ -2,11 +2,13 @@
 
 import { motion } from "framer-motion";
 import { HiBriefcase, HiUserGroup, HiArrowRight } from "react-icons/hi";
-import type { UserRole } from "@/types/auth";
+import type { SignupInput } from "@/lib/validations";
+
+type SignupRole = SignupInput["role"];
 
 interface RoleSelectionProps {
-  onRoleSelect: (role: UserRole) => void;
-  selectedRole?: UserRole;
+  onRoleSelect: (role: SignupRole) => void;
+  selectedRole?: SignupRole;
 }
 
 export const RoleSelection: React.FC<RoleSelectionProps> = ({
