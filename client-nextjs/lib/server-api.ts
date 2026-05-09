@@ -1,7 +1,19 @@
 import { cookies, headers } from "next/headers";
 import type { ApiResponse } from "@/lib/api";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api";
+const API_URL = process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api";
+
+// For server-side fetches, we need an absolute URL
+const getAbsoluteUrl = (endpoint: string) => {
+  if (API_URL.startsWith("http")) {
+    return `${API_URL}${endpoint}`;
+  }
+  
+  // If API_URL is a relative path (like '/api' for proxying), we MUST use the backend URL for server-side fetches
+  // because Node.js fetch() requires absolute URLs.
+  const backendUrl = process.env.BACKEND_API_URL || "https://employme-e4d1ca106e85.herokuapp.com/api";
+  return `${backendUrl}${endpoint}`;
+};
 
 /**
  * Server-side fetch that properly forwards authentication cookies
@@ -27,7 +39,7 @@ export async function serverFetch<T>(
     credentials: "include", // Important for cross-origin cookie forwarding
   };
 
-  const url = `${API_URL}${endpoint}`;
+  const url = getAbsoluteUrl(endpoint);
 
   try {
     const response = await fetch(url, options);

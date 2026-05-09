@@ -253,6 +253,10 @@ export const login = catchAsync(
           hasProfile,
           profile: user.jobSeeker || user.employer || user.admin || null,
         },
+        tokens: {
+          accessToken: generateAccessToken(user.id),
+          refreshToken: generateRefreshToken(user.id),
+        }
       },
     });
   }
