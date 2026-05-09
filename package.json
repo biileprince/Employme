@@ -7,6 +7,6 @@
   },
   "scripts": {
     "heroku-postbuild": "cd server && npm install --include=dev && npx prisma generate && npm run build && npm prune --production",
-    "start": "cd server && npm start"
+    "start": "cd server && npx prisma migrate deploy && npm start"
   }
 }
