@@ -97,3 +97,5 @@ export default async function JobSeekerDashboardPage() {
     />
   );
 }
+
+export const dynamic = "force-dynamic";

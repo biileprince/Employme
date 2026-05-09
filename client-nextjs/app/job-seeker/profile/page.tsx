@@ -2,6 +2,8 @@ import { serverFetch } from "@/lib/server-api";
 import { redirect } from "next/navigation";
 import JobSeekerProfileForm from "@/components/job-seeker/ProfileForm";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "My Profile | Employ.me",
   description: "Manage your professional profile and information",

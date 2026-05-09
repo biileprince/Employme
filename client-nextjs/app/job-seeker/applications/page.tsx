@@ -84,3 +84,5 @@ export default async function MyApplicationsPage() {
     <ApplicationsContent initialApplications={applicationsWithInterviews} />
   );
 }
+
+export const dynamic = "force-dynamic";

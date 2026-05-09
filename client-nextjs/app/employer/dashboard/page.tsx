@@ -114,3 +114,5 @@ export default async function EmployerDashboardPage() {
     />
   );
 }
+
+export const dynamic = "force-dynamic";

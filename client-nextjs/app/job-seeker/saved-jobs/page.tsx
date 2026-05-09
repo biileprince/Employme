@@ -38,3 +38,5 @@ export default async function SavedJobsPage() {
 
   return <SavedJobsContent initialJobs={savedJobs} />;
 }
+
+export const dynamic = "force-dynamic";

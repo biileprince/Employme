@@ -72,3 +72,5 @@ export default async function EmployerApplicationsPage() {
     <ApplicationsContent initialApplications={applicationsWithInterviews} />
   );
 }
+
+export const dynamic = "force-dynamic";

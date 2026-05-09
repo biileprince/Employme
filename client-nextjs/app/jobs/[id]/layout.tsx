@@ -53,3 +53,5 @@ export default function JobLayout({
 }) {
   return <>{children}</>;
 }
+
+export const dynamic = "force-dynamic";

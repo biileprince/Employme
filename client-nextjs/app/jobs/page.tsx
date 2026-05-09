@@ -73,3 +73,5 @@ export default async function JobsPage({
     </Suspense>
   );
 }
+
+export const dynamic = "force-dynamic";
