@@ -6,7 +6,15 @@ import { revalidateTag } from "next/cache";
 import { serverFetch } from "@/lib/server-api";
 import { documentFileSchema, jobApplicationSchema } from "@/lib/validations";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api";
+const API_URL = process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api";
+
+const getAbsoluteUrl = (endpoint: string) => {
+  if (API_URL.startsWith("http")) {
+    return `${API_URL}${endpoint}`;
+  }
+  const backendUrl = process.env.BACKEND_API_URL || "https://employme-e4d1ca106e85.herokuapp.com/api";
+  return `${backendUrl}${endpoint}`;
+};
 
 // File validation constants
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -97,7 +105,7 @@ async function uploadAttachments(
     headers["Cookie"] = cookieHeader;
   }
 
-  const response = await fetch(`${API_URL}/attachments/upload`, {
+  const response = await fetch(getAbsoluteUrl('/attachments/upload'), {
     method: "POST",
     headers,
     body: formData,
