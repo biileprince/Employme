@@ -5,6 +5,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
 import Image from "next/image";
+import { z } from "zod";
 import {
   MdEdit,
   MdSave,
@@ -29,6 +30,8 @@ import {
   jobSeekerProfileSchema,
   type JobSeekerProfileInput,
 } from "@/lib/validations";
+
+type JobSeekerProfileFormValues = z.input<typeof jobSeekerProfileSchema>;
 
 interface LocationResult {
   place_id: number;
@@ -96,7 +99,7 @@ export default function JobSeekerProfileForm({
   const resumeInputRef = useRef<HTMLInputElement>(null);
 
   // React Hook Form setup with Zod validation
-  const form = useForm<JobSeekerProfileInput>({
+  const form = useForm<JobSeekerProfileFormValues>({
     resolver: zodResolver(jobSeekerProfileSchema),
     defaultValues: {
       firstName: initialProfile?.firstName || "",
@@ -247,7 +250,7 @@ export default function JobSeekerProfileForm({
     setValue("skills", currentSkills.filter((s) => s !== skill));
   };
 
-  const onSubmit = async (data: JobSeekerProfileInput) => {
+  const onSubmit = async (data: JobSeekerProfileFormValues) => {
     setError("");
     setSuccess("");
 

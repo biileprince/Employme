@@ -60,8 +60,8 @@ export const signupSchema = z
     confirmPassword: z.string().min(1, "Please confirm your password"),
     firstName: safeString(1, 100),
     lastName: safeString(1, 100),
-    role: z.enum(["JOB_SEEKER", "EMPLOYER"], {
-      errorMap: () => ({ message: "Please select a valid role" }),
+    role: z.enum(["JOB_SEEKER", "EMPLOYER"] as const, {
+      message: "Please select a valid role",
     }),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -175,12 +175,12 @@ export const jobPostingSchema = z.object({
   responsibilities: safeString(20, 5000).optional().nullable(),
   location: safeString(2, 200),
   jobType: z.enum(
-    ["FULL_TIME", "PART_TIME", "CONTRACT", "INTERNSHIP", "REMOTE"],
-    { errorMap: () => ({ message: "Please select a valid job type" }) },
+    ["FULL_TIME", "PART_TIME", "CONTRACT", "INTERNSHIP", "REMOTE"] as const,
+    { message: "Please select a valid job type" },
   ),
   experienceLevel: z.enum(
-    ["ENTRY_LEVEL", "MID_LEVEL", "SENIOR_LEVEL", "EXECUTIVE"],
-    { errorMap: () => ({ message: "Please select experience level" }) },
+    ["ENTRY_LEVEL", "MID_LEVEL", "SENIOR_LEVEL", "EXECUTIVE"] as const,
+    { message: "Please select experience level" },
   ),
   industry: safeString(1, 100),
   salaryMin: z
@@ -272,8 +272,15 @@ export const documentFileSchema = z.object({
 export const applicationStatusSchema = z.object({
   applicationId: z.string().min(1, "Application ID is required").max(100),
   status: z.enum(
-    ["PENDING", "REVIEWING", "SHORTLISTED", "INTERVIEW", "OFFERED", "REJECTED"],
-    { errorMap: () => ({ message: "Invalid status" }) },
+    [
+      "PENDING",
+      "REVIEWING",
+      "SHORTLISTED",
+      "INTERVIEW",
+      "OFFERED",
+      "REJECTED",
+    ] as const,
+    { message: "Invalid status" },
   ),
 });
 
@@ -296,8 +303,8 @@ export const interviewSchema = z.object({
     .number()
     .min(15, "Minimum duration is 15 minutes")
     .max(480, "Maximum duration is 8 hours"),
-  type: z.enum(["IN_PERSON", "PHONE", "VIDEO"], {
-    errorMap: () => ({ message: "Invalid interview type" }),
+  type: z.enum(["IN_PERSON", "PHONE", "VIDEO"] as const, {
+    message: "Invalid interview type",
   }),
   location: safeString(0, 500).optional().nullable(),
   notes: safeString(0, 2000).optional().nullable(),
@@ -347,7 +354,7 @@ export function validateData<T>(
   }
 
   const errors: Record<string, string> = {};
-  result.error.errors.forEach((err) => {
+  result.error.issues.forEach((err) => {
     const path = err.path.join(".");
     if (!errors[path]) {
       errors[path] = err.message;
@@ -362,7 +369,7 @@ export function validateData<T>(
  */
 export function formatZodErrors(error: z.ZodError): Record<string, string> {
   const errors: Record<string, string> = {};
-  error.errors.forEach((err) => {
+  error.issues.forEach((err) => {
     const path = err.path.join(".");
     if (!errors[path]) {
       errors[path] = err.message;
