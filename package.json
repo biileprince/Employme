@@ -1,0 +1,12 @@
+{
+  "name": "employme-root",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": "20.x"
+  },
+  "scripts": {
+    "heroku-postbuild": "cd server && npm install && npx prisma generate && npm run build",
+    "start": "cd server && npm start"
+  }
+}
