@@ -115,8 +115,10 @@ interface ConversationResponse {
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 const SERVER_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") ||
-  "http://localhost:5001";
+  process.env.NEXT_PUBLIC_SOCKET_URL ||
+  (process.env.NEXT_PUBLIC_API_URL?.startsWith("http")
+    ? process.env.NEXT_PUBLIC_API_URL.replace("/api", "")
+    : "https://employme-e4d1ca106e85.herokuapp.com");
 
 export const ChatProvider: React.FC<{ children: ReactNode }> = ({
   children,
