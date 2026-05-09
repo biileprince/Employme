@@ -30,7 +30,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/create-profile"
+                  href="/job-seeker/profile"
                   className="text-muted-foreground hover:text-primary"
                 >
                   Create Profile
@@ -38,7 +38,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/career-resources"
+                  href="#"
                   className="text-muted-foreground hover:text-primary"
                 >
                   Career Resources
@@ -52,7 +52,7 @@ export function Footer() {
             <ul className="space-y-2">
               <li>
                 <Link
-                  href="/post-job"
+                  href="/employer/post-job"
                   className="text-muted-foreground hover:text-primary"
                 >
                   Post a Job
@@ -60,7 +60,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/browse-candidates"
+                  href="/employer/candidates"
                   className="text-muted-foreground hover:text-primary"
                 >
                   Browse Candidates
@@ -68,7 +68,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/pricing"
+                  href="#"
                   className="text-muted-foreground hover:text-primary"
                 >
                   Pricing Plans
