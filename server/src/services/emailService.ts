@@ -1,34 +1,45 @@
-import nodemailer from "nodemailer";
-import crypto from "crypto";
+import { Resend } from "resend";
 
-// Email transporter configuration
+const resend = new Resend(process.env.RESEND_API_KEY || "dummy_key");
+
+// Email transporter configuration (using Resend under the hood)
 const createTransporter = () => {
-  const config = {
-    host: process.env.SMTP_HOST || "sandbox.smtp.mailtrap.io",
-    port: parseInt(process.env.SMTP_PORT || "2525"),
-    secure: false, // true for 465, false for other ports
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
+  return {
+    sendMail: async (mailOptions: any) => {
+      try {
+        const { from, to, subject, html } = mailOptions;
+        
+        // Extract the actual email string if from is an object
+        const fromEmail = typeof from === 'object' && from.address ? from.address : from;
+        const fromName = typeof from === 'object' && from.name ? from.name : "EmployMe";
+        
+        // Use the configured RESEND_FROM_EMAIL
+        const sender = process.env.RESEND_FROM_EMAIL || `${fromName} <${fromEmail}>`;
+        
+        const response = await resend.emails.send({
+          from: sender,
+          to: Array.isArray(to) ? to : [to],
+          subject: subject,
+          html: html,
+        });
+
+        if (response.error) {
+          throw new Error(response.error.message);
+        }
+
+        return { messageId: response.data?.id };
+      } catch (error) {
+        console.error("Resend error:", error);
+        throw error;
+      }
     },
-    // Additional configuration for better reliability
-    connectionTimeout: 60000, // 60 seconds
-    greetingTimeout: 30000, // 30 seconds
-    socketTimeout: 60000, // 60 seconds
-    // For development with Mailtrap
-    tls: {
-      rejectUnauthorized: false,
-    },
+    verify: async () => {
+      if (!process.env.RESEND_API_KEY) {
+        throw new Error("RESEND_API_KEY is not configured");
+      }
+      return true;
+    }
   };
-
-  console.log("Creating email transporter with config:", {
-    host: config.host,
-    port: config.port,
-    user: config.auth.user ? "***hidden***" : "not set",
-    pass: config.auth.pass ? "***hidden***" : "not set",
-  });
-
-  return nodemailer.createTransport(config);
 };
 
 // Generate verification code (6-digit)
