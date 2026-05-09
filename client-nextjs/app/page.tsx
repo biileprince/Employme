@@ -288,7 +288,7 @@ export default function Home() {
                           Explore Opportunities
                         </Button>
                       </Link>
-                      <Link href="/signup">
+                      <Link href="/auth/signup">
                         <Button
                           variant="outline"
                           size="lg"
@@ -813,7 +813,7 @@ export default function Home() {
                   </p>
 
                   <div className="flex flex-col gap-4 sm:flex-row">
-                    <Link href="/signup" className="flex-1">
+                    <Link href="/auth/signup" className="flex-1">
                       <Button
                         size="lg"
                         className="w-full px-6 py-4 text-lg font-semibold shadow-lg"
@@ -895,7 +895,7 @@ export default function Home() {
                     experienced professional, your next opportunity is here.
                   </p>
                   <div className="flex flex-col gap-4 sm:flex-row">
-                    <Link href="/signup">
+                    <Link href="/auth/signup">
                       <Button
                         size="lg"
                         variant="secondary"

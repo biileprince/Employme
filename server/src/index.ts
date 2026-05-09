@@ -41,14 +41,20 @@ app.set("trust proxy", 1); // Trust first proxy (Heroku load balancer)
 const httpServer = createServer(app);
 const prisma = new PrismaClient();
 
+// Build allowed origins from environment
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.NEXT_CLIENT_URL,
+  process.env.CLIENT_URL,
+  "http://localhost:5174",
+  "http://localhost:5173",
+  "http://localhost:3000",
+].filter((origin): origin is string => !!origin);
+
 // Initialize Socket.IO for real-time features
 const io = new Server(httpServer, {
   cors: {
-    origin: [
-      process.env.CLIENT_URL || "http://localhost:5174",
-      "http://localhost:5173",
-      "http://localhost:3000", // Next.js client
-    ],
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -73,12 +79,7 @@ app.use(morgan("dev"));
 // CORS configuration
 app.use(
   cors({
-    origin: [
-      process.env.CLIENT_URL || "http://localhost:5174",
-      "http://localhost:5175",
-      "http://localhost:5173",
-      "http://localhost:3000", // Next.js client
-    ],
+    origin: allowedOrigins,
     credentials: true,
   }),
 );

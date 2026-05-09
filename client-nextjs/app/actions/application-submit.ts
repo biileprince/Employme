@@ -83,15 +83,18 @@ async function uploadAttachments(
   type: string = "APPLICATION",
 ): Promise<{ attachmentIds: string[] }> {
   const cookieStore = await cookies();
-  const token = cookieStore.get("token")?.value;
+  const allCookies = cookieStore.getAll();
+  const cookieHeader = allCookies
+    .map((c) => `${c.name}=${c.value}`)
+    .join("; ");
 
   const formData = new FormData();
   files.forEach((file) => formData.append("files", file));
   formData.append("type", type);
 
   const headers: HeadersInit = {};
-  if (token) {
-    headers["Cookie"] = `token=${token}`;
+  if (cookieHeader) {
+    headers["Cookie"] = cookieHeader;
   }
 
   const response = await fetch(`${API_URL}/attachments/upload`, {

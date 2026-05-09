@@ -74,11 +74,14 @@ export async function uploadFiles(formData: FormData): Promise<{
 }> {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get("token")?.value;
+    const allCookies = cookieStore.getAll();
+    const cookieHeader = allCookies
+      .map((c) => `${c.name}=${c.value}`)
+      .join("; ");
 
     const headers: HeadersInit = {};
-    if (token) {
-      headers["Cookie"] = `token=${token}`;
+    if (cookieHeader) {
+      headers["Cookie"] = cookieHeader;
     }
 
     const response = await fetch(`${API_URL}/attachments/upload`, {
