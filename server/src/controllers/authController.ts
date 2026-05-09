@@ -47,14 +47,14 @@ const setAuthCookies = (res: Response, userId: string) => {
   res.cookie("access_token", accessToken, {
     httpOnly: true,
     secure: isProd,
-    sameSite: isProd ? "strict" : "lax",
+    sameSite: isProd ? "none" : "lax",
     maxAge: 15 * 60 * 1000, // 15 minutes
   });
 
   res.cookie("refresh_token", refreshToken, {
     httpOnly: true,
     secure: isProd,
-    sameSite: isProd ? "strict" : "lax",
+    sameSite: isProd ? "none" : "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     path: "/api/auth/refresh",
   });
@@ -64,14 +64,14 @@ const clearAuthCookies = (res: Response) => {
   res.cookie("access_token", "", {
     httpOnly: true,
     secure: isProd,
-    sameSite: isProd ? "strict" : "lax",
+    sameSite: isProd ? "none" : "lax",
     expires: new Date(0),
   });
 
   res.cookie("refresh_token", "", {
     httpOnly: true,
     secure: isProd,
-    sameSite: isProd ? "strict" : "lax",
+    sameSite: isProd ? "none" : "lax",
     expires: new Date(0),
     path: "/api/auth/refresh",
   });
@@ -80,7 +80,7 @@ const clearAuthCookies = (res: Response) => {
   res.cookie("token", "", {
     httpOnly: true,
     secure: isProd,
-    sameSite: isProd ? "strict" : "lax",
+    sameSite: isProd ? "none" : "lax",
     expires: new Date(0),
   });
 };
